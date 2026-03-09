@@ -1,0 +1,166 @@
+#!/usr/bin/env python3
+"""
+voice-context — output a compact style-priming block for prompt injection.
+
+Usage:
+  voice-context [--human-id ID] [--db PATH] [--profile PATH]
+
+Reads the human's style profile and outputs a single compact paragraph
+that primes the model toward the human's communication register.
+
+Outputs nothing (empty, exit 0) if:
+  - The human has opted out of voice learning
+  - No style profile exists
+  - Profile is malformed
+
+This output is designed to be prepended to AM's system context so replies
+naturally drift toward how the human communicates.
+"""
+
+import argparse
+import json
+import os
+import sqlite3
+import sys
+from pathlib import Path
+
+STATE_DIR = Path(os.environ.get("OPENCLAW_STATE_DIR", Path.home() / ".openclaw"))
+BOT_DIR = STATE_DIR / "user" / "augmentedmike_bot"
+DEFAULT_DB = BOT_DIR / "voice" / "voice.db"
+DEFAULT_PROFILE = BOT_DIR / "voice" / "style-profile.json"
+
+
+def is_opted_out(db_path: Path, human_id: str) -> bool:
+    """Return True if the human has opted out of voice learning."""
+    if not db_path.exists():
+        return False
+    try:
+        con = sqlite3.connect(str(db_path))
+        row = con.execute(
+            "SELECT opted_out FROM voice_settings WHERE human_id = ?", (human_id,)
+        ).fetchone()
+        con.close()
+        return bool(row and row[0])
+    except Exception:
+        return False
+
+
+def build_priming_block(style: dict) -> str:
+    """
+    Build a compact paragraph that primes the model toward the human's register.
+    Format: 'The human you are talking to writes like this: ...'
+    """
+    parts = []
+
+    # Sentence length
+    avg = style.get("avg_sentence_length")
+    if avg is not None:
+        if int(avg) <= 5:
+            parts.append("very short sentences")
+        elif int(avg) <= 10:
+            parts.append("short to medium sentences")
+        else:
+            parts.append("longer sentences")
+
+    # Capitalization
+    cap = style.get("capitalization_style", "")
+    if cap and "lowercase" in cap.lower():
+        parts.append("writes almost entirely lowercase including 'i'")
+
+    # Vocabulary register
+    vocab = style.get("vocabulary_register", "")
+    if vocab:
+        # Extract the key descriptor without the long explanation
+        if "casual" in vocab.lower() and "technical" in vocab.lower():
+            parts.append("mixes casual language with technical terms naturally")
+
+    # Characteristic phrases
+    phrases = style.get("characteristic_phrases", [])
+    if phrases:
+        # Take up to 3 short examples
+        examples = [p.split(" (")[0].split(" —")[0].strip() for p in phrases[:3]]
+        examples = [e for e in examples if len(e) < 40]
+        if examples:
+            parts.append(f"uses phrases like {', '.join(repr(e) for e in examples)}")
+
+    # Filler reactions
+    fillers = style.get("filler_reactions", [])
+    if fillers:
+        top = [f for f in fillers[:4] if len(f) < 10]
+        if top:
+            parts.append(f"favors '{top[0]}' not formal equivalents")
+
+    # Never says
+    never = style.get("never_says", [])
+    if never:
+        top_never = [n for n in never[:2] if len(n) < 30]
+        if top_never:
+            parts.append(f"never says things like '{top_never[0]}'")
+
+    # Energy markers — brief
+    energy = style.get("energy_markers", "")
+    if energy and "ALL CAPS" not in energy:
+        parts.append("no ALL CAPS, no excessive punctuation")
+
+    # Formality
+    formality = style.get("formality_level")
+    if formality is not None and int(formality) <= 3:
+        parts.append("skips pleasantries and formal sign-offs")
+
+    # Summary as anchor
+    summary = style.get("overall_voice_summary", "")
+    if summary:
+        # Use first sentence of summary as the lead
+        first_sentence = summary.split(".")[0].strip()
+        if first_sentence and len(first_sentence) < 150:
+            lead = first_sentence + "."
+        else:
+            lead = ""
+    else:
+        lead = ""
+
+    if not parts:
+        return ""
+
+    body = ", ".join(parts)
+    if lead:
+        return f"The human you are talking to writes like this: {body}. {lead}"
+    else:
+        return f"The human you are talking to writes like this: {body}."
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Output style-priming block for prompt injection")
+    parser.add_argument("--human-id", default="michael", help="Human ID (default: michael)")
+    parser.add_argument("--db", default=str(DEFAULT_DB), help="Path to voice.db")
+    parser.add_argument("--profile", default=str(DEFAULT_PROFILE), help="Path to style-profile.json")
+    args = parser.parse_args()
+
+    db_path = Path(args.db)
+    profile_path = Path(args.profile)
+
+    # Check opt-out
+    if is_opted_out(db_path, args.human_id):
+        sys.exit(0)
+
+    # Load profile
+    if not profile_path.exists():
+        sys.exit(0)
+
+    try:
+        with open(profile_path) as f:
+            profile = json.load(f)
+    except Exception:
+        sys.exit(0)
+
+    style = profile.get("style")
+    if not style or not isinstance(style, dict):
+        sys.exit(0)
+
+    block = build_priming_block(style)
+    if block:
+        print(block)
+
+
+if __name__ == "__main__":
+    main()

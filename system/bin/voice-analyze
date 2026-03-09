@@ -1,0 +1,381 @@
+#!/usr/bin/env bash
+# voice-analyze — analyze human voice corpus and produce a style profile
+#
+# Usage:
+#   voice-analyze [--human-id ID] [--force] [--min-messages N]
+#
+# Options:
+#   --human-id ID      Human to analyze (default: michael)
+#   --force            Run even if message count hasn't changed
+#   --min-messages N   Minimum messages required to run analysis (default: 10)
+#
+# Outputs:
+#   ~/am/user/augmentedmike_bot/voice/style-profile.json
+#   ~/am/memory/michael-voice-profile.md
+#
+# Cron: runs nightly, or triggered after 50 new messages
+
+set -euo pipefail
+
+CLAUDE_BIN="/Users/augmentedmike/.local/bin/claude"
+VOICE_DB="${OPENCLAW_STATE_DIR:-$HOME/am}/user/augmentedmike_bot/voice/voice.db"
+VOICE_DIR="${OPENCLAW_STATE_DIR:-$HOME/am}/user/augmentedmike_bot/voice"
+MEMORY_DIR="${OPENCLAW_STATE_DIR:-$HOME/am}/memory"
+LOG_PREFIX="[voice-analyze]"
+
+# ── defaults ──────────────────────────────────────────────────────────────────
+HUMAN_ID="michael"
+FORCE=0
+MIN_MESSAGES=10
+
+# ── helpers ───────────────────────────────────────────────────────────────────
+die()  { echo "$LOG_PREFIX ERROR: $*" >&2; exit 1; }
+info() { echo "$LOG_PREFIX $*"; }
+
+usage() {
+  cat >&2 <<EOF
+Usage: voice-analyze [options]
+
+Options:
+  --human-id ID      Human to analyze (default: michael)
+  --force            Force run even if no new messages
+  --min-messages N   Minimum messages required (default: 10)
+  --help             Show this help
+
+EOF
+  exit 1
+}
+
+# ── argument parsing ──────────────────────────────────────────────────────────
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --help|-h)         usage ;;
+    --human-id)        HUMAN_ID="${2:-}"; [[ -n "$HUMAN_ID" ]] || die "--human-id requires a value"; shift 2 ;;
+    --force)           FORCE=1; shift ;;
+    --min-messages)    MIN_MESSAGES="${2:-}"; [[ -n "$MIN_MESSAGES" ]] || die "--min-messages requires a value"; shift 2 ;;
+    *)                 die "Unknown argument: $1" ;;
+  esac
+done
+
+# ── dependency checks ─────────────────────────────────────────────────────────
+[[ -f "$VOICE_DB" ]] || die "voice.db not found at $VOICE_DB"
+[[ -x "$CLAUDE_BIN" ]] || die "Claude CLI not found at $CLAUDE_BIN"
+command -v sqlite3 &>/dev/null || die "sqlite3 not found"
+command -v python3 &>/dev/null || die "python3 not found"
+
+# ── ensure schema exists ──────────────────────────────────────────────────────
+sqlite3 "$VOICE_DB" << 'SQL'
+CREATE TABLE IF NOT EXISTS human_voice (
+  id TEXT PRIMARY KEY,
+  human_id TEXT NOT NULL,
+  channel TEXT NOT NULL,
+  message TEXT NOT NULL,
+  sent_at TEXT NOT NULL,
+  embedding BLOB,
+  opted_out INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_voice_human_id ON human_voice(human_id);
+CREATE INDEX IF NOT EXISTS idx_voice_sent_at ON human_voice(sent_at);
+CREATE TABLE IF NOT EXISTS voice_settings (
+  human_id TEXT PRIMARY KEY,
+  opted_out INTEGER NOT NULL DEFAULT 0,
+  opted_out_at TEXT,
+  learning_active INTEGER NOT NULL DEFAULT 1,
+  last_analyzed_at TEXT,
+  message_count_at_last_analysis INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+);
+SQL
+
+# ── check opt-out ─────────────────────────────────────────────────────────────
+opted_out=$(sqlite3 "$VOICE_DB" "SELECT COALESCE(opted_out, 0) FROM voice_settings WHERE human_id='${HUMAN_ID}';" 2>/dev/null || echo "0")
+if [[ "$opted_out" == "1" ]]; then
+  info "Human $HUMAN_ID has opted out of voice learning. Exiting."
+  exit 0
+fi
+
+# ── check message count ───────────────────────────────────────────────────────
+total_count=$(sqlite3 "$VOICE_DB" "SELECT COUNT(*) FROM human_voice WHERE human_id='${HUMAN_ID}' AND opted_out=0;" 2>/dev/null || echo "0")
+last_count=$(sqlite3 "$VOICE_DB" "SELECT COALESCE(message_count_at_last_analysis, 0) FROM voice_settings WHERE human_id='${HUMAN_ID}';" 2>/dev/null || echo "0")
+new_messages=$(( total_count - last_count ))
+
+info "Messages: total=$total_count, at-last-analysis=$last_count, new=$new_messages"
+
+if [[ "$total_count" -lt "$MIN_MESSAGES" ]]; then
+  info "Not enough messages ($total_count < $MIN_MESSAGES minimum). Exiting."
+  exit 0
+fi
+
+if [[ "$FORCE" -eq 0 && "$new_messages" -lt 1 ]]; then
+  info "No new messages since last analysis. Use --force to override."
+  exit 0
+fi
+
+# ── prepare output dirs ───────────────────────────────────────────────────────
+mkdir -p "$VOICE_DIR" "$MEMORY_DIR"
+
+PROFILE_JSON="$VOICE_DIR/style-profile.json"
+PROFILE_MD="$MEMORY_DIR/michael-voice-profile.md"
+
+# ── fetch messages ────────────────────────────────────────────────────────────
+info "Fetching messages for $HUMAN_ID from voice.db..."
+
+# Fetch up to 500 most recent messages for full corpus analysis
+messages_raw=$(sqlite3 -separator $'\t' "$VOICE_DB" \
+  "SELECT channel, message, sent_at FROM human_voice WHERE human_id='${HUMAN_ID}' AND opted_out=0 ORDER BY sent_at DESC LIMIT 500;")
+
+if [[ -z "$messages_raw" ]]; then
+  info "No messages found for human_id='$HUMAN_ID'. Exiting."
+  exit 0
+fi
+
+message_count=$(echo "$messages_raw" | wc -l | tr -d ' ')
+info "Loaded $message_count messages for analysis."
+
+# ── load existing profile if present ─────────────────────────────────────────
+existing_profile=""
+if [[ -f "$PROFILE_JSON" ]]; then
+  existing_profile=$(cat "$PROFILE_JSON")
+  info "Found existing profile — will update incrementally."
+fi
+
+# ── build analysis prompt ─────────────────────────────────────────────────────
+info "Sending corpus to Claude for style analysis..."
+
+PROMPT=$(python3 - "$HUMAN_ID" "$message_count" "$existing_profile" << 'PYEOF'
+import sys, json
+
+human_id = sys.argv[1]
+msg_count = sys.argv[2]
+existing = sys.argv[3]
+
+existing_section = ""
+if existing:
+    try:
+        prof = json.loads(existing)
+        existing_section = f"""
+EXISTING PROFILE (update and refine this — do not discard observations):
+{json.dumps(prof, indent=2)}
+
+"""
+    except Exception:
+        pass
+
+print(f"""You are analyzing the writing style of a real person named {human_id} based on their actual messages.
+
+Your goal: produce a precise, data-driven style profile that could be used by an AI to write in {human_id}'s authentic voice.
+{existing_section}
+CORPUS: {msg_count} messages from {human_id} across channels (telegram, claude-code, inbox).
+
+The messages are provided below as: [channel] sent_at | message
+
+ANALYZE for:
+1. avg_sentence_length - typical word count per sentence (short/medium/long, give a number)
+2. sentence_length_variance - does he write both long and short? or consistent?
+3. capitalization_style - all lowercase? Sentence case? Mixed? Specific patterns?
+4. punctuation_style - use of ellipses, em-dashes, commas, exclamation marks, question marks
+5. opening_patterns - how does he typically start messages? examples
+6. closing_patterns - how does he end messages? just stops? signs off?
+7. vocabulary_register - casual/technical/slang mix, examples
+8. characteristic_phrases - phrases he actually uses frequently (with examples)
+9. filler_reactions - short reaction words he uses (yeah/yep/ok/okay/sure/cool etc)
+10. never_says - formal or AI-sounding words/phrases he avoids
+11. energy_markers - how urgency/excitement/frustration shows in writing
+12. topic_transitions - how does he switch topics? or does he?
+13. question_style - how he asks questions (rhetorical? direct? hedged?)
+14. correction_style - how he clarifies or corrects himself
+15. humor_style - dry/sarcastic/punny/absent?
+16. formality_level - 1-10 scale (1=texts to best friend, 10=formal report)
+17. overall_voice_summary - 3-5 sentences capturing the essential feel of his writing
+
+Return ONLY valid JSON matching this exact structure (no markdown fences, no explanation):
+{{
+  "human_id": "{human_id}",
+  "analyzed_at": "ISO8601_TIMESTAMP_HERE",
+  "message_sample_size": {msg_count},
+  "style": {{
+    "avg_sentence_length": 0,
+    "sentence_length_variance": "",
+    "capitalization_style": "",
+    "punctuation_style": "",
+    "opening_patterns": [],
+    "closing_patterns": [],
+    "vocabulary_register": "",
+    "characteristic_phrases": [],
+    "filler_reactions": [],
+    "never_says": [],
+    "energy_markers": "",
+    "topic_transitions": "",
+    "question_style": "",
+    "correction_style": "",
+    "humor_style": "",
+    "formality_level": 0,
+    "overall_voice_summary": ""
+  }}
+}}
+""")
+PYEOF
+)
+
+# ── append messages to prompt ─────────────────────────────────────────────────
+FULL_PROMPT="${PROMPT}
+
+MESSAGES:
+${messages_raw}"
+
+# ── call Claude ───────────────────────────────────────────────────────────────
+info "Calling Claude for analysis (this may take ~30s)..."
+raw_output=$(CLAUDECODE="" "$CLAUDE_BIN" \
+  --model claude-haiku-4-5-20251001 \
+  -p "$FULL_PROMPT" 2>&1) || die "Claude call failed"
+
+# ── parse and validate JSON ───────────────────────────────────────────────────
+profile_json=$(python3 - "$raw_output" << 'PYEOF'
+import sys, json, re, datetime
+
+raw = sys.argv[1]
+
+# Strip markdown fences if present
+raw = re.sub(r'^\s*```(?:json)?\s*', '', raw, flags=re.MULTILINE)
+raw = re.sub(r'^\s*```\s*$', '', raw, flags=re.MULTILINE)
+
+# Extract JSON object
+start = raw.find('{')
+end = raw.rfind('}')
+if start == -1 or end == -1:
+    print("ERROR: no JSON object found in Claude output", file=sys.stderr)
+    print(raw[:500], file=sys.stderr)
+    sys.exit(1)
+
+json_str = raw[start:end+1]
+
+try:
+    data = json.loads(json_str)
+except json.JSONDecodeError as e:
+    print(f"ERROR: invalid JSON: {e}", file=sys.stderr)
+    print(json_str[:500], file=sys.stderr)
+    sys.exit(1)
+
+# Fill in actual timestamp
+data['analyzed_at'] = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+
+print(json.dumps(data, indent=2))
+PYEOF
+)
+
+if [[ -z "$profile_json" ]]; then
+  die "Failed to parse style profile JSON from Claude output."
+fi
+
+info "Style profile parsed successfully."
+
+# ── write style-profile.json ──────────────────────────────────────────────────
+echo "$profile_json" > "$PROFILE_JSON"
+info "Written: $PROFILE_JSON"
+
+# ── write michael-voice-profile.md ───────────────────────────────────────────
+python3 - "$PROFILE_JSON" "$PROFILE_MD" << 'PYEOF'
+import sys, json, datetime
+
+profile_path = sys.argv[1]
+output_path = sys.argv[2]
+
+with open(profile_path) as f:
+    p = json.load(f)
+
+s = p.get('style', {})
+analyzed_at = p.get('analyzed_at', datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'))
+sample_size = p.get('message_sample_size', 0)
+human_id = p.get('human_id', 'michael')
+
+def fmt_list(items, prefix="- "):
+    if not items:
+        return "*(none identified)*"
+    return "\n".join(f"{prefix}{i}" for i in items)
+
+md = f"""# Michael's Voice Profile
+
+> Auto-generated by voice-analyze from {sample_size} messages.
+> Last updated: {analyzed_at}
+
+## Overview
+
+{s.get('overall_voice_summary', '')}
+
+**Formality level:** {s.get('formality_level', '?')}/10 (1 = texts to best friend, 10 = formal report)
+
+## Sentence Structure
+
+- **Average length:** {s.get('avg_sentence_length', '?')} words
+- **Variance:** {s.get('sentence_length_variance', '')}
+- **Question style:** {s.get('question_style', '')}
+- **Correction style:** {s.get('correction_style', '')}
+- **Topic transitions:** {s.get('topic_transitions', '')}
+
+## Writing Habits
+
+- **Capitalization:** {s.get('capitalization_style', '')}
+- **Punctuation:** {s.get('punctuation_style', '')}
+- **Humor:** {s.get('humor_style', '')}
+
+## How He Opens and Closes
+
+**Opening patterns:**
+{fmt_list(s.get('opening_patterns', []))}
+
+**Closing patterns:**
+{fmt_list(s.get('closing_patterns', []))}
+
+## Vocabulary and Phrases
+
+**Register:** {s.get('vocabulary_register', '')}
+
+**Characteristic phrases he actually uses:**
+{fmt_list(s.get('characteristic_phrases', []))}
+
+**Filler and reaction words:**
+{fmt_list(s.get('filler_reactions', []))}
+
+## What He Never Says
+
+These formal or AI-sounding words/phrases are absent from his writing:
+{fmt_list(s.get('never_says', []))}
+
+## Energy and Emotion
+
+{s.get('energy_markers', '')}
+
+## Usage Notes
+
+When writing as Michael or in his voice:
+- Match formality level {s.get('formality_level', '?')}/10
+- Use his characteristic phrases naturally, not as a checklist
+- Avoid words in the "never says" list
+- Match capitalization and punctuation style exactly
+- Keep energy markers authentic — don't inject energy he doesn't show
+"""
+
+with open(output_path, 'w') as f:
+    f.write(md)
+
+print(f"Written: {output_path}")
+PYEOF
+
+# ── QMD index the markdown ────────────────────────────────────────────────────
+info "Indexing $PROFILE_MD in memory..."
+CLAUDECODE="" openclaw memory index 2>/dev/null && info "Memory indexed." || info "Memory index skipped (non-fatal)."
+
+# ── update voice_settings ─────────────────────────────────────────────────────
+now_iso=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+sqlite3 "$VOICE_DB" << SQL
+INSERT INTO voice_settings (human_id, opted_out, learning_active, last_analyzed_at, message_count_at_last_analysis)
+VALUES ('${HUMAN_ID}', 0, 1, '${now_iso}', ${total_count})
+ON CONFLICT(human_id) DO UPDATE SET
+  last_analyzed_at = '${now_iso}',
+  message_count_at_last_analysis = ${total_count};
+SQL
+
+info "Updated voice_settings: last_analyzed_at=$now_iso, message_count=$total_count"
+info "Done. Style profile at: $PROFILE_JSON"
+info "Voice profile markdown at: $PROFILE_MD"

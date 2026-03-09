@@ -1,0 +1,184 @@
+#!/usr/bin/env bash
+# mc-smoke — confirm MiniClaw systems and tools are present and functional
+set -euo pipefail
+
+PASS=0
+FAIL=0
+WARN=0
+
+pass() { echo "  ✓  $1"; PASS=$(( PASS + 1 )); }
+fail() { echo "  ✗  $1  →  $2"; FAIL=$(( FAIL + 1 )); }
+warn() { echo "  ⚠  $1  →  $2"; WARN=$(( WARN + 1 )); }
+section() { echo ""; echo "── $1"; }
+
+OPENCLAW_DIR="${HOME}/.openclaw"
+MINICLAW_DIR="$OPENCLAW_DIR/miniclaw"
+VAULT_ROOT="$MINICLAW_DIR/system/vault"
+
+# ── mc-vault ──────────────────────────────────────────────────────────────────
+section "mc-vault"
+
+if command -v mc-vault &>/dev/null; then
+  pass "on PATH ($(command -v mc-vault))"
+else
+  fail "not found" "run installer: ./install.sh"
+fi
+
+if [[ -f "$VAULT_ROOT/key.txt" ]]; then
+  pass "vault initialized (key.txt present)"
+else
+  fail "vault not initialized" "run: mc-vault init"
+fi
+
+TEST_VAL="smoke-test-$$"
+if OPENCLAW_VAULT_ROOT="$VAULT_ROOT" mc-vault set _smoke_test "$TEST_VAL" &>/dev/null 2>&1 && \
+   OPENCLAW_VAULT_ROOT="$VAULT_ROOT" mc-vault export _smoke_test 2>/dev/null | grep -q "$TEST_VAL"; then
+  pass "encrypt/decrypt roundtrip ok"
+  OPENCLAW_VAULT_ROOT="$VAULT_ROOT" mc-vault rm _smoke_test &>/dev/null 2>&1 || true
+else
+  fail "encrypt/decrypt failed" "check age binaries and vault key"
+  OPENCLAW_VAULT_ROOT="$VAULT_ROOT" mc-vault rm _smoke_test &>/dev/null 2>&1 || true
+fi
+
+# ── age ───────────────────────────────────────────────────────────────────────
+section "age"
+
+for bin in /opt/homebrew/bin/age /opt/homebrew/bin/age-keygen; do
+  if [[ -x "$bin" ]]; then
+    pass "$bin"
+  else
+    fail "$bin" "brew install age"
+  fi
+done
+
+# ── qmd (optional — memory injection) ────────────────────────────────────────
+section "qmd  [optional]"
+
+if command -v qmd &>/dev/null; then
+  pass "on PATH ($(command -v qmd))"
+
+  for col in mc-memory workspace; do
+    if qmd collection list 2>/dev/null | grep -q "^${col}"; then
+      files=$(qmd collection list 2>/dev/null | grep -A3 "^${col}" | grep "Files:" | awk '{print $2}' || echo "0")
+      pass "collection '$col' (${files:-0} files)"
+    else
+      warn "collection '$col' missing" "run: qmd collection add $col <path>"
+    fi
+  done
+
+  if qmd search "identity" -n 1 &>/dev/null 2>&1; then
+    pass "search functional"
+  else
+    warn "search returned no results" "run: qmd update && qmd embed"
+  fi
+else
+  warn "qmd not found" "memory injection unavailable — run: bun install -g qmd"
+fi
+
+# ── soul-backups (optional) ───────────────────────────────────────────────────
+section "soul-backups  [optional]"
+
+SNAPSHOTS_DIR="${OPENCLAW_DIR}/soul-backups"
+if [[ -d "$SNAPSHOTS_DIR" ]]; then
+  count=$(ls "$SNAPSHOTS_DIR" 2>/dev/null | wc -l | tr -d ' ')
+  pass "soul-backups present ($count snapshots)"
+else
+  warn "soul-backups dir missing" "run: mkdir -p $SNAPSHOTS_DIR"
+fi
+
+# ── inbox ─────────────────────────────────────────────────────────────────────
+section "inbox"
+
+INBOX_CMD="${HOME}/.claude-inbox/msg"
+if [[ -x "$INBOX_CMD" ]]; then
+  pass "CLI present and executable"
+else
+  fail "CLI missing or not executable" "$INBOX_CMD"
+fi
+
+if "$INBOX_CMD" check &>/dev/null 2>&1; then
+  pass "check command functional"
+else
+  warn "check returned non-zero" "may be empty or key issue"
+fi
+
+# ── git butler ────────────────────────────────────────────────────────────────
+section "git butler"
+
+GITBUTLER_BIN="/Applications/GitButler.app/Contents/MacOS/gitbutler-tauri"
+if [[ -x "$GITBUTLER_BIN" ]]; then
+  pass "gitbutler-tauri present ($GITBUTLER_BIN)"
+else
+  fail "gitbutler-tauri not found" "brew install --cask gitbutler"
+fi
+
+# ── openclaw ──────────────────────────────────────────────────────────────────
+section "openclaw"
+
+if command -v openclaw &>/dev/null; then
+  pass "on PATH — $(openclaw --version 2>/dev/null | head -1 || echo 'version unknown')"
+else
+  fail "not found" "npm install -g openclaw@latest"
+fi
+
+if [[ -f "$OPENCLAW_DIR/openclaw.json" ]]; then
+  pass "openclaw.json present"
+else
+  fail "openclaw.json missing" "$OPENCLAW_DIR/openclaw.json"
+fi
+
+# ── runtime ───────────────────────────────────────────────────────────────────
+section "runtime"
+
+for tool in bun node; do
+  if command -v "$tool" &>/dev/null; then
+    ver=$("$tool" --version 2>/dev/null | head -1)
+    pass "$tool ($ver)"
+  else
+    fail "$tool not found" "required — run installer"
+  fi
+done
+
+# uv is optional
+if command -v uv &>/dev/null; then
+  pass "uv ($(uv --version 2>/dev/null | head -1))"
+else
+  warn "uv not found" "optional — brew install uv"
+fi
+
+# ── plugin tests ──────────────────────────────────────────────────────────────
+section "plugin tests"
+
+MINICLAW_PLUGINS_DIR="$MINICLAW_DIR/plugins"
+
+if ! command -v bun &>/dev/null; then
+  warn "bun not found" "cannot run plugin tests"
+elif [[ ! -d "$MINICLAW_PLUGINS_DIR" ]]; then
+  warn "plugins dir not found" "$MINICLAW_PLUGINS_DIR"
+else
+  for plugin_dir in "$MINICLAW_PLUGINS_DIR"/*/; do
+    plugin_name="$(basename "$plugin_dir")"
+    # Only run if there are test files
+    if ! find "$plugin_dir" -not -path "*/node_modules/*" \( -name "*.test.ts" -o -name "*.test.js" \) 2>/dev/null | grep -q .; then
+      warn "$plugin_name" "no tests found"
+      continue
+    fi
+    # Run tests, capture output
+    test_out=$(cd "$plugin_dir" && bun test 2>&1 || true)
+    passed=$(echo "$test_out" | grep -oE '[0-9]+ pass' | awk '{print $1}' || echo 0)
+    failed=$(echo "$test_out" | grep -oE '[0-9]+ fail' | awk '{print $1}' || echo 0)
+    if [[ "${failed:-0}" -gt 0 ]]; then
+      fail "$plugin_name tests" "$failed failing — run: cd $plugin_dir && bun test"
+    else
+      pass "$plugin_name tests (${passed:-0} passed)"
+    fi
+  done
+fi
+
+# ── summary ───────────────────────────────────────────────────────────────────
+echo ""
+echo "────────────────────────────────────────"
+echo "  ${PASS} passed  ${WARN} warned  ${FAIL} failed"
+echo "────────────────────────────────────────"
+
+[[ $FAIL -eq 0 ]]
