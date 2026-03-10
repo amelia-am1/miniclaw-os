@@ -211,6 +211,32 @@ ok "~/.openclaw/projects/"
 # ── Step 6: Install plugins ───────────────────────────────────────────────────
 step "Step 6: miniclaw plugins"
 
+# Migrated plugins: install to $MINICLAW_DIR/<name>/ (standalone CLI)
+MIGRATED_PLUGINS=(vault designer)
+
+for migrated in "${MIGRATED_PLUGINS[@]}"; do
+  src="$REPO_DIR/$migrated"
+  dest="$MINICLAW_DIR/$migrated"
+  if [[ ! -d "$src" ]]; then
+    warn "Migrated plugin source not found: $src"
+    continue
+  fi
+  already_exists=false
+  [[ -d "$dest" ]] && already_exists=true
+  rsync -a --exclude='node_modules' --exclude='.git' "$src/" "$dest/"
+  $already_exists && ok "Updated:   $migrated (standalone)" || ok "Installed: $migrated (standalone)"
+  # Make CLI executable
+  [[ -f "$dest/cli" ]] && chmod +x "$dest/cli"
+  [[ -f "$dest/cli.ts" ]] && chmod +x "$dest/cli.ts"
+  # Install dependencies
+  if [[ -f "$dest/package.json" ]]; then
+    (cd "$dest" && bun install --frozen-lockfile 2>/dev/null || bun install 2>/dev/null) \
+      && ok "           deps installed" \
+      || warn "           bun install failed in $migrated"
+  fi
+done
+
+# Legacy plugins: install to $MINICLAW_DIR/plugins/mc-<name>/ (openclaw-hosted)
 for plugin_src in "$REPO_DIR/plugins"/*/; do
   plugin_name="$(basename "$plugin_src")"
   plugin_dest="$MINICLAW_DIR/plugins/$plugin_name"
@@ -257,7 +283,7 @@ plugin_defaults = {
     },
     "mc-designer": {
         "enabled": True,
-        "config": { "apiKey": "", "model": "gemini-3.1-flash-image-preview", "mediaDir": state_dir + "/media/designer", "defaultWidth": 1024, "defaultHeight": 1024, "vaultBin": "~/.local/bin/mc-vault" },
+        "config": { "apiKey": "", "model": "gemini-3.1-flash-image-preview", "mediaDir": state_dir + "/media/designer", "defaultWidth": 1024, "defaultHeight": 1024, "vaultBin": mcl_dir + "/vault/cli" },
     },
     "mc-kb": {
         "enabled": True,
@@ -273,7 +299,7 @@ plugin_defaults = {
     },
     "mc-trust": {
         "enabled": True,
-        "config": { "agentId": "am", "trustDir": state_dir + "/trust", "vaultBin": mcl_dir + "/system/bin/mc-vault", "sessionTtlMs": 3600000 },
+        "config": { "agentId": "am", "trustDir": state_dir + "/trust", "vaultBin": mcl_dir + "/vault/cli", "sessionTtlMs": 3600000 },
     },
 }
 
@@ -301,10 +327,17 @@ mkdir -p "$LOCAL_BIN"
 for bin_src in "$REPO_DIR/system/bin"/*; do
   [[ -f "$bin_src" ]] || continue
   bin_name="$(basename "$bin_src")"
+  # Migrated CLIs: symlink instead of copy (path derivation needs real location)
+  [[ "$bin_name" == "mc-vault" ]] && continue
+  [[ "$bin_name" == "mc" ]] && { ln -sf "$MINICLAW_DIR/system/bin/mc" "$LOCAL_BIN/mc"; ok "Symlinked: mc → miniclaw/system/bin/mc"; continue; }
   cp "$bin_src" "$LOCAL_BIN/$bin_name"
   chmod +x "$LOCAL_BIN/$bin_name"
   ok "Installed: $bin_name"
 done
+
+# Symlink mc-vault → miniclaw/vault/cli (standalone plugin)
+ln -sf "$MINICLAW_DIR/vault/cli" "$LOCAL_BIN/mc-vault"
+ok "Symlinked: mc-vault → miniclaw/vault/cli"
 
 if [[ ":$PATH:" != *":$LOCAL_BIN:"* ]]; then
   warn "$LOCAL_BIN not in PATH — add to ~/.zshrc: export PATH=\"\$HOME/.local/bin:\$PATH\""
@@ -345,7 +378,7 @@ fi
 step "Step 11: Vault"
 
 VAULT_ROOT="$MINICLAW_DIR/system/vault"
-MC_VAULT="$LOCAL_BIN/mc-vault"
+MC_VAULT="$MINICLAW_DIR/vault/cli"
 
 if [[ ! -f "$VAULT_ROOT/key.txt" ]]; then
   OPENCLAW_VAULT_ROOT="$VAULT_ROOT" "$MC_VAULT" init
@@ -484,13 +517,30 @@ step "Step 13: Shell environment"
 
 for rcfile in "$HOME/.zshrc" "$HOME/.bashrc"; do
   [[ -f "$rcfile" ]] || continue
+
   if grep -q "OPENCLAW_STATE_DIR" "$rcfile"; then
     ok "OPENCLAW_STATE_DIR already in $rcfile"
   else
-    echo "" >> "$rcfile"
-    echo "# MiniClaw — OpenClaw state directory" >> "$rcfile"
-    echo "export OPENCLAW_STATE_DIR=\"$STATE_DIR\"" >> "$rcfile"
+    {
+      echo ""
+      echo "# Am / OpenClaw / MiniClaw"
+      echo "export OPENCLAW_STATE_DIR=\"$STATE_DIR\""
+    } >> "$rcfile"
     ok "Added OPENCLAW_STATE_DIR=$STATE_DIR to $rcfile"
+  fi
+
+  if grep -q "MINICLAW_HOME" "$rcfile"; then
+    ok "MINICLAW_HOME already in $rcfile"
+  else
+    echo "export MINICLAW_HOME=\"$MINICLAW_DIR\"" >> "$rcfile"
+    ok "Added MINICLAW_HOME=$MINICLAW_DIR to $rcfile"
+  fi
+
+  if grep -q "alias oc=" "$rcfile"; then
+    ok "oc alias already in $rcfile"
+  else
+    echo "alias oc='openclaw'" >> "$rcfile"
+    ok "Added oc alias to $rcfile"
   fi
 done
 

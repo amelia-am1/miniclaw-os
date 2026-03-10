@@ -1,48 +1,67 @@
 #!/usr/bin/env bash
-# openclaw-vault — age-encrypted secret store for OpenClaw
-# Usage:
-#   openclaw-vault init                   First-time setup: generate key, create dirs
-#   openclaw-vault set <key> <value>      Store a secret (encrypted at rest)
-#   openclaw-vault set <key> -            Read value from stdin
-#   openclaw-vault get <key>              Retrieve and decrypt a secret
-#   openclaw-vault export <key>           Raw decrypted output (for eval/piping)
-#   openclaw-vault list                   List stored keys with notes
-#   openclaw-vault rm <key>               Remove a secret and its note
-#   openclaw-vault note <key> [text]      Attach/view plaintext description
+# mc vault — age-encrypted secret store
 #
-#   openclaw-vault memo set <name> <text> Store encrypted private note
-#   openclaw-vault memo set <name> -      Read memo from stdin
-#   openclaw-vault memo get <name>        Decrypt and read memo
-#   openclaw-vault memo list              List memo names
-#   openclaw-vault memo rm <name>         Delete memo
+# Call paths:
+#   ~/am/miniclaw/vault/cli <cmd>     Direct
+#   mc vault <cmd>                    Via miniclaw wrapper
+#   oc mc-vault <cmd>                 Via openclaw plugin
+#
+# Usage:
+#   mc vault init                   First-time setup: generate key, create dirs
+#   mc vault set <key> <value>      Store a secret (encrypted at rest)
+#   mc vault set <key> -            Read value from stdin
+#   mc vault get <key>              Retrieve and decrypt a secret
+#   mc vault export <key>           Raw decrypted output (for eval/piping)
+#   mc vault list                   List stored keys with notes
+#   mc vault rm <key>               Remove a secret and its note
+#   mc vault note <key> [text]      Attach/view plaintext description
+#
+#   mc vault memo set <name> <text> Store encrypted private note
+#   mc vault memo set <name> -      Read memo from stdin
+#   mc vault memo get <name>        Decrypt and read memo
+#   mc vault memo list              List memo names
+#   mc vault memo rm <name>         Delete memo
 set -euo pipefail
+
+# ── Resolve MINICLAW_HOME ──────────────────────────────────────────────────────
+# Priority: env var > derive from real script location (follows symlinks)
+if [[ -z "${MINICLAW_HOME:-}" ]]; then
+  SOURCE="${BASH_SOURCE[0]}"
+  while [[ -L "$SOURCE" ]]; do
+    DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
+    SOURCE="$(readlink "$SOURCE")"
+    [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
+  done
+  SCRIPT_DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
+  MINICLAW_HOME="$(dirname "$SCRIPT_DIR")"
+fi
 
 AGE_BIN="${OPENCLAW_AGE_BIN:-/opt/homebrew/bin/age}"
 AGE_KEYGEN_BIN="${OPENCLAW_AGE_KEYGEN_BIN:-/opt/homebrew/bin/age-keygen}"
-VAULT_ROOT="${OPENCLAW_VAULT_ROOT:-${HOME}/.openclaw/miniclaw/system/vault}"
+VAULT_ROOT="${OPENCLAW_VAULT_ROOT:-${MINICLAW_HOME}/system/vault}"
 KEY_FILE="${VAULT_ROOT}/key.txt"
 STORE_DIR="${VAULT_ROOT}/secrets"
 NOTES_DIR="${VAULT_ROOT}/notes"
 MEMOS_DIR="${VAULT_ROOT}/memos"
 
 usage() {
-  echo "openclaw-vault — age-encrypted secret store for OpenClaw"
+  echo "mc vault — age-encrypted secret store"
   echo ""
   echo "Usage:"
-  echo "  openclaw-vault init                   First-time setup (generate key, create dirs)"
-  echo "  openclaw-vault set <key> <value>      Store a secret (encrypted at rest)"
-  echo "  openclaw-vault set <key> -            Read value from stdin"
-  echo "  openclaw-vault get <key>              Retrieve and decrypt a secret"
-  echo "  openclaw-vault export <key>           Raw decrypted output (no label, for piping)"
-  echo "  openclaw-vault list                   List all secrets with notes"
-  echo "  openclaw-vault rm <key>               Remove a secret and its note"
-  echo "  openclaw-vault note <key> [text]      Attach or view plaintext description"
+  echo "  mc vault init                   First-time setup (generate key, create dirs)"
+  echo "  mc vault set <key> <value>      Store a secret (encrypted at rest)"
+  echo "  mc vault set <key> -            Read value from stdin"
+  echo "  mc vault get <key>              Retrieve and decrypt a secret"
+  echo "  mc vault export <key>           Raw decrypted output (no label, for piping)"
+  echo "  mc vault list                   List all secrets with notes"
+  echo "  mc vault rm <key>               Remove a secret and its note"
+  echo "  mc vault note <key> [text]      Attach or view plaintext description"
   echo ""
-  echo "  openclaw-vault memo set <name> <text> Store encrypted private note"
-  echo "  openclaw-vault memo set <name> -      Read memo text from stdin"
-  echo "  openclaw-vault memo get <name>        Decrypt and display memo"
-  echo "  openclaw-vault memo list              List memo names"
-  echo "  openclaw-vault memo rm <name>         Delete a memo"
+  echo "  mc vault memo set <name> <text> Store encrypted private note"
+  echo "  mc vault memo set <name> -      Read memo text from stdin"
+  echo "  mc vault memo get <name>        Decrypt and display memo"
+  echo "  mc vault memo list              List memo names"
+  echo "  mc vault memo rm <name>         Delete a memo"
   echo ""
   echo "Vault dir: ${VAULT_ROOT}"
 }
@@ -50,7 +69,7 @@ usage() {
 require_key() {
   if [[ ! -f "$KEY_FILE" ]]; then
     echo "Error: No age key found at ${KEY_FILE}" >&2
-    echo "Run: openclaw-vault init" >&2
+    echo "Run: mc vault init" >&2
     exit 1
   fi
 }
@@ -69,8 +88,6 @@ case "$cmd" in
       echo "Refusing to overwrite. Delete it manually if you really mean it." >&2
       exit 1
     fi
-    # Refuse to init over existing secrets — prevents accidental key rotation
-    # that would make existing .age files unreadable
     if [[ -d "${VAULT_ROOT}/secrets" ]] && ls "${VAULT_ROOT}/secrets"/*.age &>/dev/null 2>&1; then
       echo "Error: Existing secrets found in ${VAULT_ROOT}/secrets/" >&2
       echo "Cannot init a new key — it would orphan existing encrypted data." >&2
@@ -81,18 +98,18 @@ case "$cmd" in
     chmod 700 "$VAULT_ROOT"
     "${AGE_KEYGEN_BIN}" -o "$KEY_FILE"
     chmod 600 "$KEY_FILE"
-    echo "openclaw-vault initialized at ${VAULT_ROOT}"
+    echo "Vault initialized at ${VAULT_ROOT}"
     echo "Key: ${KEY_FILE}"
     ;;
 
   set)
     require_key
-    key="${1:?Usage: openclaw-vault set <key> <value>}"
+    key="${1:?Usage: mc vault set <key> <value>}"
     shift
     if [[ "${1:-}" == "-" ]]; then
       value=$(cat)
     else
-      value="${*:?Usage: openclaw-vault set <key> <value>}"
+      value="${*:?Usage: mc vault set <key> <value>}"
     fi
     PUB_KEY=$(get_pubkey)
     echo -n "$value" | "${AGE_BIN}" -r "$PUB_KEY" -o "${STORE_DIR}/${key}.age"
@@ -102,7 +119,7 @@ case "$cmd" in
 
   get)
     require_key
-    key="${1:?Usage: openclaw-vault get <key>}"
+    key="${1:?Usage: mc vault get <key>}"
     file="${STORE_DIR}/${key}.age"
     if [[ ! -f "$file" ]]; then
       echo "Error: No secret found for '${key}'" >&2
@@ -115,7 +132,7 @@ case "$cmd" in
 
   export)
     require_key
-    key="${1:?Usage: openclaw-vault export <key>}"
+    key="${1:?Usage: mc vault export <key>}"
     file="${STORE_DIR}/${key}.age"
     if [[ ! -f "$file" ]]; then
       echo "Error: No secret found for '${key}'" >&2
@@ -126,7 +143,7 @@ case "$cmd" in
 
   note)
     require_key
-    key="${1:?Usage: openclaw-vault note <key> [text]}"
+    key="${1:?Usage: mc vault note <key> [text]}"
     shift || true
     note_file="${NOTES_DIR}/${key}.txt"
     if [[ $# -gt 0 ]]; then
@@ -160,7 +177,7 @@ case "$cmd" in
 
   rm|delete)
     require_key
-    key="${1:?Usage: openclaw-vault rm <key>}"
+    key="${1:?Usage: mc vault rm <key>}"
     file="${STORE_DIR}/${key}.age"
     if [[ ! -f "$file" ]]; then
       echo "Error: No secret found for '${key}'" >&2
@@ -177,12 +194,12 @@ case "$cmd" in
     shift || true
     case "$subcmd" in
       set)
-        name="${1:?Usage: openclaw-vault memo set <name> <text>}"
+        name="${1:?Usage: mc vault memo set <name> <text>}"
         shift
         if [[ "${1:-}" == "-" ]]; then
           text=$(cat)
         else
-          text="${*:?Usage: openclaw-vault memo set <name> <text>}"
+          text="${*:?Usage: mc vault memo set <name> <text>}"
         fi
         PUB_KEY=$(get_pubkey)
         echo -n "$text" | "${AGE_BIN}" -r "$PUB_KEY" -o "${MEMOS_DIR}/${name}.age"
@@ -191,7 +208,7 @@ case "$cmd" in
         ;;
 
       get)
-        name="${1:?Usage: openclaw-vault memo get <name>}"
+        name="${1:?Usage: mc vault memo get <name>}"
         file="${MEMOS_DIR}/${name}.age"
         if [[ ! -f "$file" ]]; then
           echo "Error: No memo found for '${name}'" >&2
@@ -213,7 +230,7 @@ case "$cmd" in
         ;;
 
       rm|delete)
-        name="${1:?Usage: openclaw-vault memo rm <name>}"
+        name="${1:?Usage: mc vault memo rm <name>}"
         file="${MEMOS_DIR}/${name}.age"
         if [[ ! -f "$file" ]]; then
           echo "Error: No memo found for '${name}'" >&2
