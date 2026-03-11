@@ -13,15 +13,21 @@ Everything your AI can do, plugin by plugin.
 - [mc-queue](#mc-queue--async-message-router) — Async Message Router
 - [mc-trust](#mc-trust--agent-identity--security) — Agent Identity & Security
 - [mc-soul](#mc-soul--personality--identity-snapshots) — Personality & Identity Snapshots
-- [mc-designer](#mc-designer--visual-creation) — Visual Creation
 
-### Auxiliary Plugins
+### Creation & Publishing
+- [mc-designer](#mc-designer--visual-creation) — Layered Image Generation & Compositing
+- [mc-blog](#mc-blog--persona-driven-blog-engine) — Persona-Driven Blog Engine
+- [mc-substack](#mc-substack--publishing-automation) — Publish Posts to Substack
+- [mc-reddit](#mc-reddit--reddit-community-outreach) — Reddit Community Outreach
+- [mc-youtube](#mc-youtube--youtube-analysis) — YouTube Transcript & Screenshot Extraction
+
+### Communication & Outreach
 - [mc-email](#mc-email--gmail-integration--triage) — Gmail Integration & Triage
 - [mc-voice](#mc-voice--style-mirroring--voice-learning) — Style Mirroring & Voice Learning
-- [mc-blog](#mc-blog--persona-driven-blog-engine) — Persona-Driven Blog Engine
-- [mc-seo](#mc-seo--seo-automation--rank-tracking) — SEO Automation & Rank Tracking
-- [mc-substack](#mc-substack--publishing-automation) — Publishing Automation
 - [mc-rolodex](#mc-rolodex--contact-management) — Contact Management
+- [mc-seo](#mc-seo--seo-automation--rank-tracking) — SEO Automation & Rank Tracking
+
+### Utilities
 - [mc-jobs](#mc-jobs--role-specific-job-templates) — Role-Specific Job Templates
 - [mc-human](#mc-human--human-intervention-via-novnc) — Human Intervention via noVNC
 - [mc-memo](#mc-memo--short-term-working-memory) — Short-Term Working Memory
@@ -100,6 +106,8 @@ mc soul diff "before-rebranding"
 
 ---
 
+## Creation & Publishing
+
 ### mc-designer — Visual Creation
 **The occipital lobe.** Image generation via Gemini with canvas-based project management. Supports layers, visibility toggles, and batch generation for social media sets, blog headers, and diagrams.
 
@@ -110,7 +118,48 @@ mc designer batch --template linkedin-banner,youtube-profile --theme "tech-noir"
 
 ---
 
-## Auxiliary Plugins
+### mc-blog — Persona-Driven Blog Engine
+First-person journal entries and narrative posts written from the agent's own perspective. Post seeds with metadata, arcs, and tags. Auto-generated grounding documents and self-analysis. Integrates with mc-soul, mc-kb, mc-memo, and mc-voice.
+
+```bash
+# Posts stored as:
+# posts/<NNN>-<slug>.json     (seed metadata)
+# posts/<NNN>-<slug>-body.md  (prose body)
+```
+
+---
+
+### mc-substack — Publishing Automation
+Substack post drafting, scheduling, and publication. Supports bilingual (EN/ES) workflows. Requires Substack auth cookie in vault.
+
+```bash
+mc mc-substack auth
+```
+
+---
+
+### mc-reddit — Reddit Community Outreach
+Reddit interaction — post comments, replies, and manage community outreach. Authenticated via vault credentials.
+
+```bash
+mc mc-reddit post --subreddit miniclaw --title "New release" --body "..."
+mc mc-reddit comment --post abc123 --body "Thanks for the feedback!"
+```
+
+---
+
+### mc-youtube — YouTube Analysis
+YouTube transcript extraction, key-moment analysis, and screenshot capture. Breaks videos into key points with timestamps and grabs frames automatically.
+
+```bash
+mc mc-youtube transcript "https://youtube.com/watch?v=abc123"
+mc mc-youtube keypoints "https://youtube.com/watch?v=abc123"
+mc mc-youtube screenshot "https://youtube.com/watch?v=abc123" --timestamp 1:23
+```
+
+---
+
+## Communication & Outreach
 
 ### mc-email — Gmail Integration & Triage
 Autonomous inbox polling with Haiku-based email classification across 6 categories. Auto-reply, archive, and escalation workflows. Requires Gmail app password in vault.
@@ -132,13 +181,14 @@ Learns a human's writing style from captured messages across all channels. Gemin
 
 ---
 
-### mc-blog — Persona-Driven Blog Engine
-First-person journal entries and narrative posts written from the agent's own perspective. Post seeds with metadata, arcs, and tags. Auto-generated grounding documents and self-analysis. Integrates with mc-soul, mc-kb, mc-memo, and mc-voice.
+### mc-rolodex — Contact Management
+**The social cortex.** Fast searchable contact database with fuzzy matching by name, email, phone, domain, or tag. Trust status tracking (verified, untrusted, pending, unknown). Interactive TUI browser.
 
 ```bash
-# Posts stored as:
-# posts/<NNN>-<slug>.json     (seed metadata)
-# posts/<NNN>-<slug>-body.md  (prose body)
+openclaw mc-rolodex search "Sarah"
+openclaw mc-rolodex search "example.com" --type domain
+openclaw mc-rolodex list --tag marketing
+openclaw mc-rolodex add '{"name":"Sarah Chen","emails":["sarah@example.com"]}'
 ```
 
 ---
@@ -156,26 +206,7 @@ mc mc-seo board helloam.bot
 
 ---
 
-### mc-substack — Publishing Automation
-Substack post drafting, scheduling, and publication. Supports bilingual (EN/ES) workflows. Requires Substack auth cookie in vault.
-
-```bash
-mc mc-substack auth
-```
-
----
-
-### mc-rolodex — Contact Management
-**The social cortex.** Fast searchable contact database with fuzzy matching by name, email, phone, domain, or tag. Trust status tracking (verified, untrusted, pending, unknown). Interactive TUI browser.
-
-```bash
-openclaw mc-rolodex search "Sarah"
-openclaw mc-rolodex search "example.com" --type domain
-openclaw mc-rolodex list --tag marketing
-openclaw mc-rolodex add '{"name":"Sarah Chen","emails":["sarah@example.com"]}'
-```
-
----
+## Utilities
 
 ### mc-jobs — Role-Specific Job Templates
 Workflow templates and procedures for specific agent roles. Built-in Software Developer role with review gates and quality checks. Auto-initializes default job on startup.
