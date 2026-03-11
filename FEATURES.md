@@ -4,6 +4,35 @@ Everything your AI can do, plugin by plugin.
 
 ---
 
+## Table of Contents
+
+### Core Plugins
+- [mc-board](#mc-board--kanban--work-planning) — Kanban & Work Planning
+- [mc-kb](#mc-kb--long-term-memory) — Long-Term Memory
+- [mc-context](#mc-context--working-memory) — Working Memory
+- [mc-queue](#mc-queue--async-message-router) — Async Message Router
+- [mc-trust](#mc-trust--agent-identity--security) — Agent Identity & Security
+- [mc-soul](#mc-soul--personality--identity-snapshots) — Personality & Identity Snapshots
+- [mc-designer](#mc-designer--visual-creation) — Visual Creation
+
+### Auxiliary Plugins
+- [mc-email](#mc-email--gmail-integration--triage) — Gmail Integration & Triage
+- [mc-voice](#mc-voice--style-mirroring--voice-learning) — Style Mirroring & Voice Learning
+- [mc-blog](#mc-blog--persona-driven-blog-engine) — Persona-Driven Blog Engine
+- [mc-seo](#mc-seo--seo-automation--rank-tracking) — SEO Automation & Rank Tracking
+- [mc-substack](#mc-substack--publishing-automation) — Publishing Automation
+- [mc-rolodex](#mc-rolodex--contact-management) — Contact Management
+- [mc-jobs](#mc-jobs--role-specific-job-templates) — Role-Specific Job Templates
+- [mc-human](#mc-human--human-intervention-via-novnc) — Human Intervention via noVNC
+- [mc-memo](#mc-memo--short-term-working-memory) — Short-Term Working Memory
+- [mc-docs](#mc-docs--document-authoring--versioning) — Document Authoring & Versioning
+
+### Tools
+- [CLI Tools](#cli-tools) — mc, mc-vault, mc-smoke, mc-doctor, mc-prompts
+- [Cron Jobs](#cron-jobs-built-in) — Autonomous background workers
+
+---
+
 ## Core Plugins
 
 ### mc-board — Kanban & Work Planning
