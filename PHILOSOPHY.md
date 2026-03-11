@@ -1,13 +1,43 @@
 # MiniClaw Philosophy
 
-Why we build tools instead of automating UIs.
+Why we codify business logic into tools instead of letting models improvise.
 
 ---
 
 ## The Core Idea
 
+A language model given free rein is a non-deterministic system. Every
+response is a roll of the dice — plausible, often correct, sometimes
+catastrophically wrong. The industry calls these failures "hallucinations"
+and treats them as an unsolved research problem.
+
+MiniClaw treats them as an engineering problem.
+
+Every piece of business logic codified into a tested CLI tool is a piece the
+model no longer has to guess at. The model doesn't hallucinate the right API
+endpoint if the tool already knows it. It doesn't fabricate a file path if
+the tool resolves it deterministically. It doesn't invent a workflow if the
+tool encodes the correct one.
+
+**By codifying logic into tools, we make a non-deterministic system
+deterministic — one tool at a time.**
+
+A raw model has 100% control over its outputs. Every token is a chance to
+drift. A MiniClaw agent with a mature toolbox has maybe 1% control — the
+model decides *what* to do, but the tools decide *how*. That 99% of
+deterministic execution is 99% less surface area for hallucination, security
+errors, and silent data corruption.
+
+We reduce hallucinations by the same percentage of work that is handled by
+built, tested, reusable CLI tools instead of free-form model generation.
+
+---
+
+## CLI-First: Tools Over Improvisation
+
 An AI agent that can write and call CLI tools is more capable than one that
-tries to click buttons in a GUI.
+tries to click buttons in a GUI — or one that tries to reason its way
+through problems it could just *execute*.
 
 Browser automation is brittle. Screen coordinates shift. Modals appear.
 Authentication flows change. CSS selectors break between releases. The agent
@@ -122,16 +152,67 @@ so you never need the browser again.**
 
 ---
 
+## Codification as Security
+
+This isn't just about correctness — it's about safety.
+
+A model improvising a shell command might `rm -rf` the wrong directory.
+A tested tool called `mc-backup prune` has hardcoded retention logic, bounds
+checking, and never touches anything outside its backup directory.
+
+A model drafting an API call might send credentials to the wrong endpoint.
+A tool built from observed network traffic sends credentials to exactly one
+hardcoded URL, with exactly the right headers, every time.
+
+Every tool the agent builds and tests is an attack surface it closes. The
+model's creativity is channeled into *choosing which tool to call* and
+*what arguments to pass* — not into inventing the implementation on the fly.
+The implementation is frozen in code, reviewed, and deterministic.
+
+This is why `SYSTEM/` is read-only and `USER/bin/` is the agent's own space.
+The agent can extend its capabilities, but it can't modify the foundation.
+New tools are additive. The blast radius of a bad tool is limited to that
+tool. The blast radius of a hallucinated shell command is unlimited.
+
+---
+
+## The Maturity Curve
+
+A fresh MiniClaw install has ~15 SYSTEM tools and an empty `USER/bin/`.
+The model does most of the work — and makes most of the mistakes.
+
+Over weeks, the agent encounters problems, solves them, and codifies the
+solutions. Each tool is one less thing the model needs to figure out from
+scratch. The error rate drops. The token cost drops. The speed increases.
+
+```
+Week 1:  Model 80% / Tools 20%  → frequent errors, expensive
+Week 4:  Model 40% / Tools 60%  → errors drop by half
+Week 12: Model 10% / Tools 90%  → near-deterministic for routine work
+```
+
+The agent becomes more reliable over time without any model improvement.
+The model stays the same — it just has less room to be wrong.
+
+---
+
 ## Principles
 
-1. **Tools over automation.** Build a CLI, not a macro.
-2. **Observe, then codify.** Watch the browser once, call the API forever.
-3. **The agent's toolbox grows.** Every solved problem becomes a reusable tool.
-4. **Deterministic beats probabilistic.** A tool that works is better than a
-   vision model that usually works.
-5. **Composability is power.** Small tools that pipe together beat monolithic
+1. **Codify, don't improvise.** Every piece of logic in a tested tool is a
+   hallucination that can never happen.
+2. **Tools over automation.** Build a CLI, not a macro. CLIs are testable,
+   composable, and deterministic.
+3. **Observe, then codify.** Watch the browser once, build the tool, call it
+   forever.
+4. **The agent's toolbox grows.** Every solved problem becomes a reusable
+   tool. The agent gets more reliable over time without model improvements.
+5. **Deterministic beats probabilistic.** A tool that works is better than a
+   model that usually gets it right.
+6. **Reduce the model's control surface.** The model decides *what* to do.
+   Tools decide *how*. Minimize the gap between intent and execution.
+7. **Composability is power.** Small tools that pipe together beat monolithic
    automation scripts.
-6. **The human does what humans do best.** Log in, approve, make judgment
+8. **The human does what humans do best.** Log in, approve, make judgment
    calls. The agent does the rest.
-7. **SYSTEM ships the foundation. USER builds the house.** We give the agent
+9. **SYSTEM ships the foundation. USER builds the house.** We give the agent
    a toolkit. It builds its own.
