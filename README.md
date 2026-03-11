@@ -94,6 +94,9 @@ mc board show
 
 ## Features
 
+![MiniClaw Brain Board](./assets/board-kanban.png)
+*The Brain Board — your agent's kanban for autonomous task tracking*
+
 - **Local-first.** Everything runs on your Mac. No cloud, no surveillance, no shutdown notices.
 - **Always on.** Set up automated tasks — checks, reminders, background work.
 - **Real memory.** Your AI remembers your preferences, your habits, your life.
@@ -104,6 +107,8 @@ mc board show
 ---
 
 ## Flagship Product: Amelia (AM) — helloam.bot
+
+![Amelia](./assets/am-hero.jpg)
 
 The flagship product built on MiniClaw is **[Amelia (AM)](https://helloam.bot)** — a soul-bonded personal AI companion.
 
@@ -154,7 +159,9 @@ mc board move crd_abc123 in-progress
 mc board show
 ```
 
-**[→ Full mc-board documentation](./plugins/mc-board/PLUGIN.md)**
+![Card Detail](./assets/board-card-detail.png)
+
+**[→ Full mc-board documentation](./docs/mc-board.md)**
 
 ---
 
@@ -180,7 +187,7 @@ mc kb add --type lesson --title "Always test migrations" \
   "Learned: run migrations in staging first"
 ```
 
-**[→ Full mc-kb documentation](./plugins/mc-kb/PLUGIN.md)**
+**[→ Full mc-kb documentation](./docs/mc-kb.md)**
 
 ---
 
@@ -204,7 +211,7 @@ mc designer batch --template linkedin-banner,youtube-profile \
   --theme "tech-noir"
 ```
 
-**[→ Full mc-designer documentation](./plugins/mc-designer/PLUGIN.md)**
+**[→ Full mc-designer documentation](./docs/mc-designer.md)**
 
 ---
 
@@ -217,7 +224,7 @@ Manages the conversation window. Keeps relevant history in view while pruning ol
 - Prevents token waste on old chat history
 - Automatic pruning based on relevance
 
-**[→ Full mc-context documentation](./plugins/mc-context/PLUGIN.md)**
+**[→ Full mc-context documentation](./docs/mc-context.md)**
 
 ---
 
@@ -230,7 +237,7 @@ The **basal ganglia**. Non-blocking message processing.
 - Handles multiple channels concurrently
 - Intelligent routing based on agent skill
 
-**[→ Full mc-queue documentation](./plugins/mc-queue/PLUGIN.md)**
+**[→ Full mc-queue documentation](./docs/mc-queue.md)**
 
 ---
 
@@ -252,7 +259,7 @@ mc trust challenge --peer ar
 mc trust verify --peer ar --message "..." --signature "..."
 ```
 
-**[→ Full mc-trust documentation](./plugins/mc-trust/PLUGIN.md)**
+**[→ Full mc-trust documentation](./docs/mc-trust.md)**
 
 ---
 
@@ -277,7 +284,7 @@ mc soul backup "before-rebranding"
 mc soul show
 ```
 
-**[→ Full mc-soul documentation](./plugins/mc-soul/PLUGIN.md)**
+**[→ Full mc-soul documentation](./docs/mc-soul.md)**
 
 ---
 
@@ -308,7 +315,7 @@ openclaw mc-rolodex list --tag marketing
 openclaw mc-rolodex show contact_1234
 ```
 
-**[→ Full mc-rolodex documentation](./plugins/mc-rolodex/README.md)**
+**[→ Full mc-rolodex documentation](./docs/mc-rolodex.md)**
 
 ---
 
@@ -334,7 +341,7 @@ mc jobs list
 mc jobs history --job 123
 ```
 
-**[→ Full mc-jobs documentation](./plugins/mc-jobs/PLUGIN.md)**
+**[→ Full mc-jobs documentation](./docs/mc-jobs.md)**
 
 ---
 
@@ -352,7 +359,7 @@ Autonomous inbox polling with Haiku-based email classification and reply automat
 mc mc-email auth
 ```
 
-**[→ Full mc-email documentation](./plugins/mc-email/PLUGIN.md)**
+**[→ Full mc-email documentation](./docs/mc-email.md)**
 
 ---
 
@@ -372,7 +379,7 @@ Learns your writing style from messages across all channels.
 /voice-purge    # Delete all stored messages and reset profile
 ```
 
-**[→ Full mc-voice documentation](./plugins/mc-voice/PLUGIN.md)**
+**[→ Full mc-voice documentation](./docs/mc-voice.md)**
 
 ---
 
@@ -385,7 +392,7 @@ First-person journal entries written from the agent's own perspective.
 - Auto-generated grounding documents and self-analysis
 - Integrates with mc-soul, mc-kb, mc-memo, mc-voice
 
-**[→ Full mc-blog documentation](./plugins/mc-blog/PLUGIN.md)**
+**[→ Full mc-blog documentation](./docs/mc-blog.md)**
 
 ---
 
@@ -413,7 +420,7 @@ mc mc-seo ping https://helloam.bot/sitemap.xml
 mc mc-seo board helloam.bot
 ```
 
-**[→ Full mc-seo documentation](./plugins/mc-seo/PLUGIN.md)**
+**[→ Full mc-seo documentation](./docs/mc-seo.md)**
 
 ---
 
@@ -430,7 +437,7 @@ Substack post drafting, scheduling, and publication with bilingual support.
 mc mc-substack auth
 ```
 
-**[→ Full mc-substack documentation](./plugins/mc-substack/PLUGIN.md)**
+**[→ Full mc-substack documentation](./docs/mc-substack.md)**
 
 ---
 
@@ -451,7 +458,7 @@ openclaw mc-human ask "solve CAPTCHA on login page" --timeout 300
 openclaw mc-human status
 ```
 
-**[→ Full mc-human documentation](./plugins/mc-human/PLUGIN.md)**
+**[→ Full mc-human documentation](./docs/mc-human.md)**
 
 ---
 
@@ -463,7 +470,7 @@ Per-card scratchpad to avoid repeating failed approaches within a run.
 - Timestamped notes appended during work
 - Prevents re-trying failed approaches
 
-**[→ Full mc-memo documentation](./plugins/mc-memo/PLUGIN.md)**
+**[→ Full mc-memo documentation](./docs/mc-memo.md)**
 
 ---
 
@@ -483,7 +490,7 @@ mc docs show <id>
 mc docs versions <id>
 ```
 
-**[→ Full mc-docs documentation](./plugins/mc-docs/PLUGIN.md)**
+**[→ Full mc-docs documentation](./docs/mc-docs.md)**
 
 ---
 
@@ -511,7 +518,7 @@ mc-backup restore
 mc-backup prune
 ```
 
-**[→ Full mc-backup documentation](./plugins/mc-backup/PLUGIN.md)**
+**[→ Full mc-backup documentation](./docs/mc-backup.md)**
 
 ---
 
@@ -576,11 +583,11 @@ MiniClaw's mind is built like an actual brain. Each region does one thing well.
 │  │ (Social Cortex)│  │ (Scheduler)    │  │ (Security)       │   │
 │  └────────────────┘  └────────────────┘  └──────────────────┘   │
 │                                                                   │
-│  Local Storage (~/am/user/augmentedmike_bot/)                    │
+│  Local Storage ($MINICLAW_STATE_DIR/USER/<bot_id>/)               │
 │  • brain/ — cards, projects, backlog                             │
 │  • kb/ — knowledge base indexes                                  │
 │  • vault/ — encrypted secrets                                    │
-│  • media/ — images, files                                        │
+│  • media/ — generated images (per-plugin)                        │
 │                                                                   │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -656,8 +663,8 @@ Agent: Creating LinkedIn banner...
 [mc-designer] Generated: social-linkedin-banner.png (1584×396)
 [mc-designer] Generated: social-linkedin-thumbnail.png (400×400)
 
-# Outputs placed in ~/am/media/social-backgrounds/
-$ ls -la ~/am/media/social-backgrounds/
+# Outputs placed in $MINICLAW_STATE_DIR/USER/<bot_id>/media/designer/
+$ ls -la $MINICLAW_STATE_DIR/USER/<bot_id>/media/designer/
 social-linkedin-banner-20260305.png
 social-linkedin-thumbnail-20260305.png
 
@@ -712,7 +719,7 @@ It'll diagnose what's wrong and offer to fix it.
 | Issue | Fix |
 |-------|-----|
 | Agent won't start | Run `mc-doctor` |
-| Telegram not connected | Check `~/.openclaw/config/telegram.json` |
+| Telegram not connected | Check `$MINICLAW_STATE_DIR/config/telegram.json` |
 | Out of memory | Restart: `brew services restart openclaw` |
 | Can't find mc-board | Reinstall plugins: `mc plugin install mc-board` |
 
@@ -720,7 +727,7 @@ It'll diagnose what's wrong and offer to fix it.
 
 ## Contributing
 
-**Want to build a plugin?** Follow the [Plugin Developer Guide](./docs/PLUGIN_DEVELOPMENT.md).
+**Want to build a plugin?** Follow the [Plugin Developer Guide](./docs/wiki/Writing-Plugins.md).
 
 **Found a bug?** [Open an issue](https://github.com/augmentedmike/miniclaw-os/issues).
 
@@ -819,7 +826,7 @@ await trust.verify(peerId, message, signature);
 ## Learn More
 
 - [Full Docs](https://docs.openclaw.ai) — architecture, guides, troubleshooting
-- [Plugin Development Guide](./docs/PLUGIN_DEVELOPMENT.md) — build your own
+- [Plugin Development Guide](./docs/wiki/Writing-Plugins.md) — build your own
 - [GitHub](https://github.com/augmentedmike/miniclaw-os) — source code & issues
 - [miniclaw.bot](https://miniclaw.bot) — setup help & consulting
 

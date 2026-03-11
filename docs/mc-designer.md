@@ -38,7 +38,7 @@ All config lives in `openclaw.json` under `plugins.entries.mc-designer.config`.
 |-----|---------|-------------|
 | `apiKey` | `""` | Gemini API key (required) |
 | `model` | `gemini-3.1-flash-image-preview` | Gemini model to use |
-| `mediaDir` | `~/.openclaw/media/designer` | Root directory for all generated files |
+| `mediaDir` | `$MINICLAW_STATE_DIR/USER/<bot_id>/media/designer` | Root directory for all generated files |
 | `defaultWidth` | `1024` | Default canvas width in pixels |
 | `defaultHeight` | `1024` | Default canvas height in pixels |
 
@@ -46,7 +46,7 @@ All config lives in `openclaw.json` under `plugins.entries.mc-designer.config`.
 
 ## Output Path Conventions
 
-All files are written under `mediaDir` (default: `~/.openclaw/media/designer`):
+All files are written under `mediaDir` (default: `$MINICLAW_STATE_DIR/USER/<bot_id>/media/designer`):
 
 | What | Path |
 |------|------|
@@ -87,6 +87,26 @@ Examples:
   mc designer gen "minimal logo, white on black" \
     --canvas project --layer logo --role element \
     --x 24 --y 20 --w 120 --h 40
+```
+
+### Reference-Based Generation
+
+```bash
+# Generate an image using reference photos + a text prompt
+mc designer gen-refs "<prompt>" -r <ref-image> [-r <ref-image> ...] [options]
+
+Options:
+  -r, --ref <file>    Reference image path (repeat for multiple references)
+  -c, --canvas <name> Target canvas (default: "default")
+  -l, --layer <name>  Layer name
+  -W, --width <px>    Canvas width when auto-creating
+  -H, --height <px>   Canvas height when auto-creating
+  --role <role>       background or element (default: background)
+
+Example:
+  mc designer gen-refs "same character but sitting at a cafe" \
+    -r ~/ref/character-front.png -r ~/ref/character-side.png \
+    --canvas scene2 --layer bg
 ```
 
 ### Image Editing
@@ -172,7 +192,22 @@ Example:
   # creates: ~/Desktop/product.nobg.png
 ```
 
-> **Note:** `alpha strip` is a stub. It converts the image to PNG with an alpha channel (`ensureAlpha()`), but does **not** perform actual background removal or segmentation. The source comment describes this as a "naive approach" — a real implementation would require a segmentation API or model. Use this only to add transparency support to an image; remove backgrounds manually or with a dedicated service.
+```bash
+# Chroma-key: replace a solid-color background with transparency
+mc designer alpha chroma-key <file> [options]
+
+Options:
+  --color <hex>       Target background color to key out (default: #808080)
+  --tolerance <n>     Euclidean RGB distance tolerance, 0-441 (default: 30)
+
+Example:
+  mc designer alpha chroma-key ~/gen/element.png --color "#808080" --tolerance 40
+  # creates: ~/gen/element.chromakey.png
+```
+
+The default grey `#808080` targets Gemini's typical solid-background output. Adjust `--tolerance` to capture color variation near edges.
+
+> **Note:** `alpha strip` is a basic implementation — it adds an alpha channel but does not perform segmentation-based background removal. For precise cutouts, use `chroma-key` on solid-background Gemini outputs or a dedicated service.
 
 ### Usage & Cost Tracking
 
