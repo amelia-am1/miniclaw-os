@@ -19,6 +19,12 @@
 
 ---
 
+> **Security Alert:** We do not recommend that you install OpenClaw or MiniClaw on your personal computer. It will control your screen and access ALL your unencrypted files. We use encryption to protect MiniClaw secret files, but most computers are wide open. Your personal information can be stolen if you do this.
+>
+> **Instead:** Install on a computer you control physically (or a VPS, although we have only just started working on Linux improvements) and monitor its activity daily to ensure it's not doing something you don't want. We are building tools to make this more secure and easy to use. OpenClaw is for nerds, MiniClaw is for people.
+
+---
+
 ## What does it feel like?
 
 Imagine having a brilliant friend who knows everything — and they're *always* available.
