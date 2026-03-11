@@ -71,7 +71,7 @@ When it's done:
 Once installed, start chatting:
 
 - **Browser:** Open `http://localhost:18789`
-- **Chat apps:** Telegram, WhatsApp, iMessage, Slack, and more (the installer walks you through linking one)
+- **Telegram:** Secure, encrypted messaging to your agent from anywhere
 - **Terminal:** Use `openclaw agent "your message here"` for CLI access
 
 ### Your First Agent
@@ -232,7 +232,7 @@ Manages the conversation window. Keeps relevant history in view while pruning ol
 The **basal ganglia**. Non-blocking message processing.
 
 **What it does:**
-- Routes Telegram, Slack, Discord, WhatsApp messages to agents
+- Routes Telegram messages to agents
 - Never blocks — all processing is async
 - Handles multiple channels concurrently
 - Intelligent routing based on agent skill
@@ -292,7 +292,7 @@ mc soul show
 Social cortex. Manages contacts, teams, and communication preferences.
 
 **What it does:**
-- Store contact info (email, phone, Telegram, Slack)
+- Store contact info (email, phone, Telegram)
 - Search by name, email, phone, domain, or tag
 - Track trust status (verified, pending, unknown)
 - Fuzzy matching — find contacts with partial information
@@ -545,7 +545,7 @@ MiniClaw's mind is built like an actual brain. Each region does one thing well.
 │                                                                   │
 │  Input Layer (Async Queue)                                       │
 │  ┌───────────────────────────────────────────────────────────┐  │
-│  │ Telegram │ Slack │ Discord │ WhatsApp │ Web │ cron │ API │  │
+│  │     Telegram     │     Web     │     cron     │     API     │  │
 │  └─────────────────────────┬─────────────────────────────────┘  │
 │                            │                                     │
 │                            ▼                                     │
@@ -686,7 +686,7 @@ $ mc jobs add --cron "0 8 * * *" \
 Agent: Good morning! Here's what you missed:
   • 3 urgent emails (all archived)
   • 12 GitHub notifications
-  • 2 Slack mentions
+  • 2 Telegram mentions
   • 1 calendar conflict (already resolved)
 
 # View job history
