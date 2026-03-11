@@ -53,6 +53,75 @@ echo "  log    : $LOG_FILE"
 # ── Homebrew prefix ───────────────────────────────────────────────────────────
 [[ "$ARCH" == "arm64" ]] && BREW_PREFIX="/opt/homebrew" || BREW_PREFIX="/usr/local"
 
+# -- Step 0: Detect & migrate existing OpenClaw install --------------------
+step "Step 0: Existing OpenClaw detection"
+
+ARCHIVE_DIR="$HOME/.openclaw-backup-$(date +%Y%m%d-%H%M%S)"
+NEEDS_MIGRATION=false
+OLD_CONFIG="" OLD_PLUGINS_DIR="" OLD_USER_DIR="" OLD_WORKSPACE="" OLD_CRON="" OLD_MEMORY=""
+
+if [[ -d "$OPENCLAW_DIR" && ! -d "$OPENCLAW_DIR/miniclaw" ]]; then
+  # Existing vanilla OpenClaw install (no miniclaw directory = not ours)
+  info "Found existing OpenClaw install at $OPENCLAW_DIR"
+  info "This looks like an upstream OpenClaw install (no miniclaw/ directory)."
+  echo ""
+  echo -e "  ${BOLD}MiniClaw will:${NC}"
+  echo "    1. Archive your existing ~/.openclaw to $ARCHIVE_DIR"
+  echo "    2. Install MiniClaw alongside OpenClaw"
+  echo "    3. Import your plugins, config, and personal data"
+  echo ""
+  echo "  Your original data is NEVER deleted -- only archived."
+  echo ""
+
+  if [[ "$CHECK_ONLY" == true ]]; then
+    warn "Migration needed -- run without --check to proceed"
+  else
+    MIGRATE_CONFIRM=""
+    if { true < /dev/tty; } 2>/dev/null; then
+      read -rp "  Archive and migrate? (y/N): " MIGRATE_CONFIRM < /dev/tty
+    elif [ -t 0 ]; then
+      read -rp "  Archive and migrate? (y/N): " MIGRATE_CONFIRM
+    else
+      MIGRATE_CONFIRM="y"
+      info "No terminal -- proceeding automatically"
+    fi
+
+    if [[ "$MIGRATE_CONFIRM" == "y" || "$MIGRATE_CONFIRM" == "Y" ]]; then
+      NEEDS_MIGRATION=true
+
+      info "Archiving $OPENCLAW_DIR -> $ARCHIVE_DIR"
+      cp -a "$OPENCLAW_DIR" "$ARCHIVE_DIR"
+      ok "Archived to $ARCHIVE_DIR"
+
+      # Catalog what they have
+      [[ -f "$ARCHIVE_DIR/openclaw.json" ]] && OLD_CONFIG="$ARCHIVE_DIR/openclaw.json"
+      [[ -d "$ARCHIVE_DIR/plugins" ]] && OLD_PLUGINS_DIR="$ARCHIVE_DIR/plugins"
+      [[ -d "$ARCHIVE_DIR/user" ]] && OLD_USER_DIR="$ARCHIVE_DIR/user"
+      [[ -d "$ARCHIVE_DIR/workspace" ]] && OLD_WORKSPACE="$ARCHIVE_DIR/workspace"
+      [[ -d "$ARCHIVE_DIR/cron" ]] && OLD_CRON="$ARCHIVE_DIR/cron"
+      [[ -d "$ARCHIVE_DIR/memory" ]] && OLD_MEMORY="$ARCHIVE_DIR/memory"
+
+      echo ""
+      info "Found in your existing install:"
+      [[ -n "$OLD_CONFIG" ]] && ok "  openclaw.json (config)"
+      [[ -n "$OLD_PLUGINS_DIR" ]] && ok "  plugins/ ($(ls "$OLD_PLUGINS_DIR" 2>/dev/null | wc -l | tr -d ' ') plugins)"
+      [[ -n "$OLD_USER_DIR" ]] && ok "  user/ (personal data)"
+      [[ -n "$OLD_WORKSPACE" ]] && ok "  workspace/ (identity files)"
+      [[ -n "$OLD_CRON" ]] && ok "  cron/ (scheduled jobs)"
+      [[ -n "$OLD_MEMORY" ]] && ok "  memory/ (memory files)"
+      echo ""
+    else
+      echo "  Aborted. Your existing install is untouched."
+      exit 0
+    fi
+  fi
+elif [[ -d "$OPENCLAW_DIR/miniclaw" ]]; then
+  ok "MiniClaw already installed -- updating in place"
+else
+  ok "Fresh install (no existing ~/.openclaw)"
+fi
+
+
 # ── Step 1: Homebrew ──────────────────────────────────────────────────────────
 step "Step 1: Homebrew"
 
@@ -439,6 +508,134 @@ if [[ -n "$TTY_IN" ]]; then
     warn "Skipped: mc-designer setup (run install.sh again or use 'mc vault set gemini-api-key' to enable later)"
   fi
 fi # TTY_IN check
+
+
+# -- Step 15: Migrate data from archived OpenClaw install ------------------
+if [[ "$NEEDS_MIGRATION" == true ]]; then
+  step "Step 15: Migrating your OpenClaw data"
+
+  # Import their openclaw.json settings (model prefs, auth, non-plugin config)
+  if [[ -n "$OLD_CONFIG" && -f "$OLD_CONFIG" ]]; then
+    info "Merging your openclaw.json settings..."
+    python3 - "$STATE_DIR/openclaw.json" "$OLD_CONFIG" <<'MERGE_PYEOF'
+import json, sys
+
+new_path, old_path = sys.argv[1], sys.argv[2]
+with open(new_path) as f: new_cfg = json.load(f)
+with open(old_path) as f: old_cfg = json.load(f)
+
+# Preserve their model preferences
+if "agents" in old_cfg:
+    old_agents = old_cfg["agents"]
+    new_agents = new_cfg.setdefault("agents", {})
+    if "defaults" in old_agents:
+        old_defaults = old_agents["defaults"]
+        new_defaults = new_agents.setdefault("defaults", {})
+        # Keep their model choice if they had one
+        if "model" in old_defaults:
+            new_defaults["model"] = old_defaults["model"]
+        # Keep their compaction settings
+        if "compaction" in old_defaults:
+            new_defaults["compaction"] = old_defaults["compaction"]
+
+# Preserve their auth config
+if "auth" in old_cfg:
+    new_cfg["auth"] = old_cfg["auth"]
+
+# Preserve their gateway config (but not the token -- that stays in vault)
+if "gateway" in old_cfg:
+    old_gw = old_cfg["gateway"]
+    new_gw = new_cfg.setdefault("gateway", {})
+    for key in ("bind", "port", "tailscale"):
+        if key in old_gw:
+            new_gw[key] = old_gw[key]
+
+# Preserve any custom meta
+if "meta" in old_cfg and old_cfg["meta"]:
+    new_cfg.setdefault("meta", {}).update(old_cfg["meta"])
+
+with open(new_path, "w") as f:
+    json.dump(new_cfg, f, indent=2)
+    f.write("\n")
+MERGE_PYEOF
+    ok "Merged model prefs, auth, and gateway settings"
+  fi
+
+  # Import their user data (board cards, KB, personal state)
+  if [[ -n "$OLD_USER_DIR" ]]; then
+    info "Importing your user data..."
+    # Merge into new user dir -- rsync with no-clobber so we dont overwrite miniclaw defaults
+    rsync -a --ignore-existing "$OLD_USER_DIR/" "$STATE_DIR/user/"
+    ok "Imported user data (board cards, KB, personal state)"
+  fi
+
+  # Import their workspace (SOUL.md, IDENTITY.md, MEMORY.md, etc.)
+  if [[ -n "$OLD_WORKSPACE" ]]; then
+    info "Importing your workspace files..."
+    rsync -a --ignore-existing "$OLD_WORKSPACE/" "$STATE_DIR/workspace/"
+    ok "Imported workspace (identity files, memory)"
+  fi
+
+  # Import their memory files
+  if [[ -n "$OLD_MEMORY" ]]; then
+    info "Importing your memory files..."
+    mkdir -p "$STATE_DIR/memory"
+    rsync -a --ignore-existing "$OLD_MEMORY/" "$STATE_DIR/memory/"
+    ok "Imported memory files"
+  fi
+
+  # Import their cron jobs
+  if [[ -n "$OLD_CRON" ]]; then
+    info "Importing your cron jobs..."
+    mkdir -p "$STATE_DIR/cron"
+    rsync -a --ignore-existing "$OLD_CRON/" "$STATE_DIR/cron/"
+    ok "Imported cron jobs"
+  fi
+
+  # Import their upstream openclaw plugins (non-miniclaw plugins)
+  if [[ -n "$OLD_PLUGINS_DIR" ]]; then
+    info "Importing your OpenClaw plugins..."
+    IMPORTED_COUNT=0
+    for old_plugin in "$OLD_PLUGINS_DIR"/*/; do
+      plugin_name="$(basename "$old_plugin")"
+      # Skip if miniclaw already has this plugin (ours takes precedence)
+      if [[ -d "$MINICLAW_DIR/plugins/$plugin_name" ]]; then
+        info "  Skipped $plugin_name (MiniClaw version installed)"
+        continue
+      fi
+      # Import to the openclaw plugins dir (not miniclaw plugins)
+      dest="$OPENCLAW_DIR/plugins/$plugin_name"
+      mkdir -p "$OPENCLAW_DIR/plugins"
+      rsync -a --exclude='node_modules' "$old_plugin" "$dest/"
+      ok "  Imported: $plugin_name (upstream OpenClaw plugin)"
+      IMPORTED_COUNT=$((IMPORTED_COUNT + 1))
+
+      # Register in openclaw.json
+      python3 - "$STATE_DIR/openclaw.json" "$plugin_name" "$dest" <<'REG_PYEOF'
+import json, sys
+config_path, name, path = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(config_path) as f: cfg = json.load(f)
+p = cfg.setdefault("plugins", {})
+p.setdefault("allow", [])
+p.setdefault("load", {}).setdefault("paths", [])
+p.setdefault("entries", {})
+if name not in p["allow"]: p["allow"].append(name)
+if path not in p["load"]["paths"]: p["load"]["paths"].append(path)
+if name not in p["entries"]: p["entries"][name] = {"enabled": True, "config": {}}
+with open(config_path, "w") as f:
+    json.dump(cfg, f, indent=2); f.write("\n")
+REG_PYEOF
+    done
+    ok "Imported $IMPORTED_COUNT upstream OpenClaw plugin(s)"
+  fi
+
+  echo ""
+  ok "Migration complete!"
+  info "Your original install is archived at: $ARCHIVE_DIR"
+  info "If anything looks wrong, restore with: cp -a $ARCHIVE_DIR/ $OPENCLAW_DIR/"
+  echo ""
+fi
+
 
 # ── Step 12: Brain board crons ────────────────────────────────────────────────
 step "Step 12: Brain board cron workers"
