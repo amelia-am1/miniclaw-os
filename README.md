@@ -70,9 +70,9 @@ When it's done:
 
 Once installed, start chatting:
 
-- **Browser:** Open `http://localhost:18789`
 - **Telegram:** Secure, encrypted messaging to your agent from anywhere
 - **Terminal:** Use `openclaw agent "your message here"` for CLI access
+- **Board UI:** `http://localhost:4220` (local-only, LAN-accessible with mc-trust verification)
 
 ### Your First Agent
 
@@ -195,7 +195,7 @@ mc kb add --type lesson --title "Always test migrations" \
 The **occipital lobe**. Generates images, designs, and visual content.
 
 **What it does:**
-- Generate images with Gemini (or DALL-E, Midjourney via API)
+- Generate images with Gemini (API key in mc-vault, never transmitted externally)
 - Create social media graphics, blog headers, diagrams
 - Edit and composite images
 - Supports layers, templates, and batch generation
@@ -232,9 +232,9 @@ Manages the conversation window. Keeps relevant history in view while pruning ol
 The **basal ganglia**. Non-blocking message processing.
 
 **What it does:**
-- Routes Telegram messages to agents
+- Routes Telegram messages to agents (mc-trust verified)
 - Never blocks — all processing is async
-- Handles multiple channels concurrently
+- Handles cron jobs and CLI triggers concurrently
 - Intelligent routing based on agent skill
 
 **[→ Full mc-queue documentation](./docs/mc-queue.md)**
@@ -545,7 +545,7 @@ MiniClaw's mind is built like an actual brain. Each region does one thing well.
 │                                                                   │
 │  Input Layer (Async Queue)                                       │
 │  ┌───────────────────────────────────────────────────────────┐  │
-│  │     Telegram     │     Web     │     cron     │     API     │  │
+│  │  Telegram  │  Board UI (local)  │  cron  │  CLI  │            │  │
 │  └─────────────────────────┬─────────────────────────────────┘  │
 │                            │                                     │
 │                            ▼                                     │
@@ -766,9 +766,9 @@ mc plugin test my-plugin
 - Or publish to npm as `@miniclaw/my-plugin`
 - List it on [clawhub.com](https://clawhub.com)
 
-### Plugin API
+### Plugin SDK
 
-Every plugin has access to:
+Every plugin has access to (local only — no network exposure):
 
 ```typescript
 // Configuration
@@ -782,8 +782,8 @@ await kb.add({ type: 'fact', title: '...', content: '...' });
 const tasks = await board.list({ status: 'in-progress' });
 await board.move(cardId, 'shipped');
 
-// File I/O (safe directory only)
-const files = await fs.readdir('/Users/augmentedmike/am/workspace/');
+// File I/O (sandboxed to state directory)
+const files = await fs.readdir('$MINICLAW_STATE_DIR/workspace/');
 
 // LLM inference (with escalation)
 const response = await agent.invoke('gpt-4', prompt);
