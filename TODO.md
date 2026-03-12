@@ -109,10 +109,13 @@
 ### Plugin Documentation
 - [ ] Add README.md to plugins missing one (mc-blog, mc-board, mc-context, mc-contribute, mc-designer, mc-email, mc-human, mc-jobs, mc-kb, mc-memo, mc-queue, mc-seo, mc-soul, mc-substack, mc-trust, mc-voice)
 
-### Testing
-- [ ] Set up Jest config and test infrastructure across plugins
-- [ ] Add tests for untested plugins (11 with zero coverage)
-- [ ] Investigate test-results/ failed status; add to .gitignore or CI
+### Testing — mc-smoke Failures (2026-03-11)
+- [ ] **mc-board** (43 failing) — `better-sqlite3` not supported in bun. Tests pass under Node but `bun test` can't load the native module. Either migrate to `bun:sqlite` or add a `node --test` runner for mc-board.
+- [ ] **mc-vend** (31 failing) — same `better-sqlite3` incompatibility with bun.
+- [ ] **shared** (23 failing) — same `better-sqlite3` issue in shared/logging tests.
+- [ ] **mc-docs** (2 failing) — pre-existing, needs investigation.
+- [ ] **mc-admin** — live-only plugin (not in repo), no tests. Either add to repo or add smoke test in live dir.
+- [ ] **openclaw CLI not on PATH** — `command -v openclaw` fails in some shell contexts. May need PATH setup in mc-smoke or LaunchAgent env.
 
 ### Config Hygiene
 - [ ] Replace hardcoded `~/` paths in MANIFEST.json with env var expansion
