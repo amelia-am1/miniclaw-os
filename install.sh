@@ -328,7 +328,12 @@ fi
 # ── Step 4: OpenClaw (from MiniClaw fork) ─────────────────────────────────────
 step "Step 4: OpenClaw"
 
-OPENCLAW_NPM_PKG="@miniclaw_official/openclaw"
+# Read pinned openclaw version from MANIFEST.json
+OPENCLAW_NPM_PKG=$(python3 -c "
+import json
+m = json.load(open('$REPO_DIR/MANIFEST.json'))
+print(m.get('openclaw', {}).get('npm', '@miniclaw_official/openclaw'))
+" 2>/dev/null || echo "@miniclaw_official/openclaw")
 
 if command -v openclaw &>/dev/null; then
   INSTALLED=$(openclaw --version 2>/dev/null | head -1 || echo "?")
@@ -1073,41 +1078,6 @@ echo "  Setup:   http://localhost:4210"
 echo "  Board:   http://localhost:4220"
 echo "  Verify:  mc-smoke"
 echo ""
-echo -e "${BOLD}── Next step: Connect your Anthropic account${NC}"
-echo ""
-echo "  MiniClaw requires an Anthropic subscription to function."
-echo ""
-echo "  Recommended plans:"
-echo -e "    ${GREEN}Light user${NC}   — \$20/mo   (casual use, light automation)"
-echo -e "    ${BLUE}Average user${NC} — \$100/mo  (daily use, background agents)"
-echo -e "    ${YELLOW}Power user${NC}   — \$200/mo  (heavy agentic workloads, multiple cron workers)"
-echo ""
-echo "  If you don't have an account yet, one will be created during sign-in."
-echo ""
-
-# Check if Anthropic auth is already configured
-HAS_ANTHROPIC_AUTH=false
-AUTH_PROFILES="$STATE_DIR/agents/main/agent/auth-profiles.json"
-if [[ -f "$AUTH_PROFILES" ]] && python3 -c "
-import json, sys
-store = json.load(open(sys.argv[1]))
-profiles = store.get('profiles', {})
-sys.exit(0 if any(k.startswith('anthropic:') for k in profiles) else 1)
-" "$AUTH_PROFILES" 2>/dev/null; then
-  HAS_ANTHROPIC_AUTH=true
-fi
-
-if [[ "$HAS_ANTHROPIC_AUTH" == true ]]; then
-  ok "Anthropic account already connected"
-else
-  echo -e "  ${BOLD}Launching Anthropic sign-in...${NC}"
-  echo "  A browser window will open — sign in or create your account."
-  echo ""
-  openclaw models auth setup-token --provider anthropic --yes \
-    && ok "Anthropic account connected" \
-    || warn "Auth setup skipped — run later: openclaw models auth setup-token --provider anthropic"
-fi
-
 echo ""
 
 # Open the onboarding wizard in the default browser
