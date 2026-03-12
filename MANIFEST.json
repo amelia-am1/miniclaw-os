@@ -207,6 +207,95 @@
       "cli": true,
       "tools": [],
       "config": {}
+    },
+    {
+      "id": "mc-stripe",
+      "label": "Stripe",
+      "description": "Shared Stripe payment service \u2014 charge, refund, customer management. Other plugins consume via CLI or direct import.",
+      "path": "plugins/mc-stripe",
+      "entry": "index.ts",
+      "cli": true,
+      "tools": [
+        "stripe_charge",
+        "stripe_refund",
+        "stripe_status",
+        "stripe_customer_create",
+        "stripe_customer_find"
+      ],
+      "optional": true,
+      "requires": ["stripe-secret-key"],
+      "config": {
+        "vaultBin": "~/.local/bin/mc-vault",
+        "testMode": false
+      }
+    },
+    {
+      "id": "mc-square",
+      "label": "Square",
+      "description": "Square payment service \u2014 charge, refund, payment links. Zero deps, raw fetch to Square REST API v2.",
+      "path": "plugins/mc-square",
+      "entry": "index.ts",
+      "cli": true,
+      "tools": [
+        "square_charge",
+        "square_refund",
+        "square_status",
+        "square_list_payments",
+        "square_payment_link"
+      ],
+      "optional": true,
+      "requires": ["square-access-token"],
+      "config": {
+        "vaultBin": "~/.local/bin/mc-vault",
+        "environment": "sandbox",
+        "locationId": "",
+        "currency": "USD"
+      }
+    },
+    {
+      "id": "mc-authenticator",
+      "label": "Authenticator",
+      "description": "TOTP 2FA code generation — Google Authenticator compatible. Gives the agent autonomous 2FA capability.",
+      "path": "plugins/mc-authenticator",
+      "entry": "index.ts",
+      "cli": true,
+      "tools": ["auth_code", "auth_list", "auth_time_remaining"],
+      "optional": true,
+      "config": {
+        "vaultBin": "~/.local/bin/mc-vault"
+      }
+    },
+    {
+      "id": "mc-booking",
+      "label": "Booking",
+      "description": "Appointment scheduling with Turso cloud DB, payment provider integration, and embeddable booking widget.",
+      "path": "plugins/mc-booking",
+      "entry": "index.ts",
+      "cli": true,
+      "tools": [
+        "booking_slots",
+        "booking_list",
+        "booking_show",
+        "booking_cancel",
+        "booking_reschedule"
+      ],
+      "optional": true,
+      "requires": ["turso-booking-url"],
+      "web": {
+        "port": 4221
+      },
+      "config": {
+        "vaultBin": "~/.local/bin/mc-vault",
+        "paymentProvider": "stripe",
+        "port": 4221,
+        "origins": ["https://miniclaw.bot", "https://augmentedmike.com"],
+        "availableDays": [1, 2, 3],
+        "timeSlots": [17, 18, 19],
+        "durationMinutes": 90,
+        "priceCents": 19900,
+        "maxPerDay": 1,
+        "windowWeeks": 4
+      }
     }
   ],
   "cli": [
@@ -296,6 +385,31 @@
     {
       "key": "gemini-api-key",
       "description": "Gemini API key for mc-designer (image generation)",
+      "required": false
+    },
+    {
+      "key": "stripe-secret-key",
+      "description": "Stripe secret API key (sk_test_... or sk_live_...)",
+      "required": false
+    },
+    {
+      "key": "stripe-publishable-key",
+      "description": "Stripe publishable API key (pk_test_... or pk_live_...)",
+      "required": false
+    },
+    {
+      "key": "square-access-token",
+      "description": "Square personal access token for payment processing",
+      "required": false
+    },
+    {
+      "key": "turso-booking-url",
+      "description": "Turso database URL for mc-booking (libsql://...)",
+      "required": false
+    },
+    {
+      "key": "turso-booking-token",
+      "description": "Turso auth token for mc-booking database",
       "required": false
     }
   ],

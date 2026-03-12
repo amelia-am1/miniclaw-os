@@ -1,0 +1,14 @@
+{
+  "name": "mc-booking",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "index.ts",
+  "description": "Appointment scheduling with cloud DB, payment integration, and embeddable widget",
+  "dependencies": {
+    "@libsql/client": "^0.14.0",
+    "hono": "^4.7.0"
+  },
+  "devDependencies": {
+    "openclaw": "*"
+  }
+}

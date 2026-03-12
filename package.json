@@ -1,0 +1,21 @@
+{
+  "name": "miniclaw-os",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "lint": "eslint 'plugins/mc-stripe/**/*.ts' 'plugins/mc-square/**/*.ts' 'plugins/mc-booking/**/*.ts'",
+    "lint:all": "eslint 'plugins/**/*.ts'",
+    "lint:fix": "eslint --fix 'plugins/mc-stripe/**/*.ts' 'plugins/mc-square/**/*.ts' 'plugins/mc-booking/**/*.ts'"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/bun": "latest",
+    "@typescript-eslint/eslint-plugin": "^8.57.0",
+    "@typescript-eslint/parser": "^8.57.0",
+    "eslint": "^10.0.3",
+    "eslint-plugin-sonarjs": "^4.0.2"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
