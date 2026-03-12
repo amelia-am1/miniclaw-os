@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import StepWelcome from "./steps/StepWelcome";
-import StepName from "./steps/StepName";
+import StepMeetHer from "./steps/StepMeetHer";
+import StepTelegram from "./steps/StepTelegram";
 import StepColor from "./steps/StepColor";
-import StepPersona from "./steps/StepPersona";
 import StepEmail from "./steps/StepEmail";
 import StepGemini from "./steps/StepGemini";
 import StepInstalling from "./steps/StepInstalling";
@@ -12,19 +11,23 @@ import StepDone from "./steps/StepDone";
 
 export type WizardState = {
   assistantName: string;
-  accentColor: string;
+  shortName: string;
   pronouns: string;
+  visualDescription: string;
+  accentColor: string;
   personaBlurb: string;
   emailAddress: string;
   appPassword: string;
   geminiKey: string;
+  telegramBotUsername: string;
+  telegramBotToken: string;
+  telegramChatId: string;
 };
 
 const STEPS = [
-  "welcome",
-  "name",
+  "meet",
+  "telegram",
   "color",
-  "persona",
   "email",
   "gemini",
   "installing",
@@ -32,18 +35,24 @@ const STEPS = [
 ] as const;
 type Step = (typeof STEPS)[number];
 
-const TOTAL_STEPS = 6; // excludes welcome, installing, done
+const NUMBERED_STEPS = ["meet", "telegram", "color", "email", "gemini"] as const;
 
 export default function SetupWizard() {
-  const [step, setStep] = useState<Step>("welcome");
+  const [step, setStep] = useState<Step>("meet");
   const [state, setState] = useState<WizardState>({
-    assistantName: "AM",
-    accentColor: "#00E5CC",
+    assistantName: "Amelia",
+    shortName: "Am",
     pronouns: "she/her",
+    visualDescription:
+      "Red-haired woman in her late 20s, warm brown eyes, light freckles, wavy copper hair past shoulders, confident and approachable. Usually in black sleeveless top, city background.",
+    accentColor: "#00E5CC",
     personaBlurb: "",
     emailAddress: "",
     appPassword: "",
     geminiKey: "",
+    telegramBotUsername: "",
+    telegramBotToken: "",
+    telegramChatId: "",
   });
 
   const next = useCallback(() => {
@@ -60,27 +69,33 @@ export default function SetupWizard() {
     setState((s) => ({ ...s, ...patch }));
   }, []);
 
-  const stepNum = ((): number => {
-    const map: Partial<Record<Step, number>> = {
-      name: 1, color: 2, persona: 3, email: 4, gemini: 5,
-    };
-    return map[step] ?? 0;
-  })();
+  const stepNum = NUMBERED_STEPS.indexOf(step as (typeof NUMBERED_STEPS)[number]) + 1;
 
-  const accentStyle = { "--user-accent": state.accentColor } as React.CSSProperties;
+  const accentStyle = {
+    "--user-accent": state.accentColor,
+  } as React.CSSProperties;
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12" style={accentStyle}>
+    <div
+      className="min-h-screen flex flex-col items-center justify-center px-4 py-12"
+      style={accentStyle}
+    >
       {/* Progress indicator */}
       {stepNum > 0 && step !== "installing" && step !== "done" && (
-        <div className="mb-8 flex gap-2">
-          {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
+        <div className="mb-8 flex items-center gap-2">
+          <span className="text-xs text-[#666] mr-1">
+            {stepNum}/{NUMBERED_STEPS.length}
+          </span>
+          {NUMBERED_STEPS.map((_, i) => (
             <div
               key={i}
               className="h-1.5 rounded-full transition-all duration-500"
               style={{
                 width: i < stepNum ? "32px" : "12px",
-                background: i < stepNum ? state.accentColor : "rgba(255,255,255,0.15)",
+                background:
+                  i < stepNum
+                    ? state.accentColor
+                    : "rgba(255,255,255,0.15)",
               }}
             />
           ))}
@@ -89,11 +104,23 @@ export default function SetupWizard() {
 
       {/* Step content */}
       <div className="w-full max-w-md step-enter" key={step}>
-        {step === "welcome" && <StepWelcome onNext={next} accent={state.accentColor} />}
-        {step === "name" && (
-          <StepName
-            value={state.assistantName}
-            onChange={(v) => update({ assistantName: v })}
+        {step === "meet" && (
+          <StepMeetHer
+            name={state.assistantName}
+            shortName={state.shortName}
+            pronouns={state.pronouns}
+            visualDescription={state.visualDescription}
+            onChange={(p) => update(p)}
+            onNext={next}
+            accent={state.accentColor}
+          />
+        )}
+        {step === "telegram" && (
+          <StepTelegram
+            botUsername={state.telegramBotUsername}
+            botToken={state.telegramBotToken}
+            chatId={state.telegramChatId}
+            onChange={(p) => update(p)}
             onNext={next}
             onBack={back}
             accent={state.accentColor}
@@ -102,20 +129,10 @@ export default function SetupWizard() {
         {step === "color" && (
           <StepColor
             value={state.accentColor}
-            name={state.assistantName}
+            name={state.shortName || state.assistantName}
             onChange={(v) => update({ accentColor: v })}
             onNext={next}
             onBack={back}
-          />
-        )}
-        {step === "persona" && (
-          <StepPersona
-            pronouns={state.pronouns}
-            blurb={state.personaBlurb}
-            onChange={(p) => update(p)}
-            onNext={next}
-            onBack={back}
-            accent={state.accentColor}
           />
         )}
         {step === "email" && (
@@ -141,7 +158,10 @@ export default function SetupWizard() {
           <StepInstalling state={state} onDone={next} accent={state.accentColor} />
         )}
         {step === "done" && (
-          <StepDone name={state.assistantName} accent={state.accentColor} />
+          <StepDone
+            name={state.shortName || state.assistantName}
+            accent={state.accentColor}
+          />
         )}
       </div>
     </div>

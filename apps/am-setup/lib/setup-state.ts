@@ -7,24 +7,35 @@ const STATE_FILE = path.join(STATE_DIR, "user", "setup-state.json");
 export interface SetupState {
   complete: boolean;
   assistantName: string;
+  shortName: string;
   accentColor: string;
   pronouns: string;
+  visualDescription: string;
   personaBlurb: string;
   emailAddress: string;
   emailConfigured: boolean;
   geminiConfigured: boolean;
+  telegramBotUsername: string;
+  telegramBotToken: string;
+  telegramChatId: string;
   completedAt?: string;
+  [key: string]: string | boolean | undefined;
 }
 
 const defaults: SetupState = {
   complete: false,
-  assistantName: "AM",
+  assistantName: "Amelia",
+  shortName: "Am",
   accentColor: "#00E5CC",
   pronouns: "she/her",
+  visualDescription: "",
   personaBlurb: "",
   emailAddress: "",
   emailConfigured: false,
   geminiConfigured: false,
+  telegramBotUsername: "",
+  telegramBotToken: "",
+  telegramChatId: "",
 };
 
 export function readSetupState(): SetupState {
