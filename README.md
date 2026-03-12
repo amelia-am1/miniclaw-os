@@ -152,6 +152,8 @@ What makes Amelia unique:
 
 MiniClaw is modular. Each plugin handles one job — and handles it well. You can use all of them together or pick the ones you need.
 
+> **Plugin testing status:** The `mc-*` plugins are being tested by hand, but Am builds them faster than we can verify. If you run into an issue with any plugin beyond the base install (like mc-square, mc-stripe, etc.), tell your "Am" to debug and fix the tool — she knows how to fix herself or contact us for support when needed.
+
 ### Core Plugins
 
 | Plugin | Description |
