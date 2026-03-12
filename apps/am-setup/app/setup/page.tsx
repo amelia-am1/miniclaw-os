@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default function SetupPage() {
   if (isSetupComplete()) {
-    redirect("/dashboard");
+    redirect("http://localhost:4220");
   }
   return <SetupWizard />;
 }
