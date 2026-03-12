@@ -193,6 +193,23 @@ else
   bun install -g qmd 2>/dev/null && ok "QMD installed" || warn "QMD install failed — run: bun install -g qmd"
 fi
 
+# ── Step 9b: Evacuate existing .openclaw ─────────────────────────────────────
+if [[ -d "$OPENCLAW_DIR" ]]; then
+  step "Step 9b: Evacuating existing install"
+  EVAC_DIR="${OPENCLAW_DIR}_original"
+  # Don't clobber a previous evacuation
+  if [[ -d "$EVAC_DIR" ]]; then
+    EVAC_DIR="${OPENCLAW_DIR}_original_$(date +%Y%m%d-%H%M%S)"
+  fi
+  info "Moving $OPENCLAW_DIR → $EVAC_DIR"
+  mv "$OPENCLAW_DIR" "$EVAC_DIR"
+  info "Compressing backup..."
+  (cd "$HOME" && zip -rq "$(basename "$EVAC_DIR").zip" "$(basename "$EVAC_DIR")" 2>/dev/null) \
+    && ok "Archived to ~/$(basename "$EVAC_DIR").zip" \
+    || warn "zip failed — uncompressed backup preserved at $EVAC_DIR"
+  ok "Previous install evacuated"
+fi
+
 # ── Step 10: OpenClaw (from MiniClaw fork) ────────────────────────────────────
 step "Step 10: OpenClaw"
 
@@ -211,6 +228,7 @@ else
     git clone --depth 1 https://github.com/augmentedmike/openclaw.git "$OPENCLAW_LOCAL" || die "Failed to clone OpenClaw"
   fi
   info "Installing dependencies..."
+  (cd "$OPENCLAW_LOCAL" && pnpm install --ignore-scripts 2>&1 | tail -3) || warn "pnpm install --ignore-scripts had warnings (non-fatal)"
   (cd "$OPENCLAW_LOCAL" && pnpm install 2>&1 | tail -3) || warn "pnpm install had warnings (non-fatal)"
   info "Building OpenClaw..."
   (cd "$OPENCLAW_LOCAL" && pnpm build 2>&1 | tail -3) || die "OpenClaw build failed"
