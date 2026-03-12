@@ -42,6 +42,7 @@ export default function StepMeetHer({
   const [selectedPronouns, setSelectedPronouns] = useState(pronouns);
   const [selectedColor, setSelectedColor] = useState(accentColor);
   const [photoSrc, setPhotoSrc] = useState("/amelia.png");
+  const [nickError, setNickError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -163,12 +164,28 @@ export default function StepMeetHer({
         <input
           type="text"
           value={shortInput}
-          onChange={(e) => setShortInput(e.target.value)}
+          onChange={(e) => {
+            const raw = e.target.value;
+            // Allow only filesystem-safe chars: letters, numbers, dash, underscore
+            const sanitized = raw.replace(/[^a-zA-Z0-9_-]/g, "");
+            setShortInput(sanitized);
+            if (raw !== sanitized) {
+              setNickError("Only letters, numbers, dashes, and underscores");
+            } else {
+              setNickError("");
+            }
+          }}
           placeholder="Am"
-          maxLength={8}
+          maxLength={16}
           className="w-full px-4 py-3 rounded-xl bg-[#1a1a1a] border text-white text-lg font-medium placeholder-[#444] focus:outline-none transition-all"
-          style={{ borderColor: shortInput ? selectedColor : "rgba(255,255,255,0.1)" }}
+          style={{ borderColor: nickError ? "#FF5252" : shortInput ? selectedColor : "rgba(255,255,255,0.1)" }}
         />
+        {nickError && (
+          <span className="text-xs text-[#FF5252]">{nickError}</span>
+        )}
+        <span className="text-xs text-[#555]">
+          This becomes ~/{shortInput.toLowerCase() || "am"} on your machine
+        </span>
       </div>
 
       <button
