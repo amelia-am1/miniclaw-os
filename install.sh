@@ -595,74 +595,94 @@ fi
 # ── Step 12: Brain board crons ────────────────────────────────────────────────
 step "Step 12: Brain board cron workers"
 
-OC_PORT="${OPENCLAW_PORT:-18789}"
-OC_TOKEN_FILE="$OPENCLAW_DIR/gateway-token.txt"
-OC_API="http://127.0.0.1:$OC_PORT"
+# Write cron jobs directly to jobs.json so OpenClaw picks them up on startup.
+# No running gateway required.
+CRON_DIR="$STATE_DIR/cron"
+CRON_FILE="$CRON_DIR/jobs.json"
+mkdir -p "$CRON_DIR"
 
-register_cron() {
-  local name="$1"
-  local payload="$2"
-  # Check if already registered
-  existing=$(curl -sf -H "Authorization: Bearer $(cat "$OC_TOKEN_FILE" 2>/dev/null)" \
-    "$OC_API/api/cron/jobs" 2>/dev/null | python3 -c "
-import sys,json
-jobs=json.load(sys.stdin).get('jobs',[])
-print(next((j['id'] for j in jobs if j.get('name')=='$name'),''))
-" 2>/dev/null || echo "")
-  if [[ -n "$existing" ]]; then
-    ok "Cron '$name' already registered ($existing)"
-    return
-  fi
-  result=$(curl -sf -X POST \
-    -H "Authorization: Bearer $(cat "$OC_TOKEN_FILE" 2>/dev/null)" \
-    -H "Content-Type: application/json" \
-    -d "$payload" \
-    "$OC_API/api/cron/jobs" 2>/dev/null || echo "")
-  if echo "$result" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id',''))" 2>/dev/null | grep -q .; then
-    ok "Cron '$name' registered"
-  else
-    warn "Could not register '$name' — OpenClaw may not be running. Run install.sh again after starting OpenClaw."
-  fi
-}
+# Merge board worker jobs into jobs.json (preserves any existing jobs)
+python3 << PYEOF
+import json, uuid, os, sys
 
-register_cron "board-worker-backlog" '{
-  "name": "board-worker-backlog",
-  "schedule": {"kind": "cron", "expr": "*/5 * * * *"},
-  "sessionTarget": "isolated",
-  "model": "claude-haiku-4-5-20251001",
-  "payload": {
-    "kind": "agentTurn",
-    "timeoutSeconds": 600,
-    "message": "Board worker — BACKLOG triage.\n\nMAX_CONCURRENT_COLUMN_TASKS=3.\n\n0. INTEGRITY CHECK: openclaw mc-board check-dupes --fix\n   (removes stale duplicate card files before any work begins)\n\n1. Check what is already being worked: openclaw mc-board active\n2. Get full column context (excludes on-hold cards): openclaw mc-board context --column backlog --skip-hold\n3. Group cards by project. For each project pick at most 1 card — highest priority, then oldest. Skip any card already in the active list.\n   If 0 cards available: Stop here. Silent exit. Do NOT send any Telegram message.\n4. For each selected card:\n   a. Register pickup: openclaw mc-board pickup <id> --worker board-worker-backlog\n   b. Read full detail: openclaw mc-board show <id>\n   c. Fill any missing fields (problem, plan, criteria) — research what is needed\n   d. Move to in-progress: openclaw mc-board move <id> in-progress\n   e. Release: openclaw mc-board release <id> --worker board-worker-backlog\n5. Done. Silent exit."
-  },
-  "delivery": {"mode": "none"}
-}'
+cron_file = "$CRON_FILE"
 
-register_cron "board-worker-in-progress" '{
-  "name": "board-worker-in-progress",
-  "schedule": {"kind": "cron", "expr": "1-59/5 * * * *"},
-  "sessionTarget": "isolated",
-  "model": "claude-haiku-4-5-20251001",
-  "payload": {
-    "kind": "agentTurn",
-    "timeoutSeconds": 600,
-    "message": "Board worker — IN-PROGRESS triage.\n\nMAX_CONCURRENT_COLUMN_TASKS=3. You may work on at most 3 cards, selecting the best candidate per project.\n\n1. Check active workers: openclaw mc-board active\n2. Get full column context (excludes on-hold): openclaw mc-board context --column in-progress --skip-hold\n3. Group by project. Per project pick 1 card — highest priority then oldest. Skip cards already active.\n   If 0 cards available: Stop here. Silent exit. Do NOT send any Telegram message.\n4. For each selected card:\n   a. Register pickup: openclaw mc-board pickup <id> --worker board-worker-in-progress\n   b. Read full detail: openclaw mc-board show <id>\n   c. Do one unit of work toward completing it — whatever the plan calls for next\n   d. Check off any acceptance criteria now met (- [x])\n   e. Update notes with what was done: openclaw mc-board update <id> --notes \"<what was done>\"\n   f. If all criteria checked: openclaw mc-board move <id> in-review\n   g. Release: openclaw mc-board release <id> --worker board-worker-in-progress\n5. Done. Silent exit."
-  },
-  "delivery": {"mode": "none"}
-}'
+# Load existing
+store = {"version": 1, "jobs": []}
+try:
+    with open(cron_file) as f:
+        store = json.load(f)
+except (FileNotFoundError, json.JSONDecodeError):
+    pass
 
-register_cron "board-worker-in-review" '{
-  "name": "board-worker-in-review",
-  "schedule": {"kind": "cron", "expr": "2-59/5 * * * *"},
-  "sessionTarget": "isolated",
-  "model": "claude-haiku-4-5-20251001",
-  "payload": {
-    "kind": "agentTurn",
-    "timeoutSeconds": 600,
-    "message": "Board worker — IN-REVIEW triage.\n\nMAX_CONCURRENT_COLUMN_TASKS=3. Select best candidate per project.\n\n1. Check active workers: openclaw mc-board active\n2. Get full column context (excludes on-hold): openclaw mc-board context --column in-review --skip-hold\n3. Group by project. Per project pick 1 card — highest priority then oldest. Skip cards already active.\n   If 0 cards available: Stop here. Silent exit. Do NOT send any Telegram message.\n4. For each selected card:\n   a. Register pickup: openclaw mc-board pickup <id> --worker board-worker-in-review\n   b. Read full detail: openclaw mc-board show <id>\n   c. Audit: verify the work product exists and all criteria are genuinely met\n   d. If it holds up:\n      - openclaw mc-board update <id> --review \"Audited [date]: [what was checked, findings]\"\n      - openclaw mc-board move <id> shipped\n      - IMMEDIATELY create a VERIFY card in backlog using brain_create_card:\n          title: \"VERIFY: [original card title]\"\n          project_id: [same as shipped card]\n          priority: high\n          column: backlog\n          problem: \"Confirm [shipped card title] ([shipped card id]) is live and working in production.\"\n          plan: \"1. PRODUCTION CHECK: verify the shipped work is actually live and functional (hit the URL, run the CLI, check the page, confirm the deploy).\\n2. DOCUMENT SWEEP: scan card notes and any /tmp or workspace paths mentioned — find files/docs created during the work. For each: if a knowledge doc (md, txt, research) move to ~/.openclaw/workspace/docs/ or relevant subdir then kb_add it; if an artifact (image, PDF, video) move to ~/.openclaw/workspace/artifacts/ and note path in KB; if already in workspace just kb_add if not yet indexed.\\n3. END-TO-END TEST: exercise the main use case — not just that it exists but that it works.\\n4. PASS: move this card to shipped. FAIL: create a bug card linked to original, move this card to backlog.\"\n          criteria: \"- [ ] Production verified live\\n- [ ] Documents/artifacts moved to workspace (if any)\\n- [ ] Documents indexed in KB (if any)\\n- [ ] End-to-end test passed\"\n   e. If it fails:\n      - Uncheck failed criteria and add a note explaining what is wrong\n      - openclaw mc-board update <id> --notes \"Review failed: <reason>\"\n      - Leave in in-review for another pass\n   f. Release: openclaw mc-board release <id> --worker board-worker-in-review\n5. Done. Silent exit."
-  },
-  "delivery": {"mode": "none"}
-}'
+existing_names = {j.get("name") for j in store.get("jobs", [])}
+
+workers = [
+    {
+        "name": "board-worker-backlog",
+        "schedule": {"kind": "cron", "expr": "*/5 * * * *"},
+        "sessionTarget": "isolated",
+        "model": "claude-haiku-4-5-20251001",
+        "payload": {
+            "kind": "agentTurn",
+            "timeoutSeconds": 600,
+            "messageFile": "prompts/board-worker-backlog.md"
+        },
+        "delivery": {"mode": "none"},
+        "enabled": True
+    },
+    {
+        "name": "board-worker-in-progress",
+        "schedule": {"kind": "cron", "expr": "1-59/5 * * * *"},
+        "sessionTarget": "isolated",
+        "model": "claude-haiku-4-5-20251001",
+        "payload": {
+            "kind": "agentTurn",
+            "timeoutSeconds": 600,
+            "messageFile": "prompts/board-worker-in-progress.md"
+        },
+        "delivery": {"mode": "none"},
+        "enabled": True
+    },
+    {
+        "name": "board-worker-in-review",
+        "schedule": {"kind": "cron", "expr": "2-59/5 * * * *"},
+        "sessionTarget": "isolated",
+        "model": "claude-haiku-4-5-20251001",
+        "payload": {
+            "kind": "agentTurn",
+            "timeoutSeconds": 600,
+            "messageFile": "prompts/board-worker-in-review.md"
+        },
+        "delivery": {"mode": "none"},
+        "enabled": True
+    }
+]
+
+added = 0
+for w in workers:
+    if w["name"] not in existing_names:
+        w["id"] = str(uuid.uuid4())
+        store.setdefault("jobs", []).append(w)
+        added += 1
+
+os.makedirs(os.path.dirname(cron_file), exist_ok=True)
+with open(cron_file, "w") as f:
+    json.dump(store, f, indent=2)
+
+if added:
+    print(f"  Added {added} board worker(s) to jobs.json")
+else:
+    print("  Board workers already in jobs.json")
+PYEOF
+ok "Board cron workers written to $CRON_FILE"
+
+# Copy cron prompts
+if [[ -d "$REPO_DIR/cron/prompts" ]]; then
+  mkdir -p "$CRON_DIR/prompts"
+  cp -r "$REPO_DIR/cron/prompts/"* "$CRON_DIR/prompts/" 2>/dev/null
+  ok "Cron prompts copied"
+fi
 
 # ── Step 13: Shell env ────────────────────────────────────────────────────────
 step "Step 13: Shell environment"
