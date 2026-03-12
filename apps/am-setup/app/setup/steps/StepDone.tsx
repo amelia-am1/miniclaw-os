@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 
 interface Props {
   name: string;
@@ -9,18 +8,15 @@ interface Props {
 }
 
 export default function StepDone({ name, accent }: Props) {
-  const router = useRouter();
-
   useEffect(() => {
     const t = setTimeout(() => {
-      router.push("/dashboard");
+      window.location.href = "http://localhost:4220";
     }, 3000);
     return () => clearTimeout(t);
-  }, [router]);
+  }, []);
 
   return (
     <div className="text-center flex flex-col items-center gap-8">
-      {/* Celebration mark */}
       <div
         className="w-24 h-24 rounded-full flex items-center justify-center text-4xl"
         style={{ background: `${accent}22`, border: `2px solid ${accent}` }}
@@ -33,8 +29,7 @@ export default function StepDone({ name, accent }: Props) {
           {name} is ready.
         </h2>
         <p className="text-[#888] text-lg">
-          She&apos;s been set up on your device and is already at work.
-          Taking you to your dashboard now.
+          Taking you to the brain board now.
         </p>
       </div>
 
@@ -52,7 +47,7 @@ export default function StepDone({ name, accent }: Props) {
             }}
           />
         </div>
-        <p className="text-xs text-[#555]">Redirecting to your dashboard...</p>
+        <p className="text-xs text-[#555]">Redirecting to brain board...</p>
       </div>
 
       <style>{`
