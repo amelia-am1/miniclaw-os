@@ -13,9 +13,12 @@ function _resolveBotId(): string {
   throw new Error("OPENCLAW_BOT_ID not set and botId not found in openclaw.json");
 }
 
-const _BOT_ID = _resolveBotId();
-const KB_DB = process.env.BOARD_KB_DB ?? path.join(_STATE, "USER", _BOT_ID, "kb", "kb.db");
-const QMD_DIR = process.env.BOARD_QMD_DIR ?? path.join(_STATE, "USER", _BOT_ID, "memory");
+function _getKbDb(): string {
+  return process.env.BOARD_KB_DB ?? path.join(_STATE, "USER", _resolveBotId(), "kb", "kb.db");
+}
+function _getQmdDir(): string {
+  return process.env.BOARD_QMD_DIR ?? path.join(_STATE, "USER", _resolveBotId(), "memory");
+}
 
 export interface KbEntry {
   id: string;
@@ -37,9 +40,9 @@ function mapRow(row: Record<string, unknown>): KbEntry {
 }
 
 export function listKbEntries(limit = 50): KbEntry[] {
-  if (!fs.existsSync(KB_DB)) return [];
+  if (!fs.existsSync(_getKbDb())) return [];
   try {
-    const db = new Database(KB_DB, { readonly: true });
+    const db = new Database(_getKbDb(), { readonly: true });
     const rows = db.prepare("SELECT id, title, content, summary, created_at, updated_at FROM entries ORDER BY updated_at DESC LIMIT ?").all(limit) as Record<string, unknown>[];
     db.close();
     return rows.map(mapRow);
@@ -47,9 +50,9 @@ export function listKbEntries(limit = 50): KbEntry[] {
 }
 
 export function searchKbEntries(query: string, limit = 20): KbEntry[] {
-  if (!fs.existsSync(KB_DB)) return [];
+  if (!fs.existsSync(_getKbDb())) return [];
   try {
-    const db = new Database(KB_DB, { readonly: true });
+    const db = new Database(_getKbDb(), { readonly: true });
     const q = `%${query}%`;
     const rows = db.prepare("SELECT id, title, content, summary, created_at, updated_at FROM entries WHERE title LIKE ? OR content LIKE ? ORDER BY updated_at DESC LIMIT ?").all(q, q, limit) as Record<string, unknown>[];
     db.close();
@@ -80,9 +83,9 @@ function walkMd(dir: string): string[] {
 const KB_MIN_CONTENT = 80;
 
 export function pruneKbEntries(dryRun = true): { id: string; title: string; content: string }[] {
-  if (!fs.existsSync(KB_DB)) return [];
+  if (!fs.existsSync(_getKbDb())) return [];
   try {
-    const db = new Database(KB_DB);
+    const db = new Database(_getKbDb());
     const dead = db.prepare(
       "SELECT id, title, content FROM entries WHERE length(trim(content)) < ?"
     ).all(KB_MIN_CONTENT) as { id: string; title: string; content: string }[];
@@ -111,16 +114,16 @@ comma, separated, tags
 `;
 
 export function listQmdRecent(limit = 20): QmdEntry[] {
-  if (!fs.existsSync(QMD_DIR)) return [];
+  if (!fs.existsSync(_getQmdDir())) return [];
   try {
-    const files = walkMd(QMD_DIR)
+    const files = walkMd(_getQmdDir())
       .map(full => {
         const stat = fs.statSync(full);
         const content = fs.readFileSync(full, "utf-8");
         const lines = content.split("\n");
         const title = lines[0]?.replace(/^#+\s*/, "") || path.basename(full, ".md");
         const preview = lines.slice(1, 4).join(" ").slice(0, 120);
-        const filename = path.relative(QMD_DIR, full);
+        const filename = path.relative(_getQmdDir(), full);
         return { filename, title, path: full, modified: stat.mtime.toISOString(), preview };
       })
       .sort((a, b) => b.modified.localeCompare(a.modified));
