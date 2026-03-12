@@ -5,6 +5,7 @@ import { MemoryTab } from "./MemoryTab";
 import { RolodexTab } from "./RolodexTab";
 import { Modal } from "./Modal";
 import { ChatPanel } from "./ChatPanel";
+import { WelcomeWizard, useWelcomeWizard } from "./WelcomeWizard";
 import { Project, BoardCard } from "@/lib/types";
 
 type Tab = "board" | "memory" | "rolodex";
@@ -40,6 +41,7 @@ export function AppShell({ initialTab, initialCardId, initialProjectId }: { init
   const [chatOpen, setChatOpen] = useState(false);
   const [pendingContext, setPendingContext] = useState<string | null>(null);
   const [openCardId, setOpenCardId] = useState<string | null>(initialCardId ?? null);
+  const { showWelcome, dismissWelcome } = useWelcomeWizard();
 
   const showToast = useCallback((icon: string, title: string, sub?: string) => {
     const id = Date.now();
@@ -137,7 +139,7 @@ export function AppShell({ initialTab, initialCardId, initialProjectId }: { init
         </div>
 
         {/* Center: project button (board only) */}
-        <div className="flex flex-1 items-center justify-center px-4">
+        <div className="flex flex-1 items-center justify-center px-4" data-tour="projects">
           {tab === "board" && projects.length > 0 && (() => {
             const proj = selectedProject ? projects.find(p => p.id === selectedProject) : null;
             const pCards = proj ? allCards.filter(c => c.project_id === proj.id) : [];
@@ -294,6 +296,9 @@ export function AppShell({ initialTab, initialCardId, initialProjectId }: { init
       </div>
 
       {/* Projects modal */}
+      {/* Welcome wizard */}
+      {showWelcome && <WelcomeWizard onDone={dismissWelcome} />}
+
       {projectsOpen && (
         <Modal onClose={() => setProjectsOpen(false)}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid #27272a" }}>

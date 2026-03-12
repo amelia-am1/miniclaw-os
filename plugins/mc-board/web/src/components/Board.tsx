@@ -233,7 +233,7 @@ export function Board({ selectedProject, initialCardId, onToast, notifsEnabled, 
   return (
     <div className="board-tab">
       {/* Search bar */}
-      <div ref={searchRef} className="relative" style={{ padding: "0 0 10px" }}>
+      <div ref={searchRef} className="relative" data-tour="search" style={{ padding: "0 0 10px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <input
             type="text"

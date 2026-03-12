@@ -29,7 +29,7 @@ export function ColumnShell({ column, count, activeCount, headerActions, childre
 
   if (isShipped && collapsed) {
     return (
-      <div className="shipped-col" onClick={onToggleCollapse} title={`Show shipped (${count})`}>
+      <div className="shipped-col" data-tour="shipped" onClick={onToggleCollapse} title={`Show shipped (${count})`}>
         <span className="shipped-label">Shipped</span>
         <span className="shipped-count">{count}</span>
       </div>
@@ -37,7 +37,7 @@ export function ColumnShell({ column, count, activeCount, headerActions, childre
   }
 
   return (
-    <div className={`column${isShipped ? " shipped-col open" : ""}`}>
+    <div className={`column${isShipped ? " shipped-col open" : ""}`} data-tour={column}>
       <div
         className="column-header"
         onClick={isShipped ? onToggleCollapse : undefined}
