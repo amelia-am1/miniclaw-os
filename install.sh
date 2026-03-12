@@ -685,7 +685,7 @@ fi
 # ── Step 13: Shell env ────────────────────────────────────────────────────────
 step "Step 13: Shell environment"
 
-for rcfile in "$HOME/.zshrc" "$HOME/.bashrc"; do
+for rcfile in "$HOME/.zshrc"; do
   [[ -f "$rcfile" ]] || continue
 
   if grep -q "OPENCLAW_STATE_DIR" "$rcfile"; then
