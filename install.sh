@@ -776,6 +776,9 @@ launchctl load "$BOARD_PLIST" 2>/dev/null && ok "Board web LaunchAgent loaded (p
 # ── Step 15b: AM Setup Wizard LaunchAgent ─────────────────────────────────
 step "Step 15b: AM Setup Wizard LaunchAgent"
 
+# Reset onboarding state so the wizard always runs after install
+rm -f "$STATE_DIR/user/setup-state.json"
+
 SETUP_APP_DIR="$MINICLAW_DIR/apps/am-setup"
 SETUP_PLIST="$HOME/Library/LaunchAgents/com.miniclaw.am-setup.plist"
 
