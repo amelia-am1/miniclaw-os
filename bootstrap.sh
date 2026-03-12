@@ -210,6 +210,12 @@ else
     mkdir -p "$(dirname "$OPENCLAW_LOCAL")"
     git clone --depth 1 https://github.com/augmentedmike/openclaw.git "$OPENCLAW_LOCAL" || die "Failed to clone OpenClaw"
   fi
+  info "Installing dependencies..."
+  (cd "$OPENCLAW_LOCAL" && pnpm install 2>&1 | tail -3) || warn "pnpm install had warnings (non-fatal)"
+  info "Building OpenClaw..."
+  (cd "$OPENCLAW_LOCAL" && pnpm build 2>&1 | tail -3) || die "OpenClaw build failed"
+  info "Building Control UI..."
+  (cd "$OPENCLAW_LOCAL" && pnpm ui:build 2>&1 | tail -3) || warn "Control UI build failed (non-fatal)"
   npm install -g --ignore-scripts "$OPENCLAW_LOCAL" || die "OpenClaw install failed"
   command -v openclaw &>/dev/null && ok "OpenClaw $(openclaw --version 2>/dev/null | head -1) installed" || die "openclaw not found in PATH after install"
 fi
