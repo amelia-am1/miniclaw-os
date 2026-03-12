@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import StepMeetHer from "./steps/StepMeetHer";
 import StepTelegram from "./steps/StepTelegram";
-
+import StepAnthropic from "./steps/StepAnthropic";
 import StepEmail from "./steps/StepEmail";
 import StepGemini from "./steps/StepGemini";
 import StepInstalling from "./steps/StepInstalling";
@@ -15,6 +16,7 @@ export type WizardState = {
   pronouns: string;
   accentColor: string;
   personaBlurb: string;
+  anthropicToken: string;
   emailAddress: string;
   appPassword: string;
   geminiKey: string;
@@ -28,21 +30,31 @@ const STEPS = [
   "telegram",
   "email",
   "gemini",
+  "anthropic",
   "installing",
   "done",
 ] as const;
 type Step = (typeof STEPS)[number];
 
-const NUMBERED_STEPS = ["meet", "telegram", "email", "gemini"] as const;
+const NUMBERED_STEPS = ["meet", "telegram", "email", "gemini", "anthropic"] as const;
+
+function stepFromPath(pathname: string): Step {
+  const seg = pathname.split("/").pop() || "";
+  if (STEPS.includes(seg as Step)) return seg as Step;
+  return "meet";
+}
 
 export default function SetupWizard() {
-  const [step, setStep] = useState<Step>("meet");
+  const router = useRouter();
+  const pathname = usePathname();
+  const [step, setStepState] = useState<Step>(() => stepFromPath(pathname));
   const [state, setState] = useState<WizardState>({
     assistantName: "Amelia",
     shortName: "Am",
     pronouns: "she/her",
     accentColor: "#00E5CC",
     personaBlurb: "",
+    anthropicToken: "",
     emailAddress: "",
     appPassword: "",
     geminiKey: "",
@@ -51,15 +63,29 @@ export default function SetupWizard() {
     telegramChatId: "",
   });
 
+  // Sync step from URL on pathname change
+  useEffect(() => {
+    const s = stepFromPath(pathname);
+    setStepState(s);
+  }, [pathname]);
+
+  const setStep = useCallback(
+    (s: Step) => {
+      setStepState(s);
+      router.push(`/setup/${s}`);
+    },
+    [router],
+  );
+
   const next = useCallback(() => {
     const idx = STEPS.indexOf(step);
     if (idx < STEPS.length - 1) setStep(STEPS[idx + 1]);
-  }, [step]);
+  }, [step, setStep]);
 
   const back = useCallback(() => {
     const idx = STEPS.indexOf(step);
     if (idx > 0) setStep(STEPS[idx - 1]);
-  }, [step]);
+  }, [step, setStep]);
 
   const update = useCallback((patch: Partial<WizardState>) => {
     setState((s) => ({ ...s, ...patch }));
@@ -99,7 +125,7 @@ export default function SetupWizard() {
       )}
 
       {/* Step content */}
-      <div className="w-full max-w-md step-enter" key={step}>
+      <div className="w-full max-w-xl step-enter" key={step}>
         {step === "meet" && (
           <StepMeetHer
             name={state.assistantName}
@@ -139,6 +165,16 @@ export default function SetupWizard() {
             onNext={next}
             onBack={back}
             accent={state.accentColor}
+          />
+        )}
+        {step === "anthropic" && (
+          <StepAnthropic
+            setupToken={state.anthropicToken}
+            onChange={(v) => update({ anthropicToken: v })}
+            onNext={next}
+            onBack={back}
+            accent={state.accentColor}
+            assistantName={state.shortName || state.assistantName}
           />
         )}
         {step === "installing" && (
