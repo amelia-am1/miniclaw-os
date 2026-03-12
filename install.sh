@@ -746,8 +746,16 @@ for rcfile in "$HOME/.zshrc" "$HOME/.bashrc"; do
   fi
 done
 
-# ── Step 14: Board web LaunchAgent ────────────────────────────────────────────
-step "Step 14: Board web server LaunchAgent"
+# ── Step 14: Board web build + LaunchAgent ────────────────────────────────────
+step "Step 14: Board web server"
+
+BOARD_WEB_DIR="$MINICLAW_DIR/plugins/mc-board/web"
+if [[ -f "$BOARD_WEB_DIR/package.json" ]]; then
+  info "Building board web..."
+  (cd "$BOARD_WEB_DIR" && npm install --production=false 2>&1 | tail -3 && npx next build 2>&1 | tail -5) \
+    && ok "Board web built" \
+    || warn "Board web build failed — run: cd $BOARD_WEB_DIR && npm install && npx next build"
+fi
 
 BOARD_PLIST="$HOME/Library/LaunchAgents/com.miniclaw.board-web.plist"
 if [[ ! -f "$BOARD_PLIST" ]]; then
@@ -762,8 +770,13 @@ if [[ ! -f "$BOARD_PLIST" ]]; then
   <key>ProgramArguments</key>
   <array>
     <string>$(which node || echo /opt/homebrew/bin/node)</string>
-    <string>$MINICLAW_DIR/plugins/mc-board/web/standalone.mjs</string>
+    <string>$MINICLAW_DIR/plugins/mc-board/web/node_modules/.bin/next</string>
+    <string>start</string>
+    <string>-p</string>
+    <string>4220</string>
   </array>
+  <key>WorkingDirectory</key>
+  <string>$MINICLAW_DIR/plugins/mc-board/web</string>
   <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>
