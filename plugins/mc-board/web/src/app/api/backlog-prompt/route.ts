@@ -34,20 +34,22 @@ function validatePromptPath(p: string): boolean {
   return resolved.startsWith(getPromptsDir() + path.sep) || resolved === getPromptsDir();
 }
 
-const PROMPT_PATHS = [
-  process.env.BOARD_BACKLOG_PROMPT,
-  path.join(getBrainDir(), "prompts", "backlog-triage.txt"),
-].filter((p): p is string => Boolean(p) && validatePromptPath(p!));
+function getPromptPaths(): string[] {
+  return [
+    process.env.BOARD_BACKLOG_PROMPT,
+    path.join(getBrainDir(), "prompts", "backlog-triage.txt"),
+  ].filter((p): p is string => Boolean(p) && validatePromptPath(p!));
+}
 
 function readPrompt(): string {
-  for (const p of PROMPT_PATHS) {
+  for (const p of getPromptPaths()) {
     if (fs.existsSync(p)) return fs.readFileSync(p, "utf-8");
   }
   return "";
 }
 
 function writePrompt(text: string): void {
-  for (const p of PROMPT_PATHS) {
+  for (const p of getPromptPaths()) {
     if (!validatePromptPath(p)) continue;
     try {
       fs.mkdirSync(path.dirname(p), { recursive: true });
