@@ -1,9 +1,19 @@
 import type { AnyAgentTool } from "openclaw/plugin-sdk";
 import type { ContributeConfig } from "../src/config.js";
 import { CONTRIBUTION_GUIDELINES } from "../src/guidelines.js";
-import { execSync } from "child_process";
+import {
+  sanitizePluginName,
+  sanitizeBranchTopic,
+  sanitizeTitle,
+  sanitizeBody,
+  sanitizeFreeText,
+  validateRepo,
+  validateRemote,
+} from "../src/sanitize.js";
+import { execFileSync } from "child_process";
 import fs from "fs";
 import path from "path";
+import os from "os";
 
 type Logger = { info(m: string): void; warn(m: string): void; error(m: string): void };
 
@@ -11,11 +21,59 @@ function ok(text: string) {
   return { content: [{ type: "text" as const, text: text.trim() }], details: {} };
 }
 
-function run(cmd: string, cwd?: string): string {
-  return execSync(cmd, { encoding: "utf-8", cwd, timeout: 30_000 }).trim();
+/**
+ * Safe shell execution — uses execFileSync (no shell interpolation).
+ * Arguments are passed as an array, never interpolated into a string.
+ */
+function run(cmd: string, args: string[], cwd?: string): string {
+  return execFileSync(cmd, args, { encoding: "utf-8", cwd, timeout: 30_000 }).trim();
+}
+
+/**
+ * Write body to a temp file and pass via --body-file to gh CLI.
+ * This avoids all shell interpolation of user-provided content.
+ */
+function ghWithBodyFile(
+  subcmd: string[],
+  body: string,
+  extraArgs: string[],
+  cwd?: string
+): string {
+  const tmpFile = path.join(os.tmpdir(), `mc-contribute-${Date.now()}-${Math.random().toString(36).slice(2)}.md`);
+  try {
+    fs.writeFileSync(tmpFile, body, "utf-8");
+    return run("gh", [...subcmd, "--body-file", tmpFile, ...extraArgs], cwd);
+  } finally {
+    try { fs.unlinkSync(tmpFile); } catch {}
+  }
+}
+
+/**
+ * Collect clone identity for upstream bug reports.
+ * Includes hostname, bot ID (if available), and install path.
+ */
+function collectCloneIdentity(): string {
+  const hostname = os.hostname();
+  const stateDir = process.env.OPENCLAW_STATE_DIR || "(not set)";
+
+  let botId = "(unknown)";
+  try {
+    // Try to read bot ID from the agent config
+    const agentConfig = path.join(stateDir, "agents", "main", "agent", "agent.json");
+    if (fs.existsSync(agentConfig)) {
+      const cfg = JSON.parse(fs.readFileSync(agentConfig, "utf-8"));
+      botId = cfg.id || cfg.botId || cfg.name || "(unknown)";
+    }
+  } catch {}
+
+  return `- Clone hostname: ${hostname}\n- Bot ID: ${botId}\n- State dir: ${stateDir}`;
 }
 
 export function createContributeTools(cfg: ContributeConfig, logger: Logger): AnyAgentTool[] {
+  // Validate config at registration time
+  const upstreamRepo = validateRepo(cfg.upstreamRepo);
+  const forkRemote = validateRemote(cfg.forkRemote);
+
   return [
     // ── Scaffold a new plugin ──────────────────────────────────────────
     {
@@ -45,9 +103,11 @@ export function createContributeTools(cfg: ContributeConfig, logger: Logger): An
       },
       async execute(_id: string, params: unknown) {
         const p = params as Record<string, string>;
-        const name = p.pluginName.replace(/^mc-/, "");
+        const name = sanitizePluginName(p.pluginName);
         const fullName = `mc-${name}`;
-        const repoRoot = run("git rev-parse --show-toplevel");
+        const description = sanitizeFreeText(p.description, "description");
+        const brainRegion = sanitizePluginName(p.brainRegion.replace(/^mc-/, ""));
+        const repoRoot = run("git", ["rev-parse", "--show-toplevel"]);
         const pluginDir = path.join(repoRoot, "plugins", fullName);
 
         if (fs.existsSync(pluginDir)) {
@@ -59,14 +119,16 @@ export function createContributeTools(cfg: ContributeConfig, logger: Logger): An
           fs.mkdirSync(path.join(pluginDir, sub), { recursive: true });
         }
 
+        const cap = name.charAt(0).toUpperCase() + name.slice(1);
+
         // openclaw.plugin.json
         fs.writeFileSync(
           path.join(pluginDir, "openclaw.plugin.json"),
           JSON.stringify(
             {
               id: fullName,
-              name: `MiniClaw ${name.charAt(0).toUpperCase() + name.slice(1)}`,
-              description: p.description,
+              name: `MiniClaw ${cap}`,
+              description,
               version: "0.1.0",
               configSchema: {
                 type: "object",
@@ -86,7 +148,7 @@ export function createContributeTools(cfg: ContributeConfig, logger: Logger): An
             {
               name: fullName,
               version: "0.1.0",
-              description: p.description,
+              description,
               type: "module",
               main: "index.ts",
             },
@@ -99,17 +161,17 @@ export function createContributeTools(cfg: ContributeConfig, logger: Logger): An
         fs.writeFileSync(
           path.join(pluginDir, "index.ts"),
           `import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
-import { register${name.charAt(0).toUpperCase() + name.slice(1)}Commands } from "./cli/commands.js";
-import { create${name.charAt(0).toUpperCase() + name.slice(1)}Tools } from "./tools/definitions.js";
+import { register${cap}Commands } from "./cli/commands.js";
+import { create${cap}Tools } from "./tools/definitions.js";
 
 export default function register(api: OpenClawPluginApi): void {
   api.logger.info("${fullName} loaded");
 
   api.registerCli((ctx) => {
-    register${name.charAt(0).toUpperCase() + name.slice(1)}Commands({ program: ctx.program, logger: api.logger });
+    register${cap}Commands({ program: ctx.program, logger: api.logger });
   });
 
-  for (const tool of create${name.charAt(0).toUpperCase() + name.slice(1)}Tools(api.logger)) {
+  for (const tool of create${cap}Tools(api.logger)) {
     api.registerTool(tool);
   }
 }
@@ -123,7 +185,7 @@ export default function register(api: OpenClawPluginApi): void {
 
 type Logger = { info(m: string): void; warn(m: string): void; error(m: string): void };
 
-export function create${name.charAt(0).toUpperCase() + name.slice(1)}Tools(logger: Logger): AnyAgentTool[] {
+export function create${cap}Tools(logger: Logger): AnyAgentTool[] {
   return [
     // TODO: Add your tools here
   ];
@@ -138,14 +200,14 @@ export function create${name.charAt(0).toUpperCase() + name.slice(1)}Tools(logge
 
 type Logger = { info(m: string): void; warn(m: string): void; error(m: string): void };
 
-export function register${name.charAt(0).toUpperCase() + name.slice(1)}Commands(
+export function register${cap}Commands(
   ctx: { program: Command; logger: Logger }
 ): void {
   const { program } = ctx;
 
   program
     .command("${fullName}")
-    .description("${p.description}");
+    .description("${description}");
 
   // TODO: Add subcommands here
 }
@@ -155,7 +217,7 @@ export function register${name.charAt(0).toUpperCase() + name.slice(1)}Commands(
         // docs/README.md
         fs.writeFileSync(
           path.join(pluginDir, "docs", "README.md"),
-          `# ${fullName}\n\n**Brain region:** ${p.brainRegion}\n\n${p.description}\n`
+          `# ${fullName}\n\n**Brain region:** ${brainRegion}\n\n${description}\n`
         );
 
         const files = [
@@ -199,18 +261,18 @@ export function register${name.charAt(0).toUpperCase() + name.slice(1)}Commands(
       },
       async execute(_id: string, params: unknown) {
         const p = params as Record<string, string>;
-        const slug = p.topic.replace(/\s+/g, "-").toLowerCase();
+        const slug = sanitizeBranchTopic(p.topic);
         const branch = `contrib/${slug}`;
-        const repoRoot = run("git rev-parse --show-toplevel");
+        const repoRoot = run("git", ["rev-parse", "--show-toplevel"]);
 
         // Make sure we're on main and up to date
-        run("git checkout main", repoRoot);
+        run("git", ["checkout", "main"], repoRoot);
         try {
-          run("git pull --ff-only", repoRoot);
+          run("git", ["pull", "--ff-only"], repoRoot);
         } catch {
           // May fail if no upstream — that's fine
         }
-        run(`git checkout -b ${branch}`, repoRoot);
+        run("git", ["checkout", "-b", branch], repoRoot);
 
         logger.info(`Created branch ${branch}`);
         return ok(
@@ -242,12 +304,12 @@ export function register${name.charAt(0).toUpperCase() + name.slice(1)}Commands(
       },
       async execute(_id: string, params: unknown) {
         const p = params as Record<string, string>;
-        const repoRoot = run("git rev-parse --show-toplevel");
+        const repoRoot = run("git", ["rev-parse", "--show-toplevel"]);
         const script = path.join(repoRoot, "scripts", "security-check.sh");
-        const flag = p.scope === "all" ? "--all" : "";
+        const args = p.scope === "all" ? [script, "--all"] : [script];
 
         try {
-          const output = run(`bash ${script} ${flag}`, repoRoot);
+          const output = run("bash", args, repoRoot);
           return ok(output);
         } catch (err: unknown) {
           const e = err as { stdout?: string; stderr?: string };
@@ -287,12 +349,15 @@ export function register${name.charAt(0).toUpperCase() + name.slice(1)}Commands(
       },
       async execute(_id: string, params: unknown) {
         const p = params as Record<string, string>;
-        const repoRoot = run("git rev-parse --show-toplevel");
+        const title = sanitizeTitle(p.title);
+        const summary = sanitizeBody(p.summary);
+        const plugins = p.pluginsAffected ? sanitizeFreeText(p.pluginsAffected, "plugins") : "N/A";
+        const repoRoot = run("git", ["rev-parse", "--show-toplevel"]);
 
         // Run security check first
         const script = path.join(repoRoot, "scripts", "security-check.sh");
         try {
-          run(`bash ${script} --all`, repoRoot);
+          run("bash", [script, "--all"], repoRoot);
         } catch (err: unknown) {
           const e = err as { stdout?: string };
           return ok(
@@ -302,24 +367,26 @@ export function register${name.charAt(0).toUpperCase() + name.slice(1)}Commands(
         }
 
         // Push branch
-        const branch = run("git branch --show-current", repoRoot);
+        const branch = run("git", ["branch", "--show-current"], repoRoot);
         try {
-          run(`git push -u ${cfg.forkRemote} ${branch}`, repoRoot);
+          run("git", ["push", "-u", forkRemote, branch], repoRoot);
         } catch {
           return ok(`Failed to push branch ${branch}. Make sure your fork remote is set up.`);
         }
 
-        // Create PR
-        const plugins = p.pluginsAffected || "N/A";
+        // Create PR — body written to temp file, never shell-interpolated
         const body =
-          `## Summary\n\n${p.summary}\n\n` +
+          `## Summary\n\n${summary}\n\n` +
           `## Plugin(s) affected\n\n${plugins}\n\n` +
-          `## Security check\n\n- [x] Ran \`./scripts/security-check.sh\` (passed)\n- [x] No secrets, tokens, or PII in this PR\n\n` +
+          `## Security check\n\n- [x] Ran ./scripts/security-check.sh (passed)\n- [x] No secrets, tokens, or PII in this PR\n\n` +
+          `## Clone identity\n\n${collectCloneIdentity()}\n\n` +
           `---\nSubmitted via mc-contribute`;
 
         try {
-          const prUrl = run(
-            `gh pr create --repo ${cfg.upstreamRepo} --title "${p.title.replace(/"/g, '\\"')}" --body "${body.replace(/"/g, '\\"')}"`,
+          const prUrl = ghWithBodyFile(
+            ["pr", "create"],
+            body,
+            ["--repo", upstreamRepo, "--title", title],
             repoRoot
           );
           logger.info(`PR created: ${prUrl}`);
@@ -344,14 +411,14 @@ export function register${name.charAt(0).toUpperCase() + name.slice(1)}Commands(
         properties: {},
       },
       async execute() {
-        const repoRoot = run("git rev-parse --show-toplevel");
-        const branch = run("git branch --show-current", repoRoot);
-        const status = run("git status --short", repoRoot);
-        const log = run("git log --oneline -5", repoRoot);
+        const repoRoot = run("git", ["rev-parse", "--show-toplevel"]);
+        const branch = run("git", ["branch", "--show-current"], repoRoot);
+        const status = run("git", ["status", "--short"], repoRoot);
+        const log = run("git", ["log", "--oneline", "-5"], repoRoot);
 
         let prs = "none";
         try {
-          prs = run(`gh pr list --repo ${cfg.upstreamRepo} --author @me --state open`, repoRoot);
+          prs = run("gh", ["pr", "list", "--repo", upstreamRepo, "--author", "@me", "--state", "open"], repoRoot);
           if (!prs) prs = "none";
         } catch {
           prs = "(could not check — gh auth may be needed)";
@@ -391,8 +458,10 @@ export function register${name.charAt(0).toUpperCase() + name.slice(1)}Commands(
       label: "contribute_bug_report",
       description:
         "File a bug report on the miniclaw-os repo. Automatically collects " +
-        "environment info (macOS version, Node version, mc version) and " +
-        "runs mc-doctor for diagnostics.",
+        "environment info (macOS version, Node version, mc version), clone " +
+        "identity, and runs mc-doctor for diagnostics. Reports upstream to " +
+        "augmentedmike/miniclaw-os by default so all clones feed back to the " +
+        "original repo.",
       parameters: {
         type: "object",
         required: ["title", "whatHappened", "expected", "stepsToReproduce"],
@@ -421,42 +490,47 @@ export function register${name.charAt(0).toUpperCase() + name.slice(1)}Commands(
       },
       async execute(_id: string, params: unknown) {
         const p = params as Record<string, string>;
+        const title = sanitizeTitle(p.title);
+        const whatHappened = sanitizeBody(p.whatHappened);
+        const expected = sanitizeBody(p.expected);
+        const steps = sanitizeBody(p.stepsToReproduce);
+        const plugins = p.pluginsInvolved ? sanitizeFreeText(p.pluginsInvolved, "plugins") : "N/A";
 
-        // Collect environment info
+        // Collect environment info safely (no shell interpolation)
         let macosVersion = "unknown";
         let nodeVersion = "unknown";
         let mcVersion = "unknown";
         let doctorOutput = "(mc-doctor not available)";
 
-        try { macosVersion = run("sw_vers -productVersion"); } catch {}
-        try { nodeVersion = run("node --version"); } catch {}
-        try { mcVersion = run("mc --version 2>/dev/null || echo 'unknown'"); } catch {}
-        try { doctorOutput = run("mc-doctor 2>&1 || echo '(failed)'"); } catch {}
+        try { macosVersion = run("sw_vers", ["-productVersion"]); } catch {}
+        try { nodeVersion = run("node", ["--version"]); } catch {}
+        try { mcVersion = run("mc", ["--version"]); } catch { mcVersion = "unknown"; }
+        try { doctorOutput = run("mc-doctor", []); } catch { doctorOutput = "(failed)"; }
 
         const body =
-          `**What happened?**\n${p.whatHappened}\n\n` +
-          `**What did you expect?**\n${p.expected}\n\n` +
-          `**Steps to reproduce**\n${p.stepsToReproduce}\n\n` +
+          `**What happened?**\n${whatHappened}\n\n` +
+          `**What did you expect?**\n${expected}\n\n` +
+          `**Steps to reproduce**\n${steps}\n\n` +
           `**Environment**\n` +
           `- macOS version: ${macosVersion}\n` +
           `- Node version: ${nodeVersion}\n` +
           `- MiniClaw version: ${mcVersion}\n` +
-          `- Plugin(s) involved: ${p.pluginsInvolved || "N/A"}\n\n` +
-          `**mc-doctor output**\n\`\`\`\n${doctorOutput}\n\`\`\`\n\n` +
+          `- Plugin(s) involved: ${plugins}\n\n` +
+          `**Clone identity**\n${collectCloneIdentity()}\n\n` +
+          `**mc-doctor output**\n\n${doctorOutput}\n\n` +
           `---\nFiled via mc-contribute`;
 
         try {
-          const issueUrl = run(
-            `gh issue create --repo ${cfg.upstreamRepo} ` +
-              `--title "[Bug] ${p.title.replace(/"/g, '\\"')}" ` +
-              `--label bug ` +
-              `--body "${body.replace(/"/g, '\\"').replace(/`/g, "\\`")}"`,
+          const issueUrl = ghWithBodyFile(
+            ["issue", "create"],
+            body,
+            ["--repo", upstreamRepo, "--title", `[Bug] ${title}`, "--label", "bug"],
           );
           logger.info(`Bug report filed: ${issueUrl}`);
           return ok(`Bug report filed: ${issueUrl}`);
         } catch (err: unknown) {
           const e = err as { stderr?: string };
-          return ok(`Failed to file bug report: ${e.stderr || "unknown error"}\n\nYou can file it manually at: https://github.com/${cfg.upstreamRepo}/issues/new?template=bug_report.md`);
+          return ok(`Failed to file bug report: ${e.stderr || "unknown error"}\n\nYou can file it manually at: https://github.com/${upstreamRepo}/issues/new`);
         }
       },
     } as AnyAgentTool,
@@ -466,7 +540,8 @@ export function register${name.charAt(0).toUpperCase() + name.slice(1)}Commands(
       name: "contribute_feature_request",
       label: "contribute_feature_request",
       description:
-        "Submit a feature request or plugin idea to miniclaw-os.",
+        "Submit a feature request or plugin idea to miniclaw-os. Reports " +
+        "upstream so all clones can suggest improvements to the ecosystem.",
       parameters: {
         type: "object",
         required: ["title", "problem", "proposedSolution"],
@@ -503,7 +578,13 @@ export function register${name.charAt(0).toUpperCase() + name.slice(1)}Commands(
       },
       async execute(_id: string, params: unknown) {
         const p = params as Record<string, unknown>;
+        const title = sanitizeTitle(p.title as string);
+        const problem = sanitizeBody(p.problem as string);
+        const solution = sanitizeBody(p.proposedSolution as string);
+        const brainRegion = p.brainRegion ? sanitizeFreeText(p.brainRegion as string, "brain region") : "N/A";
+        const exampleUsage = p.exampleUsage ? sanitizeBody(p.exampleUsage as string) : "";
         const isPlugin = p.isNewPlugin as boolean;
+        const pluginName = p.pluginName ? sanitizeFreeText(p.pluginName as string, "plugin name") : "mc-???";
 
         let body: string;
         let label: string;
@@ -513,36 +594,37 @@ export function register${name.charAt(0).toUpperCase() + name.slice(1)}Commands(
           label = "plugin-idea";
           titlePrefix = "[Plugin]";
           body =
-            `**Plugin name**\n${(p.pluginName as string) || "mc-???"}\n\n` +
-            `**Brain region / cognitive function**\n${(p.brainRegion as string) || "N/A"}\n\n` +
-            `**What it does**\n${p.proposedSolution as string}\n\n` +
-            `**Problem it solves**\n${p.problem as string}\n\n` +
-            (p.exampleUsage ? `**Example usage**\n\`\`\`bash\n${p.exampleUsage as string}\n\`\`\`\n\n` : "") +
+            `**Plugin name**\n${pluginName}\n\n` +
+            `**Brain region / cognitive function**\n${brainRegion}\n\n` +
+            `**What it does**\n${solution}\n\n` +
+            `**Problem it solves**\n${problem}\n\n` +
+            (exampleUsage ? `**Example usage**\n\n${exampleUsage}\n\n` : "") +
+            `**Clone identity**\n${collectCloneIdentity()}\n\n` +
             `---\nSubmitted via mc-contribute`;
         } else {
           label = "enhancement";
           titlePrefix = "[Feature]";
           body =
-            `**What problem does this solve?**\n${p.problem as string}\n\n` +
-            `**Proposed solution**\n${p.proposedSolution as string}\n\n` +
-            `**Which plugin/brain region?**\n${(p.brainRegion as string) || "N/A"}\n\n` +
-            (p.exampleUsage ? `**Example usage**\n\`\`\`bash\n${p.exampleUsage as string}\n\`\`\`\n\n` : "") +
+            `**What problem does this solve?**\n${problem}\n\n` +
+            `**Proposed solution**\n${solution}\n\n` +
+            `**Which plugin/brain region?**\n${brainRegion}\n\n` +
+            (exampleUsage ? `**Example usage**\n\n${exampleUsage}\n\n` : "") +
+            `**Clone identity**\n${collectCloneIdentity()}\n\n` +
             `---\nSubmitted via mc-contribute`;
         }
 
         try {
-          const title = `${titlePrefix} ${(p.title as string).replace(/"/g, '\\"')}`;
-          const issueUrl = run(
-            `gh issue create --repo ${cfg.upstreamRepo} ` +
-              `--title "${title}" ` +
-              `--label ${label} ` +
-              `--body "${body.replace(/"/g, '\\"').replace(/`/g, "\\`")}"`,
+          const fullTitle = `${titlePrefix} ${title}`;
+          const issueUrl = ghWithBodyFile(
+            ["issue", "create"],
+            body,
+            ["--repo", upstreamRepo, "--title", fullTitle, "--label", label],
           );
           logger.info(`Feature request filed: ${issueUrl}`);
           return ok(`Feature request filed: ${issueUrl}`);
         } catch (err: unknown) {
           const e = err as { stderr?: string };
-          return ok(`Failed to file feature request: ${e.stderr || "unknown error"}\n\nFile manually at: https://github.com/${cfg.upstreamRepo}/issues/new?template=feature_request.md`);
+          return ok(`Failed to file feature request: ${e.stderr || "unknown error"}\n\nFile manually at: https://github.com/${upstreamRepo}/issues/new`);
         }
       },
     } as AnyAgentTool,
@@ -584,13 +666,12 @@ export function register${name.charAt(0).toUpperCase() + name.slice(1)}Commands(
         if (p.action === "list") {
           try {
             const discussions = run(
-              `gh api repos/${cfg.upstreamRepo}/discussions --jq '.[] | "\\(.number) \\(.title) (\\(.category.name))"' 2>/dev/null || ` +
-                `gh discussion list --repo ${cfg.upstreamRepo} --limit 10 2>/dev/null || ` +
-                `echo "(discussions API not available — visit https://github.com/${cfg.upstreamRepo}/discussions)"`
+              "gh",
+              ["discussion", "list", "--repo", upstreamRepo, "--limit", "10"],
             );
-            return ok(`Recent discussions:\n\n${discussions}`);
+            return ok(`Recent discussions:\n\n${discussions || "(none)"}`);
           } catch {
-            return ok(`Visit discussions at: https://github.com/${cfg.upstreamRepo}/discussions`);
+            return ok(`Visit discussions at: https://github.com/${upstreamRepo}/discussions`);
           }
         }
 
@@ -598,22 +679,22 @@ export function register${name.charAt(0).toUpperCase() + name.slice(1)}Commands(
           return ok("Both title and body are required to create a discussion.");
         }
 
+        const title = sanitizeTitle(p.title);
         const category = p.category || "Ideas";
-        const body = `${p.body}\n\n---\nStarted via mc-contribute`;
+        const body = `${sanitizeBody(p.body)}\n\n---\nStarted via mc-contribute`;
 
         try {
-          const url = run(
-            `gh discussion create --repo ${cfg.upstreamRepo} ` +
-              `--title "${p.title.replace(/"/g, '\\"')}" ` +
-              `--body "${body.replace(/"/g, '\\"')}" ` +
-              `--category "${category}"`
+          const url = ghWithBodyFile(
+            ["discussion", "create"],
+            body,
+            ["--repo", upstreamRepo, "--title", title, "--category", category],
           );
           return ok(`Discussion created: ${url}`);
         } catch (err: unknown) {
           const e = err as { stderr?: string };
           return ok(
             `Failed to create discussion: ${e.stderr || "unknown error"}\n\n` +
-              `Create manually at: https://github.com/${cfg.upstreamRepo}/discussions/new`
+              `Create manually at: https://github.com/${upstreamRepo}/discussions/new`
           );
         }
       },

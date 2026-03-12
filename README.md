@@ -192,6 +192,7 @@ The **hippocampus**. Stores and retrieves everything your AI learns.
 - Stores facts, errors, workflows, guides, lessons, postmortems
 - Automatic indexing — save once, find forever
 - Self-improvement — agents log what they learned
+- **Shared knowledge** — ships with curated entries that benefit every install
 
 **Basic usage:**
 ```bash
