@@ -196,27 +196,15 @@ fi
 # ── Step 10: OpenClaw (from MiniClaw fork) ────────────────────────────────────
 step "Step 10: OpenClaw"
 
-OPENCLAW_REPO="https://github.com/augmentedmike/openclaw.git"
-OPENCLAW_SRC="$OPENCLAW_DIR/src"
+OPENCLAW_FORK="github:augmentedmike/openclaw"
 
 if command -v openclaw &>/dev/null; then
   ok "OpenClaw $(openclaw --version 2>/dev/null | head -1) already installed"
 else
-  info "Cloning OpenClaw from MiniClaw fork..."
-  if [[ -d "$OPENCLAW_SRC/.git" ]]; then
-    git -C "$OPENCLAW_SRC" pull --ff-only 2>/dev/null || true
-  else
-    rm -rf "$OPENCLAW_SRC"
-    git clone --depth 1 "$OPENCLAW_REPO" "$OPENCLAW_SRC" || die "Failed to clone OpenClaw"
-  fi
-  info "Installing pnpm..."
-  npm install -g pnpm 2>&1 | tail -3 || die "pnpm install failed"
-  info "Installing dependencies..."
-  (cd "$OPENCLAW_SRC" && pnpm install --frozen-lockfile 2>&1 | tail -5) || die "OpenClaw dependency install failed"
-  info "Building OpenClaw..."
-  (cd "$OPENCLAW_SRC" && pnpm build 2>&1 | tail -5) || die "OpenClaw build failed"
-  info "Linking globally..."
-  (cd "$OPENCLAW_SRC" && npm link 2>&1 | tail -3) || die "OpenClaw global link failed"
+  info "Installing OpenClaw from MiniClaw fork..."
+  npm install -g --ignore-scripts "$OPENCLAW_FORK" || die "OpenClaw install failed"
+  info "Building native dependencies..."
+  npm rebuild -g openclaw 2>&1 | tail -5 || warn "Native rebuild had warnings (non-fatal)"
   command -v openclaw &>/dev/null && ok "OpenClaw $(openclaw --version 2>/dev/null | head -1) installed" || die "openclaw not found in PATH after install"
 fi
 
