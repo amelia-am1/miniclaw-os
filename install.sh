@@ -461,40 +461,8 @@ else
   ok "Vault already initialised"
 fi
 
-if { true < /dev/tty; } 2>/dev/null; then
-  # Read from /dev/tty directly so this works even when stdin is a pipe (curl | bash)
-  TTY_IN=/dev/tty
-elif [ -t 0 ]; then
-  TTY_IN=/dev/stdin
-else
-  warn "No terminal available — skipping secret prompts. Run ./install.sh directly to enter secrets."
-  TTY_IN=""
-fi
-
-if [[ -n "$TTY_IN" ]]; then
-
-  echo ""
-  echo "  Enter secrets (leave blank to skip):"
-  echo ""
-
-  VAULT_SECRETS=(
-    "gh-token:GitHub personal access token"
-  )
-
-  for entry in "${VAULT_SECRETS[@]}"; do
-    key="${entry%%:*}"; desc="${entry#*:}"
-    printf "  %s (%s)\n  > " "$key" "$desc"
-    read -r -s value < "$TTY_IN"; echo ""
-    if [[ -n "$value" ]]; then
-      echo -n "$value" | OPENCLAW_VAULT_ROOT="$VAULT_ROOT" "$MC_VAULT" set "$key" -
-      ok "Stored: $key"
-    else
-      warn "Skipped: $key"
-    fi
-  done
-
-  # gmail-app-password and gemini-api-key are collected in am-setup onboarding (port 4210)
-fi # TTY_IN check
+# All secrets (gh-token, gmail-app-password, gemini-api-key) are collected
+# in the am-setup onboarding wizard (port 4210) — not in the terminal installer.
 
 
 # -- Step 15: Migrate data from archived OpenClaw install ------------------
