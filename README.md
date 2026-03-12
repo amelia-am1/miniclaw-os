@@ -552,6 +552,53 @@ mc-backup prune
 
 ---
 
+#### **mc-authenticator** — TOTP 2FA for Agents
+Autonomous two-factor authentication. Stores TOTP secrets in mc-vault and generates RFC 6238-compliant codes on demand — the same codes Google Authenticator would produce. When a login flow asks for a 2FA code, the agent generates it instead of waiting for a human to open an authenticator app.
+
+Zero npm dependencies. Pure `node:crypto`.
+
+**What it does:**
+- Stores TOTP secrets (base32 or `otpauth://` URIs from QR codes)
+- Generates 6-digit codes identical to Google Authenticator
+- Supports SHA1, SHA256, SHA512 — configurable digits (6/8) and period (30s/60s)
+- Clock drift tolerance (verifies current code ±1 window)
+
+**Basic usage:**
+```bash
+# Store a TOTP secret (from your 2FA setup page)
+mc mc-auth add github JBSWY3DPEHPK3PXP --issuer GitHub --account user@example.com
+
+# Store from an otpauth:// URI (preserves all metadata)
+mc mc-auth add-uri github "otpauth://totp/GitHub:user@example.com?secret=JBSWY3DPEHPK3PXP&issuer=GitHub"
+
+# Get the current code
+mc mc-auth code github
+# 482901 (expires in 14s)
+
+# Verify a code
+mc mc-auth verify github 482901
+# Valid ✓
+
+# List all stored services
+mc mc-auth list
+#   github       — GitHub (user@example.com)   SHA1/6/30s
+
+# Remove a service
+mc mc-auth remove github
+```
+
+**Agent tools:**
+
+| Tool | Description |
+|------|-------------|
+| `auth_code` | Get current TOTP code + seconds until expiry |
+| `auth_list` | List all stored 2FA services |
+| `auth_time_remaining` | Seconds until current code expires |
+
+**[→ Full mc-authenticator documentation](./plugins/mc-authenticator/docs/README.md)**
+
+---
+
 ### CLI Tools
 
 | Tool | Purpose |
@@ -689,43 +736,41 @@ It'll diagnose what's wrong and offer to fix it.
 
 ## Contributing
 
-**Want to build a plugin?** Follow the [Plugin Developer Guide](./docs/wiki/Writing-Plugins.md).
+MiniClaw has a built-in contribution plugin — **[mc-contribute](./docs/mc-contribute.md)** — that lets your agent scaffold plugins, file bugs, submit PRs, and manage discussions on your behalf. Your bot already knows the contribution rules (they're injected into its context automatically).
 
-**Found a bug?** [Open an issue](https://github.com/augmentedmike/miniclaw-os/issues).
-
-**Want to improve docs?** [Submit a PR](https://github.com/augmentedmike/miniclaw-os/pulls).
-
-### Creating Your Own Plugin
-
-1. **Create the plugin folder:**
 ```bash
-mkdir plugins/my-plugin
-cd plugins/my-plugin
+# Scaffold a new plugin
+mc mc-contribute scaffold weather --description "Fetch weather forecasts"
+
+# Create a contribution branch
+mc mc-contribute branch mc-weather
+
+# File a bug report (auto-collects mc-doctor output, versions, etc.)
+mc mc-contribute bug "mc-board crashes on empty backlog"
+
+# Submit a feature request or plugin idea
+mc mc-contribute feature "Add weather alerts to mc-weather"
+
+# Run the security scanner before committing
+mc mc-contribute security
+
+# Submit your PR (runs security check first)
+mc mc-contribute pr
+
+# Check your contribution status
+mc mc-contribute status
+
+# Read the full contribution guidelines
+mc mc-contribute guidelines
 ```
 
-2. **Add required files:**
-```
-my-plugin/
-├── PLUGIN.md          # Plugin documentation
-├── package.json       # Node.js metadata
-├── src/
-│   └── index.ts       # Main plugin code
-└── config.schema.json # Configuration schema
-```
+### Manual Contributing
 
-3. **Register with MiniClaw:**
-```bash
-mc plugin register ./my-plugin
-```
+If you prefer to work without the plugin:
 
-4. **Test it:**
-```bash
-mc plugin test my-plugin
-```
-
-5. **Share it:**
-- Open a PR to add it to `plugins/`
-- Or publish to npm as `@miniclaw/my-plugin`
+- **Found a bug?** [Open an issue](https://github.com/augmentedmike/miniclaw-os/issues)
+- **Want to improve docs?** [Submit a PR](https://github.com/augmentedmike/miniclaw-os/pulls)
+- **Plugin Developer Guide:** [Writing Plugins](./docs/wiki/Writing-Plugins.md)
 
 
 ### Plugin SDK
