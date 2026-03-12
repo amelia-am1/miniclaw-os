@@ -1,8 +1,11 @@
 # Coding Axioms
 
 Rules for writing code in this project. Language-independent unless noted.
-When an axiom conflicts with a language's idioms, **idiomatic code wins.**
-When an axiom causes measurable slowness, a small imperative escape is fine.
+
+**Caveats — these override any axiom:**
+- When an axiom conflicts with a language's idioms, **idiomatic code wins.**
+- When a declarative/functional approach causes measurable slowness, a small imperative escape is fine.
+- These axioms are defaults, not dogma. Use judgment.
 
 ---
 
@@ -41,13 +44,15 @@ Every piece of logic in a tested tool is a hallucination that can never happen.
 If behavior can be codified into a function with known inputs and outputs, do that.
 Don't leave it to runtime inference, string matching, or pattern guessing.
 
-## 5. Functional-leaning, not functional-religious
+## 5. Declarative over imperative
 
-Prefer pure functions, immutable data, and composition. But don't worship the
-paradigm. A `for` loop that's clear and fast beats a `reduce` chain that
-allocates needlessly. Use the functional approach when it makes the code shorter
-and clearer. Use the imperative approach when it makes the code faster or more
-readable for the language.
+Say *what*, not *how*. Prefer pure functions, immutable data, composition, and
+declarative patterns. SQL over manual loops through rows. `map`/`filter` over
+index tracking. Config over code when the behavior is static.
+
+But not religiously. A `for` loop that's clear and fast beats a `reduce` chain
+that allocates needlessly. When declarative causes measurable slowness, a small
+imperative escape is fine — just keep it contained.
 
 ```ts
 // fine — functional is clearer here
@@ -129,3 +134,34 @@ No magic. No action at a distance. No global state that changes behavior
 based on who imported what. If a function needs something, pass it in.
 If a module has a dependency, import it. If a behavior changes based on
 a condition, the condition should be visible at the call site.
+
+## 16. No DSLs for DSLs' sake
+
+A DSL is justified when it compresses a domain into something genuinely
+simpler. Most DSLs just move complexity from code you can debug into syntax
+you can't. If the DSL doesn't save significant cognitive load over plain
+code in the host language, skip it. Configuration files are fine. Inventing
+a grammar is almost never fine.
+
+## 17. Runtime decoration is evil
+
+Decorators, monkey-patching, runtime class mutation, aspect-oriented
+injection — anything that changes what code does without changing what code
+says. If you read a function and it does X, it should do X. Not X-plus-
+whatever-some-decorator-injected-at-import-time. Dynamic dispatch is fine.
+Metaprogramming that rewrites behavior behind your back is not.
+
+```python
+# evil — what does this function actually do? depends on what @thing does
+@log_calls
+@retry(3)
+@cache(ttl=60)
+def get_user(id): ...
+
+# fine — explicit, readable, debuggable
+def get_user(id):
+    user = db.query("SELECT * FROM users WHERE id = ?", id)
+    if not user:
+        raise NotFoundError(f"user {id}")
+    return user
+```
