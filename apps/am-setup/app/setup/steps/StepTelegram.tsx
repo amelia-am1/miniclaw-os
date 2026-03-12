@@ -102,21 +102,27 @@ export default function StepTelegram({
             <span className="text-white font-medium">2.</span> Send{" "}
             <code className="px-1.5 py-0.5 rounded bg-[#1a1a1a] text-white text-xs">
               /newbot
-            </code>{" "}
-            — name it, get the <span className="text-white">bot token</span>
+            </code>
           </p>
           <p>
-            <span className="text-white font-medium">3.</span> Find{" "}
+            <span className="text-white font-medium">3.</span> Name your bot (e.g.{" "}
+            <span className="text-white">Amelia</span>)
+          </p>
+          <p>
+            <span className="text-white font-medium">4.</span> Create a username (e.g.{" "}
+            <span className="text-white font-mono">amelia_am420_bot</span>) — enter it in the first field below
+          </p>
+          <p>
+            <span className="text-white font-medium">5.</span> BotFather gives you a{" "}
+            <span className="text-white">bot token</span> — email it to yourself so you can paste it here
+          </p>
+          <p>
+            <span className="text-white font-medium">6.</span> Find{" "}
             <span className="text-white font-medium">@userinfobot</span>{" "}
-            — send it anything, get your <span className="text-white">user ID</span>
+            — send it anything, get your <span className="text-white">user ID</span>, email that too
           </p>
           <p>
-            <span className="text-white font-medium">4.</span> Send a message to your new bot so it can reply to you
-          </p>
-          <p>
-            <span className="text-white font-medium">5.</span>{" "}
-            <span className="text-white">Email the bot token and user ID to yourself</span>{" "}
-            so you can copy them on this computer
+            <span className="text-white font-medium">7.</span> Send a message to your new bot so it can reply to you
           </p>
         </div>
       </div>
