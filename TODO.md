@@ -89,6 +89,24 @@
 
 ## In Progress
 
+### Welcome wizard uses localStorage — must use file (URGENT)
+The board's WelcomeWizard checks `localStorage("mc-board:welcome-done")` which persists
+across reinstalls (same browser, same port, same localStorage). Must use a file at
+`~/.openclaw/USER/.welcome-done` so deleting `~/.openclaw` resets it.
+
+**Status:** API route created at `plugins/mc-board/web/src/app/api/welcome/route.ts` (GET/POST).
+Still need to update `WelcomeWizard.tsx` and `useWelcomeWizard()` to fetch from API on mount
+and POST on dismiss — remove all localStorage usage.
+
+### Default projects missing after fresh install (URGENT)
+After the `USER/<botId>/` → `USER/` flatten, the setup wizard's `seedBoardDb()` may write
+to the wrong path, or the board web reads from a different path.
+
+**Check:**
+- `seedBoardDb()` in `apps/am-setup/app/api/setup/complete/route.ts` — must write to `USER/brain/board.db`
+- Board web `data.ts` — must read from `USER/brain/board.db`
+- Confirm both use the same `OPENCLAW_STATE_DIR` (should be `~/.openclaw`)
+
 ### Cron Backup for Migration (install.sh)
 - [ ] Read upstream cron store module (`src/cron/store.ts`) for exact path resolution
 - [ ] Read cron types (`src/cron/types.ts`) for job schema
