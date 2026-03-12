@@ -17,10 +17,9 @@ function resolveBotId(): string {
   throw new Error("OPENCLAW_BOT_ID not set and botId not found in openclaw.json");
 }
 
-const DB_PATH = path.join(STATE_DIR, "USER", resolveBotId(), "brain", "board.db");
-
 function getDb() {
-  return new Database(DB_PATH);
+  const dbPath = path.join(STATE_DIR, "USER", resolveBotId(), "brain", "board.db");
+  return new Database(dbPath);
 }
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ cardId: string }> }) {

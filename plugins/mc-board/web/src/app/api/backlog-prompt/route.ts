@@ -16,10 +16,14 @@ function resolveBotId(): string {
   throw new Error("OPENCLAW_BOT_ID not set and botId not found in openclaw.json");
 }
 
-const BRAIN_DIR = path.join(STATE_DIR, "USER", resolveBotId(), "brain");
+function getBrainDir(): string {
+  return path.join(STATE_DIR, "USER", resolveBotId(), "brain");
+}
 
 /** Allowed directory for prompt files — all paths validated against this. */
-const PROMPTS_DIR = path.resolve(BRAIN_DIR, "prompts");
+function getPromptsDir(): string {
+  return path.resolve(getBrainDir(), "prompts");
+}
 
 /**
  * Validate that a path is within the allowed prompts directory.
@@ -27,12 +31,12 @@ const PROMPTS_DIR = path.resolve(BRAIN_DIR, "prompts");
  */
 function validatePromptPath(p: string): boolean {
   const resolved = path.resolve(p);
-  return resolved.startsWith(PROMPTS_DIR + path.sep) || resolved === PROMPTS_DIR;
+  return resolved.startsWith(getPromptsDir() + path.sep) || resolved === getPromptsDir();
 }
 
 const PROMPT_PATHS = [
   process.env.BOARD_BACKLOG_PROMPT,
-  path.join(BRAIN_DIR, "prompts", "backlog-triage.txt"),
+  path.join(getBrainDir(), "prompts", "backlog-triage.txt"),
 ].filter((p): p is string => Boolean(p) && validatePromptPath(p!));
 
 function readPrompt(): string {

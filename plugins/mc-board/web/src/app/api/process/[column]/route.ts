@@ -16,11 +16,13 @@ function resolveBotId(): string {
   throw new Error("OPENCLAW_BOT_ID not set and botId not found in openclaw.json");
 }
 
-const BRAIN_DIR = path.join(STATE_DIR, "USER", resolveBotId(), "brain");
+function getBrainDir(): string {
+  return path.join(STATE_DIR, "USER", resolveBotId(), "brain");
+}
 
 function promptPath(column: string): string {
   const envKey = `BOARD_${column.toUpperCase().replace(/-/g, "_")}_PROCESS_PROMPT`;
-  return process.env[envKey] ?? path.join(BRAIN_DIR, "prompts", `${column}-process.txt`);
+  return process.env[envKey] ?? path.join(getBrainDir(), "prompts", `${column}-process.txt`);
 }
 
 const DEFAULT_PROCESS_PROMPT = `You are a triage processor for the Brain board. This prompt runs both on-demand (web UI) and via the periodic cron job that checks the backlog column.

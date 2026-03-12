@@ -16,7 +16,9 @@ function resolveBotId(): string {
   throw new Error("OPENCLAW_BOT_ID not set and botId not found in openclaw.json");
 }
 
-const BRAIN_DIR = path.join(STATE_DIR, "USER", resolveBotId(), "brain");
+function getBrainDir(): string {
+  return path.join(STATE_DIR, "USER", resolveBotId(), "brain");
+}
 
 /** Whitelist of valid column names to prevent path traversal via column parameter. */
 const VALID_COLUMNS = new Set([
@@ -29,7 +31,7 @@ function validateColumn(column: string): string | null {
 }
 
 function promptPath(column: string): string {
-  const promptsDir = path.join(BRAIN_DIR, "prompts");
+  const promptsDir = path.join(getBrainDir(), "prompts");
   const resolved = path.resolve(promptsDir, `${column}-triage.txt`);
   // Ensure resolved path stays within the prompts directory
   if (!resolved.startsWith(path.resolve(promptsDir) + path.sep)) {

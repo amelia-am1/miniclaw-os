@@ -20,7 +20,9 @@ function resolveBotId(): string {
   throw new Error("OPENCLAW_BOT_ID not set and botId not found in openclaw.json");
 }
 
-const BRAIN_DIR = path.join(STATE_DIR, "USER", resolveBotId(), "brain");
+function getBrainDir(): string {
+  return path.join(STATE_DIR, "USER", resolveBotId(), "brain");
+}
 
 // Parse a job ID into { column, projectId } — supports both:
 //   "board-{col}-triage"            (global)
@@ -43,7 +45,7 @@ function scheduleIntervalMs(expr: string): number {
 }
 
 function readPrompt(column: string): string {
-  const p = path.join(BRAIN_DIR, "prompts", `${column}-process.txt`);
+  const p = path.join(getBrainDir(), "prompts", `${column}-process.txt`);
   return fs.existsSync(p) ? fs.readFileSync(p, "utf8") : "";
 }
 
