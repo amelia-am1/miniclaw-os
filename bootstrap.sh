@@ -44,7 +44,7 @@ echo "  log: $LOG_FILE"
 echo ""
 echo "  This will install:"
 echo "    • Homebrew, Node.js 22, Git, Python 3, jq, bun, QMD"
-echo "    • OpenClaw (npm global)"
+echo "    • OpenClaw (MiniClaw fork — @miniclaw_official/openclaw)"
 echo "    • miniclaw-os plugins and CLI tools"
 echo ""
 if { true < /dev/tty; } 2>/dev/null; then
