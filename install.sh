@@ -773,6 +773,46 @@ mkdir -p "$STATE_DIR/logs"
 launchctl load "$BOARD_PLIST" 2>/dev/null && ok "Board web LaunchAgent loaded (port 4220)" \
   || warn "LaunchAgent created — run: launchctl load $BOARD_PLIST"
 
+# ── Step 14b: Seed default projects ──────────────────────────────────────────
+step "Step 14b: Default board projects"
+
+BOARD_DB="$STATE_DIR/USER/augmentedmike_bot/brain/board.db"
+mkdir -p "$(dirname "$BOARD_DB")"
+
+python3 << PYEOF
+import sqlite3, os, datetime
+
+db_path = "$BOARD_DB"
+now = datetime.datetime.utcnow().isoformat() + "Z"
+
+conn = sqlite3.connect(db_path)
+conn.execute("""CREATE TABLE IF NOT EXISTS projects (
+    id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'active',
+    created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+)""")
+
+seeds = [
+    ("prj_uncategorized", "Uncategorized", "uncategorized", "Default project for unassigned cards"),
+    ("prj_miniclaw_enh", "MiniClaw Enhancements", "miniclaw-enhancements", "Improvements and new features for MiniClaw"),
+]
+
+for sid, name, slug, desc in seeds:
+    existing = conn.execute("SELECT id FROM projects WHERE id = ?", (sid,)).fetchone()
+    if not existing:
+        conn.execute(
+            "INSERT INTO projects (id, name, slug, description, status, created_at, updated_at) VALUES (?,?,?,?,?,?,?)",
+            (sid, name, slug, desc, "active", now, now)
+        )
+        print(f"  Added project: {name}")
+    else:
+        print(f"  Project exists: {name}")
+
+conn.commit()
+conn.close()
+PYEOF
+ok "Default projects seeded"
+
 # ── Step 15b: AM Setup Wizard LaunchAgent ─────────────────────────────────
 step "Step 15b: AM Setup Wizard LaunchAgent"
 
