@@ -124,7 +124,9 @@ export default function StepTelegram({
       {/* Inputs */}
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-1.5">
-          <label className="text-sm text-[#aaa] font-medium">Bot username</label>
+          <label className="text-sm text-[#aaa] font-medium">
+            Bot username <span className="text-[#555]">(the one you gave BotFather)</span>
+          </label>
           <input
             type="text"
             value={usernameInput}
