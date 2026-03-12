@@ -120,6 +120,7 @@ export default function SetupWizard() {
             botUsername={state.telegramBotUsername}
             botToken={state.telegramBotToken}
             chatId={state.telegramChatId}
+            assistantName={state.shortName || state.assistantName}
             onChange={(p) => update(p)}
             onNext={next}
             onBack={back}

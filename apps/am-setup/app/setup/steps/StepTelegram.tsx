@@ -6,6 +6,7 @@ interface Props {
   botUsername: string;
   botToken: string;
   chatId: string;
+  assistantName: string;
   onChange: (p: {
     telegramBotUsername?: string;
     telegramBotToken?: string;
@@ -22,6 +23,7 @@ export default function StepTelegram({
   botUsername,
   botToken,
   chatId,
+  assistantName,
   onChange,
   onNext,
   onBack,
@@ -35,7 +37,7 @@ export default function StepTelegram({
 
   const handleTest = async () => {
     if (!tokenInput.trim() || !chatIdInput.trim()) {
-      setErrorMsg("Bot token and chat ID are both required");
+      setErrorMsg("Bot token and user ID are both required");
       return;
     }
     setStatus("testing");
@@ -70,103 +72,82 @@ export default function StepTelegram({
     }
   };
 
+  const displayBotName = usernameInput.trim()
+    ? usernameInput.trim().replace(/^@/, "@")
+    : "@your_bot";
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5">
       <div>
         <h2 className="text-3xl font-bold text-white mb-2">
           Connect Telegram
         </h2>
         <p className="text-[#888]">
-          Telegram is the secure channel between you and your AM.
+          Telegram is the secure channel between you and {assistantName || "your AM"}.
         </p>
       </div>
 
-      {/* Instructions */}
-      <div
-        className="rounded-xl p-4 flex flex-col gap-3 text-sm"
-        style={{
-          background: `${accent}08`,
-          border: `1px solid ${accent}33`,
-        }}
-      >
-        <p className="text-[#aaa] font-semibold text-xs uppercase tracking-wide">
-          How to set up
+      {/* Step 1: BotFather + bot username */}
+      <div className="flex flex-col gap-2">
+        <p className="text-sm text-[#ccc]">
+          <span className="text-white font-medium">1.</span> Open Telegram on your phone. Find{" "}
+          <span className="text-white font-medium">@BotFather</span>, send{" "}
+          <code className="px-1.5 py-0.5 rounded bg-[#1a1a1a] text-white text-xs">/newbot</code>.
+          Name it, then create a username for it.
         </p>
-        <div className="flex flex-col gap-2 text-[#ccc]">
-          <p>
-            <span className="text-white font-medium">1.</span> Open Telegram on your{" "}
-            <span className="text-white">phone</span>, find{" "}
-            <span className="text-white font-medium">@BotFather</span>
-          </p>
-          <p>
-            <span className="text-white font-medium">2.</span> Send{" "}
-            <code className="px-1.5 py-0.5 rounded bg-[#1a1a1a] text-white text-xs">
-              /newbot
-            </code>
-          </p>
-          <p>
-            <span className="text-white font-medium">3.</span> Name your bot (e.g.{" "}
-            <span className="text-white">Amelia</span>)
-          </p>
-          <p>
-            <span className="text-white font-medium">4.</span> Create a username (e.g.{" "}
-            <span className="text-white font-mono">amelia_am420_bot</span>) — enter it in the first field below
-          </p>
-          <p>
-            <span className="text-white font-medium">5.</span> BotFather gives you a{" "}
-            <span className="text-white">bot token</span> — email it to yourself so you can paste it here
-          </p>
-          <p>
-            <span className="text-white font-medium">6.</span> Find{" "}
-            <span className="text-white font-medium">@userinfobot</span>{" "}
-            — send it anything, get your <span className="text-white">user ID</span>, email that too
-          </p>
-          <p>
-            <span className="text-white font-medium">7.</span> Send a message to your new bot so it can reply to you
-          </p>
-        </div>
+        <input
+          type="text"
+          value={usernameInput}
+          onChange={(e) => setUsernameInput(e.target.value)}
+          placeholder="@amelia_am420_bot"
+          className="w-full px-4 py-3 rounded-xl bg-[#1a1a1a] border border-[rgba(255,255,255,0.1)] text-white text-sm placeholder-[#444] focus:outline-none"
+          style={{ borderColor: usernameInput ? `${accent}66` : undefined }}
+          disabled={status === "ok"}
+        />
       </div>
 
-      {/* Inputs */}
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm text-[#aaa] font-medium">
-            Bot username <span className="text-[#555]">(the one you gave BotFather)</span>
-          </label>
-          <input
-            type="text"
-            value={usernameInput}
-            onChange={(e) => setUsernameInput(e.target.value)}
-            placeholder="@amelia_am420_bot"
-            className="w-full px-4 py-3 rounded-xl bg-[#1a1a1a] border border-[rgba(255,255,255,0.1)] text-white text-sm placeholder-[#444] focus:outline-none"
-            style={{ borderColor: usernameInput ? `${accent}66` : undefined }}
-            disabled={status === "ok"}
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm text-[#aaa] font-medium">Bot token</label>
-          <input
-            type="password"
-            value={tokenInput}
-            onChange={(e) => setTokenInput(e.target.value)}
-            placeholder="123456:ABC-DEF..."
-            className="w-full px-4 py-3 rounded-xl bg-[#1a1a1a] border border-[rgba(255,255,255,0.1)] text-white text-sm font-mono placeholder-[#444] focus:outline-none"
-            style={{ borderColor: tokenInput ? `${accent}66` : undefined }}
-            disabled={status === "ok"}
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm text-[#aaa] font-medium">Your user ID</label>
-          <input
-            type="text"
-            value={chatIdInput}
-            onChange={(e) => setChatIdInput(e.target.value)}
-            placeholder="123456789"
-            className="w-full px-4 py-3 rounded-xl bg-[#1a1a1a] border border-[rgba(255,255,255,0.1)] text-white text-sm font-mono placeholder-[#444] focus:outline-none"
-            style={{ borderColor: chatIdInput ? `${accent}66` : undefined }}
-            disabled={status === "ok"}
-          />
-        </div>
+      {/* Step 2: Bot token */}
+      <div className="flex flex-col gap-2">
+        <p className="text-sm text-[#ccc]">
+          <span className="text-white font-medium">2.</span> BotFather gives you a{" "}
+          <span className="text-white">bot token</span>. Email it to yourself so you can paste it here.
+        </p>
+        <input
+          type="password"
+          value={tokenInput}
+          onChange={(e) => setTokenInput(e.target.value)}
+          placeholder="123456:ABC-DEF..."
+          className="w-full px-4 py-3 rounded-xl bg-[#1a1a1a] border border-[rgba(255,255,255,0.1)] text-white text-sm font-mono placeholder-[#444] focus:outline-none"
+          style={{ borderColor: tokenInput ? `${accent}66` : undefined }}
+          disabled={status === "ok"}
+        />
+      </div>
+
+      {/* Step 3: Send message to bot (no textfield) */}
+      <div>
+        <p className="text-sm text-[#ccc]">
+          <span className="text-white font-medium">3.</span> Send a Telegram message from your phone to{" "}
+          <span className="text-white font-medium font-mono">{displayBotName}</span>{" "}
+          so it can reply to you.
+        </p>
+      </div>
+
+      {/* Step 4: User ID */}
+      <div className="flex flex-col gap-2">
+        <p className="text-sm text-[#ccc]">
+          <span className="text-white font-medium">4.</span> Find{" "}
+          <span className="text-white font-medium">@userinfobot</span> in Telegram, send it anything.
+          It replies with your <span className="text-white">user ID</span>. Email it to yourself and paste here.
+        </p>
+        <input
+          type="text"
+          value={chatIdInput}
+          onChange={(e) => setChatIdInput(e.target.value)}
+          placeholder="123456789"
+          className="w-full px-4 py-3 rounded-xl bg-[#1a1a1a] border border-[rgba(255,255,255,0.1)] text-white text-sm font-mono placeholder-[#444] focus:outline-none"
+          style={{ borderColor: chatIdInput ? `${accent}66` : undefined }}
+          disabled={status === "ok"}
+        />
       </div>
 
       {/* Status feedback */}
