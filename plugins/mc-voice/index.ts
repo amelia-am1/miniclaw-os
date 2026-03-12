@@ -12,10 +12,21 @@
  */
 
 import * as path from "node:path";
+import * as fs from "node:fs";
 import * as os from "node:os";
 import { spawn } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+
+function _resolveBotId(): string {
+  if (process.env.OPENCLAW_BOT_ID) return process.env.OPENCLAW_BOT_ID;
+  const stateDir = process.env.OPENCLAW_STATE_DIR ?? path.join(os.homedir(), ".openclaw");
+  try {
+    const cfg = JSON.parse(fs.readFileSync(path.join(stateDir, "openclaw.json"), "utf-8"));
+    if (cfg.botId) return cfg.botId as string;
+  } catch {}
+  throw new Error("OPENCLAW_BOT_ID not set and botId not found in openclaw.json — run the setup wizard");
+}
 
 interface VoiceConfig {
   humanId: string;
@@ -50,7 +61,7 @@ function resolveConfig(api: OpenClawPluginApi): VoiceConfig {
   return {
     humanId: raw.humanId ?? "augmentedmike",
     dbPath: resolvePath(
-      raw.dbPath ?? path.join(stateDir, "USER/augmentedmike_bot/voice/voice.db")
+      raw.dbPath ?? path.join(stateDir, "USER", _resolveBotId(), "voice", "voice.db")
     ),
     ingestBin: resolvePath(
       raw.ingestBin ?? path.join(stateDir, "miniclaw/SYSTEM/bin/voice-ingest")

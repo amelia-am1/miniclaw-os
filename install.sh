@@ -341,11 +341,15 @@ p.setdefault("load", {}).setdefault("paths", [])
 p.setdefault("entries", {})
 
 state_dir = sys.argv[3] if len(sys.argv) > 3 else os.path.expanduser("~/.openclaw")
+bot_id = cfg.get("botId") or os.environ.get("OPENCLAW_BOT_ID")
+if not bot_id:
+    print("ERROR: botId not in openclaw.json and OPENCLAW_BOT_ID not set — run the setup wizard", file=sys.stderr)
+    sys.exit(1)
 
 plugin_defaults = {
     "mc-board": {
         "enabled": True,
-        "config": { "cardsDir": state_dir + "/user/brain/cards", "qmdBin": "~/.bun/bin/qmd", "qmdCollection": "mc-board", "webPort": 4220 },
+        "config": { "cardsDir": state_dir + "/USER/brain/cards", "qmdBin": "~/.bun/bin/qmd", "qmdCollection": "mc-board", "webPort": 4220 },
     },
     "mc-context": {
         "enabled": True,
@@ -357,11 +361,11 @@ plugin_defaults = {
     },
     "mc-kb": {
         "enabled": True,
-        "config": { "dbDir": state_dir + "/user/brain/kb", "modelPath": "~/.cache/qmd/models/hf_ggml-org_embeddinggemma-300M-Q8_0.gguf", "qmdBin": "~/.bun/bin/qmd", "qmdCollection": "kb", "contextN": 3, "contextThreshold": 0.75 },
+        "config": { "dbDir": state_dir + "/USER/brain/kb", "modelPath": "~/.cache/qmd/models/hf_ggml-org_embeddinggemma-300M-Q8_0.gguf", "qmdBin": "~/.bun/bin/qmd", "qmdCollection": "kb", "contextN": 3, "contextThreshold": 0.75 },
     },
     "mc-queue": {
         "enabled": True,
-        "config": { "enabled": True, "haikuModel": "claude-haiku-4-5-20251001", "maxToolCallsPerTurn": 3, "applyToChannels": True, "applyToDMs": True, "tgLogChatId": "", "tgBotName": "@augmentedmike_bot", "boardUrl": "" },
+        "config": { "enabled": True, "haikuModel": "claude-haiku-4-5-20251001", "maxToolCallsPerTurn": 3, "applyToChannels": True, "applyToDMs": True, "tgLogChatId": "", "tgBotName": "@" + bot_id, "boardUrl": "" },
     },
     "mc-soul": {
         "enabled": True,
@@ -398,12 +402,12 @@ ok "openclaw.json patched"
 step "Step 8: CLI tools → $LOCAL_BIN"
 
 mkdir -p "$LOCAL_BIN"
-for bin_src in "$REPO_DIR/system/bin"/*; do
+for bin_src in "$REPO_DIR/SYSTEM/bin"/*; do
   [[ -f "$bin_src" ]] || continue
   bin_name="$(basename "$bin_src")"
   # Migrated CLIs: symlink instead of copy (path derivation needs real location)
   [[ "$bin_name" == "mc-vault" ]] && continue
-  [[ "$bin_name" == "mc" ]] && { ln -sf "$MINICLAW_DIR/system/bin/mc" "$LOCAL_BIN/mc"; ok "Symlinked: mc → miniclaw/system/bin/mc"; continue; }
+  [[ "$bin_name" == "mc" ]] && { ln -sf "$MINICLAW_DIR/SYSTEM/bin/mc" "$LOCAL_BIN/mc"; ok "Symlinked: mc → miniclaw/system/bin/mc"; continue; }
   cp "$bin_src" "$LOCAL_BIN/$bin_name"
   chmod +x "$LOCAL_BIN/$bin_name"
   ok "Installed: $bin_name"
@@ -422,11 +426,11 @@ fi
 # ── Step 9: Directories ───────────────────────────────────────────────────────
 step "Step 9: User directories"
 
-USER_MEMORY_DIR="$OPENCLAW_DIR/user/memory"
+USER_MEMORY_DIR="$OPENCLAW_DIR/USER/memory"
 SOUL_BACKUPS_DIR="$OPENCLAW_DIR/soul-backups"
 
 mkdir -p "$USER_MEMORY_DIR"
-ok "~/.openclaw/user/memory/"
+ok "~/.openclaw/USER/memory/"
 
 mkdir -p "$SOUL_BACKUPS_DIR"
 ok "~/.openclaw/soul-backups/"
@@ -451,7 +455,7 @@ fi
 # ── Step 11: Vault ────────────────────────────────────────────────────────────
 step "Step 11: Vault"
 
-VAULT_ROOT="$MINICLAW_DIR/system/vault"
+VAULT_ROOT="$MINICLAW_DIR/SYSTEM/vault"
 MC_VAULT="$MINICLAW_DIR/vault/cli"
 
 if [[ ! -f "$VAULT_ROOT/key.txt" ]]; then
@@ -520,7 +524,7 @@ MERGE_PYEOF
   if [[ -n "$OLD_USER_DIR" ]]; then
     info "Importing your user data..."
     # Merge into new user dir -- rsync with no-clobber so we dont overwrite miniclaw defaults
-    rsync -a --ignore-existing "$OLD_USER_DIR/" "$STATE_DIR/user/"
+    rsync -a --ignore-existing "$OLD_USER_DIR/" "$STATE_DIR/USER/"
     ok "Imported user data (board cards, KB, personal state)"
   fi
 
@@ -773,51 +777,17 @@ mkdir -p "$STATE_DIR/logs"
 launchctl load "$BOARD_PLIST" 2>/dev/null && ok "Board web LaunchAgent loaded (port 4220)" \
   || warn "LaunchAgent created — run: launchctl load $BOARD_PLIST"
 
-# ── Step 14b: Seed default projects ──────────────────────────────────────────
+# ── Step 14b: Default board projects (deferred to setup wizard) ──────────────
 step "Step 14b: Default board projects"
-
-BOARD_DB="$STATE_DIR/USER/augmentedmike_bot/brain/board.db"
-mkdir -p "$(dirname "$BOARD_DB")"
-
-python3 << PYEOF
-import sqlite3, os, datetime
-
-db_path = "$BOARD_DB"
-now = datetime.datetime.utcnow().isoformat() + "Z"
-
-conn = sqlite3.connect(db_path)
-conn.execute("""CREATE TABLE IF NOT EXISTS projects (
-    id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT NOT NULL,
-    description TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'active',
-    created_at TEXT NOT NULL, updated_at TEXT NOT NULL
-)""")
-
-seeds = [
-    ("prj_uncategorized", "Uncategorized", "uncategorized", "Default project for unassigned cards"),
-    ("prj_miniclaw_enh", "MiniClaw Enhancements", "miniclaw-enhancements", "Improvements and new features for MiniClaw"),
-]
-
-for sid, name, slug, desc in seeds:
-    existing = conn.execute("SELECT id FROM projects WHERE id = ?", (sid,)).fetchone()
-    if not existing:
-        conn.execute(
-            "INSERT INTO projects (id, name, slug, description, status, created_at, updated_at) VALUES (?,?,?,?,?,?,?)",
-            (sid, name, slug, desc, "active", now, now)
-        )
-        print(f"  Added project: {name}")
-    else:
-        print(f"  Project exists: {name}")
-
-conn.commit()
-conn.close()
-PYEOF
-ok "Default projects seeded"
+info "Board DB and default projects will be seeded when the setup wizard completes"
+info "(The wizard sets the bot ID from your Telegram username)"
+ok "Deferred to setup wizard"
 
 # ── Step 15b: AM Setup Wizard LaunchAgent ─────────────────────────────────
 step "Step 15b: AM Setup Wizard LaunchAgent"
 
 # Reset onboarding state so the wizard always runs after install
-rm -f "$STATE_DIR/user/setup-state.json"
+rm -f "$STATE_DIR/USER/setup-state.json"
 
 SETUP_APP_DIR="$MINICLAW_DIR/apps/am-setup"
 SETUP_PLIST="$HOME/Library/LaunchAgents/com.miniclaw.am-setup.plist"

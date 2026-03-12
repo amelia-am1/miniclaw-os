@@ -22,7 +22,16 @@ import { fileURLToPath } from "node:url";
 // ---- Config ----
 
 const STATE_DIR = process.env.OPENCLAW_STATE_DIR ?? path.join(os.homedir(), ".openclaw");
-const DB_PATH   = process.env.BOARD_DB_PATH ?? path.join(STATE_DIR, "user/augmentedmike_bot/brain/board.db");
+function resolveBotId() {
+  if (process.env.OPENCLAW_BOT_ID) return process.env.OPENCLAW_BOT_ID;
+  try {
+    const cfg = JSON.parse(fs.readFileSync(path.join(STATE_DIR, "openclaw.json"), "utf-8"));
+    if (cfg.botId) return cfg.botId;
+  } catch {}
+  throw new Error("OPENCLAW_BOT_ID not set and botId not found in openclaw.json");
+}
+const BOT_ID    = resolveBotId();
+const DB_PATH   = process.env.BOARD_DB_PATH ?? path.join(STATE_DIR, "USER", BOT_ID, "brain", "board.db");
 const CLAUDE_BIN    = process.env.CLAUDE_BIN ?? "claude";
 const OPENCLAW_BIN  = process.env.OPENCLAW_BIN ?? "openclaw";
 const POLL_MS       = parseInt(process.env.AGENT_RUNNER_POLL_MS ?? "5000", 10);

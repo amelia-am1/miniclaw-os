@@ -67,10 +67,10 @@ The cron prompt instructs the agent to:
 
 ```json
 {
-  "reflectionDir": "~/.openclaw/USER/augmentedmike_bot/reflections",
+  "reflectionDir": "~/.openclaw/USER/<bot_id>/reflections",
   "memoryDir": "~/.openclaw/workspace/memory",
-  "boardDbPath": "~/.openclaw/USER/augmentedmike_bot/brain",
-  "kbDbPath": "~/.openclaw/USER/augmentedmike_bot/kb",
+  "boardDbPath": "~/.openclaw/USER/<bot_id>/brain",
+  "kbDbPath": "~/.openclaw/USER/<bot_id>/kb",
   "transcriptsDir": "~/.claude/projects"
 }
 ```

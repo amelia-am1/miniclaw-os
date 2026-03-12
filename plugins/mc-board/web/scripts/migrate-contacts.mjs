@@ -12,15 +12,26 @@ const require = createRequire(import.meta.url);
 const Database = require("better-sqlite3");
 
 const STATE = process.env.OPENCLAW_STATE_DIR ?? join(homedir(), ".openclaw");
-const DB_PATH = join(STATE, "user/augmentedmike_bot/rolodex/contacts.db");
+
+function resolveBotId() {
+  if (process.env.OPENCLAW_BOT_ID) return process.env.OPENCLAW_BOT_ID;
+  try {
+    const cfg = JSON.parse(readFileSync(join(STATE, "openclaw.json"), "utf-8"));
+    if (cfg.botId) return cfg.botId;
+  } catch {}
+  throw new Error("OPENCLAW_BOT_ID not set and botId not found in openclaw.json");
+}
+const BOT_ID = resolveBotId();
+
+const DB_PATH = join(STATE, "USER", BOT_ID, "rolodex", "contacts.db");
 
 // Source files to try (in priority order)
 const SOURCES = [
-  join(STATE, "user/augmentedmike_bot/contacts.json"),
-  join(STATE, "user/augmentedmike_bot/rolodex/contacts.json"),
+  join(STATE, "USER", BOT_ID, "contacts.json"),
+  join(STATE, "USER", BOT_ID, "rolodex", "contacts.json"),
 ];
 
-mkdirSync(join(STATE, "user/augmentedmike_bot/rolodex"), { recursive: true });
+mkdirSync(join(STATE, "USER", BOT_ID, "rolodex"), { recursive: true });
 
 const db = new Database(DB_PATH);
 db.pragma("journal_mode = WAL");

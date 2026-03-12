@@ -38,7 +38,7 @@ fi
 
 AGE_BIN="${OPENCLAW_AGE_BIN:-/opt/homebrew/bin/age}"
 AGE_KEYGEN_BIN="${OPENCLAW_AGE_KEYGEN_BIN:-/opt/homebrew/bin/age-keygen}"
-VAULT_ROOT="${OPENCLAW_VAULT_ROOT:-${MINICLAW_HOME}/system/vault}"
+VAULT_ROOT="${OPENCLAW_VAULT_ROOT:-${MINICLAW_HOME}/SYSTEM/vault}"
 KEY_FILE="${VAULT_ROOT}/key.txt"
 STORE_DIR="${VAULT_ROOT}/secrets"
 NOTES_DIR="${VAULT_ROOT}/notes"

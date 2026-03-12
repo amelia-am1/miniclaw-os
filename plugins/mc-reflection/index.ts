@@ -12,12 +12,23 @@
  * - KB entries (lessons, postmortems, decisions)
  * - A reflection snapshot (stored in SQLite + markdown)
  *
- * Reflection dir: ~/.openclaw/USER/augmentedmike_bot/reflections
+ * Reflection dir: ~/.openclaw/USER/<bot_id>/reflections
  */
 
 import * as path from "node:path";
+import * as fs from "node:fs";
 import * as os from "node:os";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+
+function _resolveBotId(): string {
+  if (process.env.OPENCLAW_BOT_ID) return process.env.OPENCLAW_BOT_ID;
+  const stateDir = process.env.OPENCLAW_STATE_DIR ?? path.join(os.homedir(), ".openclaw");
+  try {
+    const cfg = JSON.parse(fs.readFileSync(path.join(stateDir, "openclaw.json"), "utf-8"));
+    if (cfg.botId) return cfg.botId as string;
+  } catch {}
+  throw new Error("OPENCLAW_BOT_ID not set and botId not found in openclaw.json — run the setup wizard");
+}
 import { registerReflectionCommands } from "./cli/commands.js";
 import { createReflectionTools, type ReflectionToolsConfig } from "./tools/definitions.js";
 import type { GatherConfig } from "./src/gather.js";
@@ -37,11 +48,12 @@ function resolvePath(p: string): string {
 
 function resolveConfig(api: OpenClawPluginApi): ReflectionPluginConfig {
   const raw = (api.pluginConfig ?? {}) as Partial<ReflectionPluginConfig>;
+  const botId = _resolveBotId();
   return {
-    reflectionDir: resolvePath(raw.reflectionDir ?? "~/.openclaw/USER/augmentedmike_bot/reflections"),
+    reflectionDir: resolvePath(raw.reflectionDir ?? `~/.openclaw/USER/${botId}/reflections`),
     memoryDir: resolvePath(raw.memoryDir ?? "~/.openclaw/workspace/memory"),
-    boardDbPath: resolvePath(raw.boardDbPath ?? "~/.openclaw/USER/augmentedmike_bot/brain"),
-    kbDbPath: resolvePath(raw.kbDbPath ?? "~/.openclaw/USER/augmentedmike_bot/kb"),
+    boardDbPath: resolvePath(raw.boardDbPath ?? `~/.openclaw/USER/${botId}/brain`),
+    kbDbPath: resolvePath(raw.kbDbPath ?? `~/.openclaw/USER/${botId}/kb`),
     transcriptsDir: resolvePath(raw.transcriptsDir ?? "~/.claude/projects"),
   };
 }

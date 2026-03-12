@@ -10,7 +10,17 @@ import { sortCards } from "@/lib/sort";
 export const dynamic = "force-dynamic";
 
 const STATE_DIR = process.env.OPENCLAW_STATE_DIR ?? path.join(os.homedir(), ".openclaw");
-const BRAIN_DIR = path.join(STATE_DIR, "USER", "augmentedmike_bot", "brain");
+
+function resolveBotId(): string {
+  if (process.env.OPENCLAW_BOT_ID) return process.env.OPENCLAW_BOT_ID;
+  try {
+    const cfg = JSON.parse(fs.readFileSync(path.join(STATE_DIR, "openclaw.json"), "utf-8"));
+    if (cfg.botId) return cfg.botId;
+  } catch {}
+  throw new Error("OPENCLAW_BOT_ID not set and botId not found in openclaw.json");
+}
+
+const BRAIN_DIR = path.join(STATE_DIR, "USER", resolveBotId(), "brain");
 
 // Parse a job ID into { column, projectId } — supports both:
 //   "board-{col}-triage"            (global)

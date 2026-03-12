@@ -31,7 +31,7 @@
         "standalone": "web/standalone.mjs"
       },
       "config": {
-        "cardsDir": "~/.openclaw/user/brain/cards",
+        "cardsDir": "~/.openclaw/USER/brain/cards",
         "qmdBin": "~/.bun/bin/qmd",
         "qmdCollection": "mc-board",
         "webPort": 4220
@@ -90,7 +90,7 @@
         "kb_get"
       ],
       "config": {
-        "dbDir": "~/.openclaw/user/brain/kb",
+        "dbDir": "~/.openclaw/USER/brain/kb",
         "modelPath": "~/.cache/qmd/models/hf_ggml-org_embeddinggemma-300M-Q8_0.gguf",
         "qmdBin": "~/.bun/bin/qmd",
         "qmdCollection": "kb",
@@ -107,7 +107,7 @@
       "cli": true,
       "tools": [],
       "config": {
-        "storagePath": "~/.openclaw/user/augmentedmike_bot/rolodex/contacts.json"
+        "storagePath": "~/.openclaw/USER/<bot_id>/rolodex/contacts.json"
       }
     },
     {
@@ -153,7 +153,7 @@
       "config": {
         "agentId": "am",
         "trustDir": "~/.openclaw/trust",
-        "vaultBin": "~/.openclaw/miniclaw/system/bin/mc-vault",
+        "vaultBin": "~/.openclaw/miniclaw/SYSTEM/bin/mc-vault",
         "sessionTtlMs": 3600000
       }
     },
@@ -301,22 +301,22 @@
   "cli": [
     {
       "name": "mc",
-      "path": "system/bin/mc",
+      "path": "SYSTEM/bin/mc",
       "description": "Main miniclaw CLI wrapper"
     },
     {
       "name": "mc-vault",
-      "path": "system/bin/mc-vault",
+      "path": "SYSTEM/bin/mc-vault",
       "description": "age-encrypted secret store \u2014 get/set/export/list/rm"
     },
     {
       "name": "mc-smoke",
-      "path": "system/bin/mc-smoke",
+      "path": "SYSTEM/bin/mc-smoke",
       "description": "Health check \u2014 verifies all miniclaw components are installed and running"
     },
     {
       "name": "mc-doctor",
-      "path": "system/bin/mc-doctor",
+      "path": "SYSTEM/bin/mc-doctor",
       "description": "Diagnostics and auto-repair \u2014 identifies and fixes common configuration issues"
     }
   ],
@@ -422,7 +422,7 @@
       "port": 4210,
       "pm2": "am-setup",
       "entryUrl": "http://localhost:4210",
-      "setupState": "~/.openclaw/user/setup-state.json"
+      "setupState": "~/.openclaw/USER/setup-state.json"
     }
   ]
 }

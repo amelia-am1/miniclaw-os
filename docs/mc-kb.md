@@ -520,7 +520,7 @@ Plugin config in `openclaw.plugin.json` or the openclaw config file:
 ```json
 {
   "mc-kb": {
-    "dbDir": "~/.openclaw/user/augmentedmike_bot/kb",
+    "dbDir": "~/.openclaw/user/<bot_id>/kb",
     "modelPath": "~/.cache/qmd/models/hf_ggml-org_embeddinggemma-300M-Q8_0.gguf",
     "qmdBin": "~/.bun/bin/qmd",
     "qmdCollection": "kb",

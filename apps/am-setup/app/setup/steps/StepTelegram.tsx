@@ -125,9 +125,9 @@ export default function StepTelegram({
 
       {/* Step 3: Send message to bot (no textfield) */}
       <div>
-        <p className="text-sm text-[#ccc]">
-          <span className="text-white font-medium">3.</span> Send a Telegram message from your phone to{" "}
-          <span className="text-white font-medium font-mono">{displayBotName}</span>{" "}
+        <p className="text-sm text-white font-bold">
+          3. Send a Telegram message from your phone to{" "}
+          <span className="font-mono">{displayBotName}</span>{" "}
           so it can reply to you.
         </p>
       </div>

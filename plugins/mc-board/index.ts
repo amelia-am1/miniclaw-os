@@ -8,8 +8,19 @@
  */
 
 import * as path from "node:path";
+import * as fs from "node:fs";
 import * as os from "node:os";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+
+function _resolveBotId(): string {
+  if (process.env.OPENCLAW_BOT_ID) return process.env.OPENCLAW_BOT_ID;
+  const stateDir = process.env.OPENCLAW_STATE_DIR ?? path.join(os.homedir(), ".openclaw");
+  try {
+    const cfg = JSON.parse(fs.readFileSync(path.join(stateDir, "openclaw.json"), "utf-8"));
+    if (cfg.botId) return cfg.botId as string;
+  } catch {}
+  throw new Error("OPENCLAW_BOT_ID not set and botId not found in openclaw.json — run the setup wizard");
+}
 import { openDb } from "./src/db.js";
 import { migrateIfNeeded } from "./src/migrate.js";
 import { CardStore } from "./src/store.js";
@@ -31,7 +42,8 @@ function resolveConfig(api: OpenClawPluginApi): BrainConfig {
   const raw = (api.pluginConfig ?? {}) as Partial<{ cardsDir: string; qmdBin: string; qmdCollection: string }>;
 
   // stateDir = parent of cardsDir (the brain/ directory)
-  const cardsDir = resolvePath(raw.cardsDir ?? "~/.openclaw/USER/augmentedmike_bot/brain/cards");
+  const botId = _resolveBotId();
+  const cardsDir = resolvePath(raw.cardsDir ?? `~/.openclaw/USER/${botId}/brain/cards`);
   const stateDir = path.dirname(cardsDir);
 
   const qmdBin = resolvePath(raw.qmdBin ?? "~/.bun/bin/qmd");

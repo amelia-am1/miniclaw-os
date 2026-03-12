@@ -34,17 +34,28 @@ interface ContactRow {
   notes: string;
 }
 
+function resolveBotId(): string {
+  if (process.env.OPENCLAW_BOT_ID) return process.env.OPENCLAW_BOT_ID;
+  const stateDir = process.env.OPENCLAW_STATE_DIR ?? path.join(os.homedir(), ".openclaw");
+  try {
+    const cfg = JSON.parse(fs.readFileSync(path.join(stateDir, "openclaw.json"), "utf-8"));
+    if (cfg.botId) return cfg.botId;
+  } catch {}
+  throw new Error("OPENCLAW_BOT_ID not set and botId not found in openclaw.json");
+}
+
 function resolveDbPath(): string {
   if (process.env.ROLODEX_DB_PATH) return process.env.ROLODEX_DB_PATH;
   const stateDir = process.env.OPENCLAW_STATE_DIR ?? path.join(os.homedir(), ".openclaw");
-  return path.join(stateDir, "USER/augmentedmike_bot/rolodex/contacts.db");
+  return path.join(stateDir, "USER", resolveBotId(), "rolodex", "contacts.db");
 }
 
 function resolveJsonPath(): string {
   if (process.env.ROLODEX_STORAGE_PATH) return process.env.ROLODEX_STORAGE_PATH;
   const stateDir = process.env.OPENCLAW_STATE_DIR ?? path.join(os.homedir(), ".openclaw");
+  const botId = resolveBotId();
   // Check new location first, then fall back to legacy
-  const newPath = path.join(stateDir, "USER/augmentedmike_bot/rolodex/contacts.json");
+  const newPath = path.join(stateDir, "USER", botId, "rolodex", "contacts.json");
   if (fs.existsSync(newPath)) return newPath;
   return path.join(os.homedir(), ".openclaw", "rolodex", "contacts.json");
 }

@@ -24,7 +24,7 @@ export interface BoardEvent {
 
 export interface Signal {
   type: SignalType;
-  sender: string; // "augmentedmike_bot" or "augmentedryan_bot"
+  sender: string; // "<bot_id>" or "augmentedryan_bot"
   recipient?: string; // if recipient, show as "sender → recipient"
   cardId: string;
   title?: string;
@@ -83,10 +83,10 @@ export function formatBoardEvent(ev: BoardEvent, boardUrl: string = ""): string 
  * Format a cross-bot signal.
  *
  * Examples:
- *   working_on → "🔗 @augmentedmike_bot working on crd_abc (est. done: 2pm) — Task Title"
- *   blocked    → "⛔ @augmentedmike_bot blocked on crd_abc — waiting for X"
- *   done       → "✅ @augmentedmike_bot done: crd_abc shipped"
- *   escalate   → "📢 @augmentedmike_bot escalates: crd_abc — needs human decision"
+ *   working_on → "🔗 @<bot_id> working on crd_abc (est. done: 2pm) — Task Title"
+ *   blocked    → "⛔ @<bot_id> blocked on crd_abc — waiting for X"
+ *   done       → "✅ @<bot_id> done: crd_abc shipped"
+ *   escalate   → "📢 @<bot_id> escalates: crd_abc — needs human decision"
  */
 export function formatSignal(sig: Signal, boardUrl: string = ""): string {
   const link = sig.cardId ? formatCardLink(sig.cardId, undefined, boardUrl) : "";
@@ -144,7 +144,7 @@ export function formatSignal(sig: Signal, boardUrl: string = ""): string {
  *
  * Example:
  *   "🚨 CRITICAL — Pricing decision needed\n
- *    From: @augmentedmike_bot\n
+ *    From: @<bot_id>\n
  *    Due: today 6pm\n
  *    Card: crd_abc\n
  *    \nContext: Does PHI ever touch third-party models?..."

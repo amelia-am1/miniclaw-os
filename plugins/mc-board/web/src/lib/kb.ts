@@ -3,8 +3,19 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 const _STATE = process.env.OPENCLAW_STATE_DIR ?? path.join(require("node:os").homedir(), ".openclaw");
-const KB_DB = process.env.BOARD_KB_DB ?? path.join(_STATE, "USER", "augmentedmike_bot", "kb", "kb.db");
-const QMD_DIR = process.env.BOARD_QMD_DIR ?? path.join(_STATE, "USER", "augmentedmike_bot", "memory");
+
+function _resolveBotId(): string {
+  if (process.env.OPENCLAW_BOT_ID) return process.env.OPENCLAW_BOT_ID;
+  try {
+    const cfg = JSON.parse(fs.readFileSync(path.join(_STATE, "openclaw.json"), "utf-8"));
+    if (cfg.botId) return cfg.botId;
+  } catch {}
+  throw new Error("OPENCLAW_BOT_ID not set and botId not found in openclaw.json");
+}
+
+const _BOT_ID = _resolveBotId();
+const KB_DB = process.env.BOARD_KB_DB ?? path.join(_STATE, "USER", _BOT_ID, "kb", "kb.db");
+const QMD_DIR = process.env.BOARD_QMD_DIR ?? path.join(_STATE, "USER", _BOT_ID, "memory");
 
 export interface KbEntry {
   id: string;

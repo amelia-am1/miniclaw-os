@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # sync-dev.sh — sync miniclaw-os repo → live ~/.openclaw/miniclaw/
 #
-# Rsyncs plugins and system/bin from the project repo to the live install.
+# Rsyncs plugins and SYSTEM/bin from the project repo to the live install.
 # Run this after making changes in ~/.openclaw/projects/miniclaw-os/ to test them live.
 #
 # Usage:
-#   ./scripts/sync-dev.sh            # sync plugins + system/bin
+#   ./scripts/sync-dev.sh            # sync plugins + SYSTEM/bin
 #   ./scripts/sync-dev.sh --check    # dry-run, show what would change
 #   ./scripts/sync-dev.sh --reload   # sync + signal OpenClaw to reload plugins
 
@@ -52,8 +52,8 @@ eval rsync $RSYNC_FLAGS \
 ok "plugins/"
 
 # ── System bin ────────────────────────────────────────────────────────────────
-info "Syncing system/bin → $LOCAL_BIN..."
-for bin_src in "$REPO_DIR/system/bin"/*; do
+info "Syncing SYSTEM/bin → $LOCAL_BIN..."
+for bin_src in "$REPO_DIR/SYSTEM/bin"/*; do
   [[ -f "$bin_src" ]] || continue
   bin_name="$(basename "$bin_src")"
   if [[ "$DRY_RUN" == true ]]; then
@@ -61,7 +61,7 @@ for bin_src in "$REPO_DIR/system/bin"/*; do
   else
     cp "$bin_src" "$LOCAL_BIN/$bin_name"
     chmod +x "$LOCAL_BIN/$bin_name"
-    ok "system/bin/$bin_name"
+    ok "SYSTEM/bin/$bin_name"
   fi
 done
 

@@ -38,6 +38,16 @@ import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 const OPENCLAW_STATE_DIR = (process.env.OPENCLAW_STATE_DIR ?? "").trim()
   || path.join(os.homedir(), ".openclaw");
 
+function _resolveBotId(): string {
+  if (process.env.OPENCLAW_BOT_ID) return process.env.OPENCLAW_BOT_ID;
+  const stateDir = OPENCLAW_STATE_DIR;
+  try {
+    const cfg = JSON.parse(fs.readFileSync(path.join(stateDir, "openclaw.json"), "utf-8"));
+    if (cfg.botId) return cfg.botId as string;
+  } catch {}
+  throw new Error("OPENCLAW_BOT_ID not set and botId not found in openclaw.json — run the setup wizard");
+}
+
 // ---- Load workspace soul files at startup ----
 
 function readWorkspaceFile(filename: string): string {
@@ -121,7 +131,8 @@ type BoardEvent =
 /** Look up a card's project_id from the brain cards directory. Best-effort, returns "" if not found. */
 function lookupCardProjectId(cardId: string): string {
   try {
-    const cardsDir = path.join(OPENCLAW_STATE_DIR, "USER", "augmentedmike_bot", "brain", "cards");
+    const qBotId = _resolveBotId();
+    const cardsDir = path.join(OPENCLAW_STATE_DIR, "USER", qBotId, "brain", "cards");
     const files = fs.readdirSync(cardsDir).filter(f => f.startsWith(cardId) && f.endsWith(".md"));
     if (!files.length) return "";
     const content = fs.readFileSync(path.join(cardsDir, files[0]), "utf8");
@@ -211,7 +222,7 @@ export default function register(api: OpenClawPluginApi) {
   const applyToChannels = cfg.applyToChannels ?? true;
   const applyToDMs = cfg.applyToDMs ?? true;
   const tgLogChatId = cfg.tgLogChatId ?? "";
-  const tgBotName = cfg.tgBotName ?? "@augmentedmike_bot";
+  const tgBotName = cfg.tgBotName ?? `@${_resolveBotId()}`;
   const boardUrl = process.env.MINICLAW_BOARD_URL ?? cfg.boardUrl ?? "";
 
   // Read bot token from OpenClaw's telegram channel config

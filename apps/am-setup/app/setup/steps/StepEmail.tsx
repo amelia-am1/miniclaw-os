@@ -92,7 +92,7 @@ export default function StepEmail({ email, appPassword, onChange, onNext, onBack
       <div>
         <h2 className="text-3xl font-bold text-white mb-2">Email setup</h2>
         <p className="text-[#888]">
-          Your assistant reads and manages your inbox.
+          Your assistant reads and manages their inbox. Later they can manage yours too!
         </p>
       </div>
 

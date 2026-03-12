@@ -19,7 +19,7 @@ FAILED=0
 
 OPENCLAW_DIR="${HOME}/.openclaw"
 MINICLAW_DIR="$OPENCLAW_DIR/miniclaw"
-VAULT_ROOT="$MINICLAW_DIR/system/vault"
+VAULT_ROOT="$MINICLAW_DIR/SYSTEM/vault"
 LOCAL_BIN="$HOME/.local/bin"
 
 # ── Colours ───────────────────────────────────────────────────────────────────
@@ -113,7 +113,7 @@ fi
 if command -v qmd &>/dev/null; then
   for col in mc-memory workspace; do
     if ! qmd collection list 2>/dev/null | grep -q "^${col}"; then
-      default_path="$OPENCLAW_DIR/user/memory"
+      default_path="$OPENCLAW_DIR/USER/memory"
       [[ "$col" == "workspace" ]] && default_path="$OPENCLAW_DIR/workspace"
       if ask "Register qmd collection '$col' → $default_path?"; then
         mkdir -p "$default_path"
@@ -195,7 +195,7 @@ section "directories"
 for dir in \
   "$OPENCLAW_DIR/soul-backups" \
   "$OPENCLAW_DIR/projects" \
-  "$OPENCLAW_DIR/user/memory"; do
+  "$OPENCLAW_DIR/USER/memory"; do
   if [[ ! -d "$dir" ]]; then
     if ask "Create $dir?"; then
       mkdir -p "$dir" && fixed "created $dir" || broke "failed to create $dir"

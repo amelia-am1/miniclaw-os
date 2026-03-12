@@ -177,7 +177,7 @@ Configuration lives in the plugin block of the OpenClaw config file under the `m
   "applyToChannels": true,
   "applyToDMs": true,
   "tgLogChatId": "-1001234567890",
-  "tgBotName": "@augmentedmike_bot",
+  "tgBotName": "@<bot_id>",
   "boardUrl": "https://mini.example.com"
 }
 ```
@@ -190,7 +190,7 @@ Configuration lives in the plugin block of the OpenClaw config file under the `m
 | `applyToChannels` | boolean | `true` | Apply triage to group/channel sessions |
 | `applyToDMs` | boolean | `true` | Apply triage to DM sessions |
 | `tgLogChatId` | string | `""` | Telegram channel ID to post board events |
-| `tgBotName` | string | `@augmentedmike_bot` | Bot handle shown in log channel redirect |
+| `tgBotName` | string | `@<bot_id>` | Bot handle shown in log channel redirect |
 | `boardUrl` | string | `""` | Base URL for board card links in log messages. Also reads `MINICLAW_BOARD_URL` env var |
 
 The bot token is read from the OpenClaw channels config (`channels.telegram.botToken`) — it is not a separate mc-queue config field.
