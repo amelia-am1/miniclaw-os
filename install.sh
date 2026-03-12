@@ -12,8 +12,8 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd 2>/dev/null)" || REPO_DIR="$(pwd)"
 STATE_DIR="${MINICLAW_STATE_DIR:-${OPENCLAW_STATE_DIR:-${OPENCLAW_DIR:-$HOME/.openclaw}}}"
-MINICLAW_DIR="$OPENCLAW_DIR/miniclaw"
-PROJECTS_DIR="$OPENCLAW_DIR/projects"
+MINICLAW_DIR="$STATE_DIR/miniclaw"
+PROJECTS_DIR="$STATE_DIR/projects"
 LOCAL_BIN="${LOCAL_BIN:-$HOME/.local/bin}"
 LOG_FILE="/tmp/miniclaw-install.log"
 ARCH=$(uname -m)
@@ -57,10 +57,10 @@ ARCHIVE_DIR="$HOME/.openclaw-backup-$(date +%Y%m%d-%H%M%S)"
 NEEDS_MIGRATION=false
 OLD_CONFIG="" OLD_PLUGINS_DIR="" OLD_USER_DIR="" OLD_WORKSPACE="" OLD_CRON="" OLD_MEMORY=""
 
-if [[ -d "$OPENCLAW_DIR" && ! -d "$OPENCLAW_DIR/miniclaw" && \
-      ( -d "$OPENCLAW_DIR/plugins" || -d "$OPENCLAW_DIR/user" ) ]]; then
+if [[ -d "$STATE_DIR" && ! -d "$STATE_DIR/miniclaw" && \
+      ( -d "$STATE_DIR/plugins" || -d "$STATE_DIR/user" ) ]]; then
   # Existing vanilla OpenClaw install with real user data (not just openclaw.json from a prior install.sh run)
-  info "Found existing OpenClaw install at $OPENCLAW_DIR"
+  info "Found existing OpenClaw install at $STATE_DIR"
   info "This looks like an upstream OpenClaw install (no miniclaw/ directory)."
   echo ""
   echo -e "  ${BOLD}MiniClaw will:${NC}"
@@ -87,8 +87,8 @@ if [[ -d "$OPENCLAW_DIR" && ! -d "$OPENCLAW_DIR/miniclaw" && \
     if [[ "$MIGRATE_CONFIRM" == "y" || "$MIGRATE_CONFIRM" == "Y" ]]; then
       NEEDS_MIGRATION=true
 
-      info "Archiving $OPENCLAW_DIR -> $ARCHIVE_DIR"
-      cp -a "$OPENCLAW_DIR" "$ARCHIVE_DIR"
+      info "Archiving $STATE_DIR -> $ARCHIVE_DIR"
+      cp -a "$STATE_DIR" "$ARCHIVE_DIR"
       ok "Archived to $ARCHIVE_DIR"
 
       # Catalog what they have
@@ -113,7 +113,7 @@ if [[ -d "$OPENCLAW_DIR" && ! -d "$OPENCLAW_DIR/miniclaw" && \
       exit 0
     fi
   fi
-elif [[ -d "$OPENCLAW_DIR/miniclaw" ]]; then
+elif [[ -d "$STATE_DIR/miniclaw" ]]; then
   ok "MiniClaw already installed -- updating in place"
 else
   ok "Fresh install (no existing ~/.openclaw)"
@@ -239,10 +239,10 @@ else
 fi
 
 # Init dirs if needed
-if [[ ! -d "$OPENCLAW_DIR" ]]; then
-  [[ "$CHECK_ONLY" == true ]] && fail "$OPENCLAW_DIR not found" || mkdir -p "$OPENCLAW_DIR"
+if [[ ! -d "$STATE_DIR" ]]; then
+  [[ "$CHECK_ONLY" == true ]] && fail "$STATE_DIR not found" || mkdir -p "$STATE_DIR"
 fi
-if [[ "$STATE_DIR" != "$OPENCLAW_DIR" && ! -d "$STATE_DIR" ]]; then
+if [[ "$STATE_DIR" != "$STATE_DIR" && ! -d "$STATE_DIR" ]]; then
   mkdir -p "$STATE_DIR"
 fi
 
@@ -420,8 +420,8 @@ fi
 # ── Step 9: Directories ───────────────────────────────────────────────────────
 step "Step 9: User directories"
 
-USER_MEMORY_DIR="$OPENCLAW_DIR/USER/memory"
-SOUL_BACKUPS_DIR="$OPENCLAW_DIR/soul-backups"
+USER_MEMORY_DIR="$STATE_DIR/USER/memory"
+SOUL_BACKUPS_DIR="$STATE_DIR/soul-backups"
 
 mkdir -p "$USER_MEMORY_DIR"
 ok "~/.openclaw/USER/memory/"
@@ -557,8 +557,8 @@ MERGE_PYEOF
         continue
       fi
       # Import to the openclaw plugins dir (not miniclaw plugins)
-      dest="$OPENCLAW_DIR/plugins/$plugin_name"
-      mkdir -p "$OPENCLAW_DIR/plugins"
+      dest="$STATE_DIR/plugins/$plugin_name"
+      mkdir -p "$STATE_DIR/plugins"
       rsync -a --exclude='node_modules' "$old_plugin" "$dest/"
       ok "  Imported: $plugin_name (upstream OpenClaw plugin)"
       IMPORTED_COUNT=$((IMPORTED_COUNT + 1))
@@ -585,7 +585,7 @@ REG_PYEOF
   echo ""
   ok "Migration complete!"
   info "Your original install is archived at: $ARCHIVE_DIR"
-  info "If anything looks wrong, restore with: cp -a $ARCHIVE_DIR/ $OPENCLAW_DIR/"
+  info "If anything looks wrong, restore with: cp -a $ARCHIVE_DIR/ $STATE_DIR/"
   echo ""
 fi
 
