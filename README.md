@@ -1,4 +1,4 @@
-# MiniClaw — Your Super Agent
+# MiniClaw — Prove it isnt AGI. I dare you.
 
 <p align="center">
     <img src="https://raw.githubusercontent.com/augmentedmike/miniclaw-os/main/assets/miniclaw-logo.png" alt="MiniClaw" width="500">
