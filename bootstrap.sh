@@ -78,37 +78,42 @@ if ! sudo -n true 2>/dev/null; then
   sudo -v || { echo "  ! sudo required"; }
 fi
 
-# ── Add myam.local hostname ──────────────────────────────────────────────────
-if ! grep -q 'myam.local' /etc/hosts 2>/dev/null; then
-  echo "127.0.0.1 myam.local" | sudo tee -a /etc/hosts >/dev/null 2>&1
-  echo "  ✓ myam.local added"
+# ── Add myam.localhost hostname ──────────────────────────────────────────────────
+if ! grep -q 'myam.localhost' /etc/hosts 2>/dev/null; then
+  echo "127.0.0.1 myam.localhost" | sudo tee -a /etc/hosts >/dev/null 2>&1
+  echo "  ✓ myam.localhost added"
 fi
 
 # ── Port 80 → 4220 redirect via pfctl ────────────────────────────────────────
-# This lets users access http://myam.local with no port number.
-PF_ANCHOR="com.miniclaw"
+# This lets users access http://myam.localhost with no port number.
 PF_RULE="rdr pass on lo0 inet proto tcp from any to 127.0.0.1 port 80 -> 127.0.0.1 port $APP_PORT"
-PF_CONF="/etc/pf.anchors/$PF_ANCHOR"
 
-# Write the redirect rule
-echo "$PF_RULE" | sudo tee "$PF_CONF" >/dev/null 2>&1
+# Load the rule directly into a named anchor (no pf.conf editing needed)
+echo "$PF_RULE" | sudo pfctl -a com.miniclaw -f - 2>/dev/null
+sudo pfctl -e 2>/dev/null || true
 
-# Add anchor to pf.conf if not already there
-if ! sudo grep -q "anchor \"$PF_ANCHOR\"" /etc/pf.conf 2>/dev/null; then
-  # Insert anchor lines before the last line of pf.conf
-  sudo cp /etc/pf.conf /etc/pf.conf.miniclaw-backup
-  {
-    sudo cat /etc/pf.conf
-    echo "rdr-anchor \"$PF_ANCHOR\""
-    echo "anchor \"$PF_ANCHOR\""
-    echo "load anchor \"$PF_ANCHOR\" from \"$PF_CONF\""
-  } | sudo tee /etc/pf.conf.new >/dev/null
-  sudo mv /etc/pf.conf.new /etc/pf.conf
-fi
-
-# Enable and load
-sudo pfctl -ef /etc/pf.conf 2>/dev/null || sudo pfctl -f /etc/pf.conf 2>/dev/null || true
-echo "  ✓ http://myam.local → port $APP_PORT"
+# Also install a LaunchDaemon so the redirect survives reboots
+PF_DAEMON="/Library/LaunchDaemons/com.miniclaw.pfctl.plist"
+sudo tee "$PF_DAEMON" >/dev/null << PFDAEMON
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.miniclaw.pfctl</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/sh</string>
+    <string>-c</string>
+    <string>echo "$PF_RULE" | /sbin/pfctl -a com.miniclaw -f - 2>/dev/null; /sbin/pfctl -e 2>/dev/null; true</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+</dict>
+</plist>
+PFDAEMON
+sudo launchctl load "$PF_DAEMON" 2>/dev/null || true
+echo "  ✓ http://myam.localhost → port $APP_PORT"
 
 # ── Install LaunchAgent (persists across reboots) ────────────────────────────
 echo "  Installing service..."
@@ -182,7 +187,7 @@ for i in $(seq 1 30); do
 done
 
 # ── Open browser ─────────────────────────────────────────────────────────────
-APP_URL="http://myam.local"
+APP_URL="http://myam.localhost"
 if command -v open &>/dev/null; then
   open "$APP_URL"
 fi
