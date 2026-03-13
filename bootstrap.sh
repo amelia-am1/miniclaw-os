@@ -36,16 +36,11 @@ get_sudo() {
   for attempt in 1 2 3; do
     local PW
     PW=$(osascript <<'APPLESCRIPT'
-tell application "System Events"
+tell current application
   activate
-  set frontmost to true
-  delay 0.3
 end tell
-tell application "System Events"
-  activate
-  set pw to text returned of (display dialog "MiniClaw needs your Mac password to finish setting up." & return & return & "Your password is only used locally and is never stored." default answer "" with hidden answer with title "MiniClaw Setup" with icon caution buttons {"Cancel", "OK"} default button "OK" giving up after 300)
-  return pw
-end tell
+display dialog "MiniClaw needs your Mac password to finish setting up." & return & return & "Your password is only used locally and is never stored." default answer "" with hidden answer with title "MiniClaw Setup" with icon caution buttons {"Cancel", "OK"} default button "OK"
+text returned of result
 APPLESCRIPT
     ) || exit 0  # User clicked Cancel
 
