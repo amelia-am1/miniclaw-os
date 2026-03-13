@@ -1065,8 +1065,9 @@ fi
 # ── Step 15b: AM Setup Wizard LaunchAgent ─────────────────────────────────
 step "Step 15b: AM Setup Wizard LaunchAgent"
 
-# Reset onboarding state so the wizard always runs after install
-rm -f "$STATE_DIR/USER/setup-state.json"
+# NOTE: Do NOT reset setup-state.json here — the user may be actively
+# filling out the wizard while install.sh runs in the background.
+# bootstrap.sh handles the reset before the web app starts.
 
 SETUP_APP_DIR="$MINICLAW_DIR/apps/am-setup"
 SETUP_PLIST="$HOME/Library/LaunchAgents/com.miniclaw.am-setup.plist"
