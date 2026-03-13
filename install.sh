@@ -1067,28 +1067,39 @@ fi
 # ── Step 15b: AM Setup Wizard LaunchAgent ─────────────────────────────────
 step "Step 15b: AM Setup Wizard LaunchAgent"
 
-# NOTE: Do NOT reset setup-state.json here — the user may be actively
-# filling out the wizard while install.sh runs in the background.
-# bootstrap.sh handles the reset before the web app starts.
-
 SETUP_APP_DIR="$MINICLAW_DIR/apps/am-setup"
 SETUP_PLIST="$HOME/Library/LaunchAgents/com.miniclaw.am-setup.plist"
 
-# Copy am-setup app into miniclaw dir
-if [[ -d "$REPO_DIR/apps/am-setup" ]]; then
-  mkdir -p "$MINICLAW_DIR/apps"
-  rsync -a --exclude='node_modules' --exclude='.next' --exclude='.git' "$REPO_DIR/apps/am-setup/" "$SETUP_APP_DIR/"
-  ok "am-setup app copied"
-  # Install dependencies and build
-  if [[ -f "$SETUP_APP_DIR/package.json" ]]; then
-    (cd "$SETUP_APP_DIR" && run_quiet npm install --production=false && run_quiet npm run build) \
-      && ok "am-setup built" \
-      || warn "am-setup build failed — run: cd $SETUP_APP_DIR && npm install && npm run build"
+# If the wizard is already running (port 4210), skip the copy/build/reload —
+# it would kill the server the user is actively using.
+WIZARD_RUNNING=false
+if lsof -ti :4210 &>/dev/null; then
+  WIZARD_RUNNING=true
+  ok "Setup wizard already running on port 4210 — skipping rebuild"
+fi
+
+if [[ "$WIZARD_RUNNING" == false ]]; then
+  # Copy am-setup app into miniclaw dir
+  if [[ -d "$REPO_DIR/apps/am-setup" ]]; then
+    mkdir -p "$MINICLAW_DIR/apps"
+    rsync -a --exclude='node_modules' --exclude='.next' --exclude='.git' "$REPO_DIR/apps/am-setup/" "$SETUP_APP_DIR/"
+    ok "am-setup app copied"
+    # Install dependencies and build
+    if [[ -f "$SETUP_APP_DIR/package.json" ]]; then
+      (cd "$SETUP_APP_DIR" && run_quiet npm install --production=false && run_quiet npm run build) \
+        && ok "am-setup built" \
+        || warn "am-setup build failed — run: cd $SETUP_APP_DIR && npm install && npm run build"
+    fi
   fi
 fi
 
 mkdir -p "$HOME/Library/LaunchAgents"
-launchctl unload "$SETUP_PLIST" 2>/dev/null || true
+# Don't unload/reload if the wizard is running
+if [[ "$WIZARD_RUNNING" == true ]]; then
+  ok "Skipping LaunchAgent reload (wizard is live)"
+else
+  launchctl unload "$SETUP_PLIST" 2>/dev/null || true
+fi
 cat > "$SETUP_PLIST" << PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -1131,8 +1142,12 @@ cat > "$SETUP_PLIST" << PLIST
 </plist>
 PLIST
 mkdir -p "$STATE_DIR/logs"
-launchctl load "$SETUP_PLIST" 2>/dev/null && ok "AM Setup LaunchAgent loaded (port 4210)" \
-  || warn "LaunchAgent created — run: launchctl load $SETUP_PLIST"
+if [[ "$WIZARD_RUNNING" == true ]]; then
+  ok "Plist written (will load on next boot)"
+else
+  launchctl load "$SETUP_PLIST" 2>/dev/null && ok "AM Setup LaunchAgent loaded (port 4210)" \
+    || warn "LaunchAgent created — run: launchctl load $SETUP_PLIST"
+fi
 
 # ── Step 15c: OpenClaw Gateway LaunchAgent ───────────────────────────────────
 step "Step 15c: OpenClaw Gateway"
