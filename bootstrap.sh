@@ -75,6 +75,14 @@ fi
 # ── Reset setup state so the wizard runs fresh ───────────────────────────────
 rm -f "${HOME}/.openclaw/USER/setup-state.json"
 
+# ── Add local hostname ───────────────────────────────────────────────────────
+if ! grep -q 'myam.local' /etc/hosts 2>/dev/null; then
+  echo "  Adding myam.local to /etc/hosts (may need your password)..."
+  echo "127.0.0.1 myam.local" | sudo tee -a /etc/hosts >/dev/null 2>&1 \
+    && echo "  ✓ myam.local added" \
+    || echo "  ! Could not add myam.local — use localhost:$APP_PORT instead"
+fi
+
 # ── Start the app ────────────────────────────────────────────────────────────
 echo "  Starting at http://localhost:$APP_PORT"
 echo ""
@@ -96,14 +104,15 @@ for i in $(seq 1 30); do
 done
 
 # Open browser — goes to / which redirects to /setup/meet or /board
+APP_URL="http://myam.local:$APP_PORT"
 if command -v open &>/dev/null; then
-  open "http://localhost:$APP_PORT"
+  open "$APP_URL"
 fi
 
 echo "  ✓ Setup is running in your browser."
 echo ""
 echo "  If the browser didn't open, go to:"
-echo "  http://localhost:$APP_PORT"
+echo "  $APP_URL"
 echo ""
 echo "  Close this terminal window when you're done."
 echo ""
