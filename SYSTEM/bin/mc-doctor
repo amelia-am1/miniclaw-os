@@ -263,7 +263,7 @@ fi
 # ── LaunchAgents ─────────────────────────────────────────────────────────────
 section "LaunchAgents"
 
-for label in com.miniclaw.board-web com.miniclaw.am-setup com.openclaw.gateway; do
+for label in com.miniclaw.board-web com.openclaw.gateway; do
   plist_path="$HOME/Library/LaunchAgents/$label.plist"
   if [[ ! -f "$plist_path" ]]; then
     if [[ "$label" == "com.openclaw.gateway" ]]; then

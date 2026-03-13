@@ -3,9 +3,9 @@ import { isSetupComplete } from "@/lib/setup-state";
 
 export const dynamic = "force-dynamic";
 
-export default function Home() {
-  if (!isSetupComplete()) {
-    redirect("/setup/meet");
+export default function SetupIndex() {
+  if (isSetupComplete()) {
+    redirect("/settings");
   }
-  redirect("/board");
+  redirect("/setup/meet");
 }

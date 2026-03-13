@@ -150,34 +150,12 @@ step "Step 0b: Pre-flight collision checks"
 
 COLLISIONS=0
 
-# Check port 4220 (board web) — skip 4210 since the setup wizard uses it
-# and may be the process that launched this install
-for portnum in 4220; do
-  PORT_PID=$(lsof -ti ":$portnum" 2>/dev/null | head -1 || true)
-  if [[ -n "$PORT_PID" ]]; then
-    PORT_CMD=$(ps -p "$PORT_PID" -o comm= 2>/dev/null || echo "unknown")
-    warn "Port $portnum in use by PID $PORT_PID ($PORT_CMD) — killing"
-    kill "$PORT_PID" 2>/dev/null || true
-    # Wait briefly for clean shutdown, then force-kill if still alive
-    sleep 1
-    if kill -0 "$PORT_PID" 2>/dev/null; then
-      kill -9 "$PORT_PID" 2>/dev/null || true
-      sleep 0.5
-    fi
-    if kill -0 "$PORT_PID" 2>/dev/null; then
-      fail "Could not kill PID $PORT_PID on port $portnum"
-      COLLISIONS=$((COLLISIONS + 1))
-    else
-      ok "Killed PID $PORT_PID — port $portnum now free"
-    fi
-  else
-    ok "Port $portnum available"
-  fi
-done
-ok "Port 4210 skipped (setup wizard)"
+# Skip port checks — the board web app (4220) is the setup wizard and may
+# be the process that launched this install. Don't kill it.
+ok "Port collision checks skipped (web app may be running install)"
 
 # Check for existing com.miniclaw.* LaunchAgents from a different install
-for label in com.miniclaw.board-web com.miniclaw.am-setup; do
+for label in com.miniclaw.board-web; do
   plist="$HOME/Library/LaunchAgents/$label.plist"
   if [[ -f "$plist" ]]; then
     PLIST_STATE_DIR=$(grep -A1 'OPENCLAW_STATE_DIR' "$plist" 2>/dev/null | tail -1 | sed 's/.*<string>//;s|</string>.*||' || true)
@@ -625,7 +603,7 @@ else
 fi
 
 # All secrets (gh-token, gmail-app-password, gemini-api-key) are collected
-# in the am-setup onboarding wizard (port 4210) — not in the terminal installer.
+# in the board web setup wizard (port 4220) — not in the terminal installer.
 
 
 # -- Step 15: Migrate data from archived OpenClaw install ------------------
@@ -1064,89 +1042,17 @@ if [[ -d "$REPO_DIR/scripts" ]]; then
   ok "Scripts copied to $MINICLAW_DIR/scripts/"
 fi
 
-# ── Step 15b: AM Setup Wizard LaunchAgent ─────────────────────────────────
-step "Step 15b: AM Setup Wizard LaunchAgent"
+# ── Step 15b: Clean up legacy am-setup LaunchAgent ───────────────────────────
+step "Step 15b: Legacy am-setup cleanup"
 
-SETUP_APP_DIR="$MINICLAW_DIR/apps/am-setup"
+# Setup wizard is now part of the board web app (port 4220). Remove old 4210 agent.
 SETUP_PLIST="$HOME/Library/LaunchAgents/com.miniclaw.am-setup.plist"
-
-# If the wizard is already running (port 4210), skip the copy/build/reload —
-# it would kill the server the user is actively using.
-WIZARD_RUNNING=false
-if lsof -ti :4210 &>/dev/null; then
-  WIZARD_RUNNING=true
-  ok "Setup wizard already running on port 4210 — skipping rebuild"
-fi
-
-if [[ "$WIZARD_RUNNING" == false ]]; then
-  # Copy am-setup app into miniclaw dir
-  if [[ -d "$REPO_DIR/apps/am-setup" ]]; then
-    mkdir -p "$MINICLAW_DIR/apps"
-    rsync -a --exclude='node_modules' --exclude='.next' --exclude='.git' "$REPO_DIR/apps/am-setup/" "$SETUP_APP_DIR/"
-    ok "am-setup app copied"
-    # Install dependencies and build
-    if [[ -f "$SETUP_APP_DIR/package.json" ]]; then
-      (cd "$SETUP_APP_DIR" && run_quiet npm install --production=false && run_quiet npm run build) \
-        && ok "am-setup built" \
-        || warn "am-setup build failed — run: cd $SETUP_APP_DIR && npm install && npm run build"
-    fi
-  fi
-fi
-
-mkdir -p "$HOME/Library/LaunchAgents"
-# Don't unload/reload if the wizard is running
-if [[ "$WIZARD_RUNNING" == true ]]; then
-  ok "Skipping LaunchAgent reload (wizard is live)"
-else
+if [[ -f "$SETUP_PLIST" ]]; then
   launchctl unload "$SETUP_PLIST" 2>/dev/null || true
-fi
-cat > "$SETUP_PLIST" << PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key>
-  <string>com.miniclaw.am-setup</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>$(which node || echo /opt/homebrew/bin/node)</string>
-    <string>$SETUP_APP_DIR/node_modules/.bin/next</string>
-    <string>start</string>
-    <string>-p</string>
-    <string>4210</string>
-  </array>
-  <key>WorkingDirectory</key>
-  <string>$SETUP_APP_DIR</string>
-  <key>RunAtLoad</key>
-  <true/>
-  <key>KeepAlive</key>
-  <true/>
-  <key>ThrottleInterval</key>
-  <integer>5</integer>
-  <key>StandardOutPath</key>
-  <string>$STATE_DIR/logs/am-setup.log</string>
-  <key>StandardErrorPath</key>
-  <string>$STATE_DIR/logs/am-setup.log</string>
-  <key>EnvironmentVariables</key>
-  <dict>
-    <key>HOME</key>
-    <string>$HOME</string>
-    <key>PATH</key>
-    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
-    <key>OPENCLAW_STATE_DIR</key>
-    <string>$STATE_DIR</string>
-    <key>NODE_ENV</key>
-    <string>production</string>
-  </dict>
-</dict>
-</plist>
-PLIST
-mkdir -p "$STATE_DIR/logs"
-if [[ "$WIZARD_RUNNING" == true ]]; then
-  ok "Plist written (will load on next boot)"
+  rm -f "$SETUP_PLIST"
+  ok "Removed legacy am-setup LaunchAgent (port 4210)"
 else
-  launchctl load "$SETUP_PLIST" 2>/dev/null && ok "AM Setup LaunchAgent loaded (port 4210)" \
-    || warn "LaunchAgent created — run: launchctl load $SETUP_PLIST"
+  ok "No legacy am-setup LaunchAgent to remove"
 fi
 
 # ── Step 15c: OpenClaw Gateway LaunchAgent ───────────────────────────────────
@@ -1200,14 +1106,13 @@ ok "Shared KB import started in background"
 echo ""
 echo -e "${GREEN}${BOLD}miniclaw-os installed.${NC}"
 echo ""
-echo "  Setup:   http://localhost:4210"
-echo "  Board:   http://localhost:4220"
-echo "  Verify:  mc-smoke"
+echo "  MiniClaw: http://localhost:4220"
+echo "  Verify:   mc-smoke"
 echo ""
 echo ""
 
 # Open the onboarding wizard in the default browser
 if command -v open &>/dev/null; then
   sleep 2  # give LaunchAgents a moment to start
-  open "http://localhost:4210"
+  open "http://localhost:4220"
 fi

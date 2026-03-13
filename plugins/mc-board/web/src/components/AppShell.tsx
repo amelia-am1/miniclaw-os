@@ -3,16 +3,17 @@ import { useState, useCallback, useEffect } from "react";
 import { Board } from "./Board";
 import { MemoryTab } from "./MemoryTab";
 import { RolodexTab } from "./RolodexTab";
+import { SettingsPage } from "./SettingsPage";
 import { Modal } from "./Modal";
 import { ChatPanel } from "./ChatPanel";
 import { WelcomeWizard, useWelcomeWizard } from "./WelcomeWizard";
 import { Project, BoardCard } from "@/lib/types";
 
-type Tab = "board" | "memory" | "rolodex";
+type Tab = "board" | "memory" | "rolodex" | "settings";
 interface Toast { id: number; icon: string; title: string; sub?: string; exiting?: boolean; }
 interface Counts { backlog: number; inProgress: number; inReview: number; shipped: number; }
 
-const TAB_PATHS: Record<Tab, string> = { board: "/board", memory: "/memory", rolodex: "/rolodex" };
+const TAB_PATHS: Record<Tab, string> = { board: "/board", memory: "/memory", rolodex: "/rolodex", settings: "/settings" };
 
 function getNotifsEnabled(): boolean {
   try { return localStorage.getItem("brain-toasts") !== "false"; } catch { return true; }
@@ -124,13 +125,13 @@ export function AppShell({ initialTab, initialCardId, initialProjectId }: { init
         <div className="flex items-stretch">
           <div className="brand">MiniClaw Brain</div>
           <div className="tab-bar">
-            {(["board", "memory", "rolodex"] as Tab[]).map(t => {
+            {(["board", "memory", "rolodex", "settings"] as Tab[]).map(t => {
               const activeCount = t === "board" && counts ? counts.inProgress + counts.inReview : 0;
               return (
                 <button key={t} onClick={() => switchTab(t)}
                   className={`tab-btn${tab === t ? " active" : ""}`}
                   style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  {t === "board" ? "Board" : t === "memory" ? "Memory" : "Rolodex"}
+                  {t === "board" ? "Board" : t === "memory" ? "Memory" : t === "rolodex" ? "Rolodex" : "Settings"}
                   {activeCount > 0 && (
                     <span style={{
                       fontSize: 10,
@@ -278,6 +279,9 @@ export function AppShell({ initialTab, initialCardId, initialProjectId }: { init
           </div>
           <div className={`tab-panel${tab === "rolodex" ? " active" : ""}`}>
             <RolodexTab />
+          </div>
+          <div className={`tab-panel${tab === "settings" ? " active" : ""}`}>
+            <SettingsPage />
           </div>
         </div>
 
