@@ -42,6 +42,16 @@ export function AppShell({ initialTab, initialCardId, initialProjectId }: { init
   const [pendingContext, setPendingContext] = useState<string | null>(null);
   const [openCardId, setOpenCardId] = useState<string | null>(initialCardId ?? null);
   const { showWelcome, dismissWelcome } = useWelcomeWizard();
+  const [assistantName, setAssistantName] = useState("Am");
+
+  // Fetch assistant name for empty-state message
+  useEffect(() => {
+    fetch("/api/assistant-name").then(r => r.json()).then(d => {
+      if (d.shortName) setAssistantName(d.shortName);
+    }).catch(() => {});
+  }, []);
+
+  const showEmptyState = !showWelcome && counts !== null && allCards.length === 0 && tab === "board";
 
   const showToast = useCallback((icon: string, title: string, sub?: string) => {
     const id = Date.now();
@@ -298,6 +308,30 @@ export function AppShell({ initialTab, initialCardId, initialProjectId }: { init
       {/* Projects modal */}
       {/* Welcome wizard */}
       {showWelcome && <WelcomeWizard onDone={dismissWelcome} />}
+
+      {/* Empty board prompt */}
+      {showEmptyState && (
+        <div style={{
+          position: "fixed",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          background: "#18181b",
+          border: "1px solid #3f3f46",
+          borderRadius: 12,
+          padding: "32px 28px",
+          textAlign: "center",
+          zIndex: 100,
+          boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+          maxWidth: 360,
+        }}>
+          <div style={{ fontSize: 32, marginBottom: 16 }}>📋</div>
+          <h3 style={{ fontSize: 18, fontWeight: 600, color: "#e4e4e7", marginBottom: 12 }}>No cards yet</h3>
+          <p style={{ fontSize: 14, color: "#a1a1aa", lineHeight: 1.6 }}>
+            You have no cards to view. Start by telling {assistantName} to do some work and you will see it here.
+          </p>
+        </div>
+      )}
 
       {projectsOpen && (
         <Modal onClose={() => setProjectsOpen(false)}>
