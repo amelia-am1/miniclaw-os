@@ -150,8 +150,9 @@ step "Step 0b: Pre-flight collision checks"
 
 COLLISIONS=0
 
-# Check ports 4210 (setup wizard) and 4220 (board web)
-for portnum in 4210 4220; do
+# Check port 4220 (board web) — skip 4210 since the setup wizard uses it
+# and may be the process that launched this install
+for portnum in 4220; do
   PORT_PID=$(lsof -ti ":$portnum" 2>/dev/null | head -1 || true)
   if [[ -n "$PORT_PID" ]]; then
     PORT_CMD=$(ps -p "$PORT_PID" -o comm= 2>/dev/null || echo "unknown")
@@ -173,6 +174,7 @@ for portnum in 4210 4220; do
     ok "Port $portnum available"
   fi
 done
+ok "Port 4210 skipped (setup wizard)"
 
 # Check for existing com.miniclaw.* LaunchAgents from a different install
 for label in com.miniclaw.board-web com.miniclaw.am-setup; do
