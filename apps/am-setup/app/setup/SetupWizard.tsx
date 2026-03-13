@@ -2,8 +2,10 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import InstallOverlay from "./InstallOverlay";
 import StepMeetHer from "./steps/StepMeetHer";
 import StepTelegram from "./steps/StepTelegram";
+import StepGithub from "./steps/StepGithub";
 import StepAnthropic from "./steps/StepAnthropic";
 import StepEmail from "./steps/StepEmail";
 import StepGemini from "./steps/StepGemini";
@@ -20,6 +22,7 @@ export type WizardState = {
   emailAddress: string;
   appPassword: string;
   geminiKey: string;
+  ghToken: string;
   telegramBotUsername: string;
   telegramBotToken: string;
   telegramChatId: string;
@@ -28,6 +31,7 @@ export type WizardState = {
 const STEPS = [
   "meet",
   "telegram",
+  "github",
   "email",
   "gemini",
   "anthropic",
@@ -36,7 +40,7 @@ const STEPS = [
 ] as const;
 type Step = (typeof STEPS)[number];
 
-const NUMBERED_STEPS = ["meet", "telegram", "email", "gemini", "anthropic"] as const;
+const NUMBERED_STEPS = ["meet", "telegram", "github", "email", "gemini", "anthropic"] as const;
 
 function stepFromPath(pathname: string): Step {
   const seg = pathname.split("/").pop() || "";
@@ -58,6 +62,7 @@ export default function SetupWizard() {
     emailAddress: "",
     appPassword: "",
     geminiKey: "",
+    ghToken: "",
     telegramBotUsername: "",
     telegramBotToken: "",
     telegramChatId: "",
@@ -102,6 +107,9 @@ export default function SetupWizard() {
       className="min-h-screen flex flex-col items-center justify-center px-4 py-12"
       style={accentStyle}
     >
+      {/* Background install — floating indicator + draggable log modal */}
+      <InstallOverlay accent={state.accentColor} />
+
       {/* Progress indicator */}
       {stepNum > 0 && step !== "installing" && step !== "done" && (
         <div className="mb-8 flex items-center gap-2">
@@ -143,6 +151,16 @@ export default function SetupWizard() {
             chatId={state.telegramChatId}
             assistantName={state.shortName || state.assistantName}
             onChange={(p) => update(p)}
+            onNext={next}
+            onBack={back}
+            accent={state.accentColor}
+          />
+        )}
+        {step === "github" && (
+          <StepGithub
+            ghToken={state.ghToken}
+            assistantName={state.shortName || state.assistantName}
+            onChange={(v) => update({ ghToken: v })}
             onNext={next}
             onBack={back}
             accent={state.accentColor}

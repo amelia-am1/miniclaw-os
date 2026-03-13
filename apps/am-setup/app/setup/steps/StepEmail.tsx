@@ -90,9 +90,33 @@ export default function StepEmail({ email, appPassword, onChange, onNext, onBack
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h2 className="text-3xl font-bold text-white mb-2">Email setup</h2>
+        <h2 className="text-3xl font-bold text-white mb-2">Email</h2>
         <p className="text-[#888]">
-          Your assistant reads and manages their inbox. Later they can manage yours too!
+          <span className="text-white font-medium">Optional</span> — but this is how your AM works independently.
+        </p>
+      </div>
+
+      {/* Why */}
+      <div className="rounded-xl p-4 bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] flex flex-col gap-3">
+        <p className="text-sm text-[#ccc]">
+          Email is the universal API. With an inbox, your AM can:
+        </p>
+        <ul className="text-sm text-[#aaa] flex flex-col gap-2 pl-1">
+          <li className="flex gap-2">
+            <span style={{ color: accent }}>◆</span>
+            <span><span className="text-white">Act as your agent</span> — send emails, reply to messages, and follow up on your behalf</span>
+          </li>
+          <li className="flex gap-2">
+            <span style={{ color: accent }}>◆</span>
+            <span><span className="text-white">Triage your inbox</span> — classify, prioritize, and surface what matters</span>
+          </li>
+          <li className="flex gap-2">
+            <span style={{ color: accent }}>◆</span>
+            <span><span className="text-white">Work autonomously</span> — interact with services, receive confirmations, handle account workflows</span>
+          </li>
+        </ul>
+        <p className="text-xs text-[#666] mt-1">
+          We recommend creating a dedicated Gmail address for your AM (e.g. amelia.am@gmail.com) so she has her own identity.
         </p>
       </div>
 
@@ -219,14 +243,24 @@ export default function StepEmail({ email, appPassword, onChange, onNext, onBack
         >
           ← Back
         </button>
-        <button
-          onClick={handleVerify}
-          disabled={status === "checking" || status === "ok"}
-          className="flex-[2] py-3 rounded-xl font-semibold transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-60"
-          style={{ background: accent, color: "#0f0f0f" }}
-        >
-          {status === "checking" ? "Verifying..." : status === "ok" ? "✓ Verified" : "Verify & continue →"}
-        </button>
+        {emailInput.trim() && passwordInput.trim() ? (
+          <button
+            onClick={handleVerify}
+            disabled={status === "checking" || status === "ok"}
+            className="flex-[2] py-3 rounded-xl font-semibold transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-60"
+            style={{ background: accent, color: "#0f0f0f" }}
+          >
+            {status === "checking" ? "Verifying..." : status === "ok" ? "✓ Verified" : "Verify & continue →"}
+          </button>
+        ) : (
+          <button
+            onClick={onNext}
+            className="flex-[2] py-3 rounded-xl font-semibold transition-all hover:opacity-90 active:scale-[0.98]"
+            style={{ background: "rgba(255,255,255,0.08)", color: "#aaa" }}
+          >
+            Skip for now →
+          </button>
+        )}
       </div>
     </div>
   );

@@ -347,6 +347,88 @@ else
   done
 fi
 
+# ── gateway ──────────────────────────────────────────────────────────────────
+section "gateway"
+
+GW_PLIST="$HOME/Library/LaunchAgents/com.openclaw.gateway.plist"
+if [[ -f "$GW_PLIST" ]]; then
+  pass "gateway LaunchAgent plist present"
+else
+  fail "gateway LaunchAgent plist missing" "run: openclaw gateway install --force"
+fi
+
+if launchctl list 2>/dev/null | grep -q "com.openclaw.gateway"; then
+  pass "gateway LaunchAgent loaded"
+else
+  fail "gateway LaunchAgent not loaded" "run: launchctl load $GW_PLIST"
+fi
+
+if command -v openclaw &>/dev/null; then
+  GW_STATUS=$(openclaw gateway status 2>&1 || true)
+  if echo "$GW_STATUS" | grep -qi "running\|listening\|connected\|uptime"; then
+    pass "gateway process running"
+  else
+    fail "gateway not running" "run: openclaw gateway start"
+  fi
+fi
+
+# ── LaunchAgents ─────────────────────────────────────────────────────────────
+section "LaunchAgents"
+
+for label in com.miniclaw.board-web com.miniclaw.am-setup com.openclaw.gateway; do
+  plist_path="$HOME/Library/LaunchAgents/$label.plist"
+  if [[ ! -f "$plist_path" ]]; then
+    fail "$label plist missing" "$plist_path"
+    continue
+  fi
+  pass "$label plist present"
+  if launchctl list 2>/dev/null | grep -q "$label"; then
+    pass "$label loaded"
+  else
+    fail "$label not loaded" "run: launchctl load $plist_path"
+  fi
+done
+
+# ── cron jobs ────────────────────────────────────────────────────────────────
+section "cron jobs"
+
+CRON_FILE="$STATE_DIR/cron/jobs.json"
+MANIFEST_FILE="$MINICLAW_DIR/MANIFEST.json"
+
+if [[ ! -f "$CRON_FILE" ]]; then
+  fail "jobs.json missing" "$CRON_FILE — run install.sh"
+else
+  pass "jobs.json present"
+  if [[ -f "$MANIFEST_FILE" ]] && command -v python3 &>/dev/null; then
+    CRON_CHECK=$(python3 - "$CRON_FILE" "$MANIFEST_FILE" <<'PYEOF'
+import json, sys
+jobs_path, manifest_path = sys.argv[1], sys.argv[2]
+with open(jobs_path) as f: jobs = json.load(f)
+with open(manifest_path) as f: manifest = json.load(f)
+job_names = {j["name"] for j in jobs.get("jobs", [])}
+expected = [c["name"] for c in manifest.get("crons", [])]
+missing = [n for n in expected if n not in job_names]
+extra = [n for n in job_names if n not in expected and n not in ("_smoke_test",)]
+if missing:
+    for m in missing:
+        print(f"MISSING:{m}")
+if extra:
+    for e in extra:
+        print(f"EXTRA:{e}")
+if not missing:
+    print(f"OK:{len(expected)}")
+PYEOF
+    )
+    while IFS= read -r line; do
+      case "$line" in
+        MISSING:*) fail "cron job missing: ${line#MISSING:}" "run install.sh to sync from MANIFEST.json" ;;
+        EXTRA:*)   warn "unexpected cron job: ${line#EXTRA:}" "not in MANIFEST.json" ;;
+        OK:*)      pass "all ${line#OK:} expected cron jobs present" ;;
+      esac
+    done <<< "$CRON_CHECK"
+  fi
+fi
+
 # ── summary ───────────────────────────────────────────────────────────────────
 echo ""
 echo "────────────────────────────────────────"

@@ -232,6 +232,170 @@ else
   done
 fi
 
+# ── gateway ──────────────────────────────────────────────────────────────────
+section "gateway"
+
+GW_PLIST="$HOME/Library/LaunchAgents/com.openclaw.gateway.plist"
+
+if command -v openclaw &>/dev/null; then
+  GW_STATUS=$(openclaw gateway status 2>&1 || true)
+  if echo "$GW_STATUS" | grep -qi "running\|listening\|connected\|uptime"; then
+    ok "gateway running"
+  elif [[ ! -f "$GW_PLIST" ]]; then
+    if ask "Install gateway LaunchAgent (openclaw gateway install --force)?"; then
+      openclaw gateway install --force 2>/dev/null \
+        && fixed "gateway LaunchAgent installed" || broke "gateway install failed"
+    else
+      skip "gateway install"
+    fi
+  else
+    if ask "Start gateway (openclaw gateway start)?"; then
+      openclaw gateway start 2>/dev/null \
+        && fixed "gateway started" || broke "gateway start failed — try: openclaw gateway install --force"
+    else
+      skip "gateway start"
+    fi
+  fi
+else
+  broke "openclaw not found — cannot manage gateway"
+fi
+
+# ── LaunchAgents ─────────────────────────────────────────────────────────────
+section "LaunchAgents"
+
+for label in com.miniclaw.board-web com.miniclaw.am-setup com.openclaw.gateway; do
+  plist_path="$HOME/Library/LaunchAgents/$label.plist"
+  if [[ ! -f "$plist_path" ]]; then
+    if [[ "$label" == "com.openclaw.gateway" ]]; then
+      # gateway plist is managed by openclaw gateway install
+      continue
+    fi
+    broke "$label plist missing — run install.sh"
+    continue
+  fi
+  if ! launchctl list 2>/dev/null | grep -q "$label"; then
+    if ask "Load LaunchAgent $label?"; then
+      launchctl load "$plist_path" 2>/dev/null \
+        && fixed "$label loaded" || broke "failed to load $label"
+    else
+      skip "$label"
+    fi
+  else
+    ok "$label loaded"
+  fi
+done
+
+# ── cron jobs ────────────────────────────────────────────────────────────────
+section "cron jobs"
+
+CRON_FILE="$OPENCLAW_DIR/cron/jobs.json"
+MANIFEST_FILE="$MINICLAW_DIR/MANIFEST.json"
+
+if [[ ! -f "$CRON_FILE" ]]; then
+  if ask "Create jobs.json with crons from MANIFEST?"; then
+    mkdir -p "$(dirname "$CRON_FILE")"
+    python3 - "$CRON_FILE" "$MANIFEST_FILE" <<'PYEOF'
+import json, uuid, os, sys
+cron_file, manifest_path = sys.argv[1], sys.argv[2]
+store = {"version": 1, "jobs": []}
+try:
+    with open(manifest_path) as f:
+        manifest = json.load(f)
+except (FileNotFoundError, json.JSONDecodeError):
+    manifest = {}
+for mc in manifest.get("crons", []):
+    store["jobs"].append({
+        "id": str(uuid.uuid4()),
+        "name": mc["name"],
+        "schedule": mc["schedule"],
+        "sessionTarget": mc.get("sessionTarget", "isolated"),
+        "model": mc.get("model", "claude-haiku-4-5-20251001"),
+        "payload": {"kind": "agentTurn", "timeoutSeconds": mc.get("timeoutSeconds", 600), "messageFile": f"prompts/{mc['name']}.md"},
+        "delivery": {"mode": "none"},
+        "enabled": True
+    })
+with open(cron_file, "w") as f:
+    json.dump(store, f, indent=2)
+print(f"  Created with {len(store['jobs'])} job(s)")
+PYEOF
+    fixed "jobs.json created"
+  else
+    skip "jobs.json"
+  fi
+elif [[ -f "$MANIFEST_FILE" ]] && command -v python3 &>/dev/null; then
+  MISSING_CRONS=$(python3 - "$CRON_FILE" "$MANIFEST_FILE" <<'PYEOF'
+import json, sys
+jobs_path, manifest_path = sys.argv[1], sys.argv[2]
+with open(jobs_path) as f: jobs = json.load(f)
+with open(manifest_path) as f: manifest = json.load(f)
+job_names = {j["name"] for j in jobs.get("jobs", [])}
+missing = [c["name"] for c in manifest.get("crons", []) if c["name"] not in job_names]
+print(",".join(missing) if missing else "")
+PYEOF
+  )
+  if [[ -n "$MISSING_CRONS" ]]; then
+    if ask "Add missing cron jobs ($MISSING_CRONS) to jobs.json?"; then
+      python3 - "$CRON_FILE" "$MANIFEST_FILE" <<'PYEOF'
+import json, uuid, sys
+cron_file, manifest_path = sys.argv[1], sys.argv[2]
+with open(cron_file) as f: store = json.load(f)
+with open(manifest_path) as f: manifest = json.load(f)
+existing = {j["name"] for j in store.get("jobs", [])}
+added = 0
+for mc in manifest.get("crons", []):
+    if mc["name"] not in existing:
+        store.setdefault("jobs", []).append({
+            "id": str(uuid.uuid4()),
+            "name": mc["name"],
+            "schedule": mc["schedule"],
+            "sessionTarget": mc.get("sessionTarget", "isolated"),
+            "model": mc.get("model", "claude-haiku-4-5-20251001"),
+            "payload": {"kind": "agentTurn", "timeoutSeconds": mc.get("timeoutSeconds", 600), "messageFile": f"prompts/{mc['name']}.md"},
+            "delivery": {"mode": "none"},
+            "enabled": True
+        })
+        added += 1
+with open(cron_file, "w") as f:
+    json.dump(store, f, indent=2)
+print(f"  Added {added} missing cron job(s)")
+PYEOF
+      fixed "missing cron jobs added"
+    else
+      skip "missing cron jobs"
+    fi
+  else
+    ok "all MANIFEST crons present in jobs.json"
+  fi
+fi
+
+# ── agent-assisted repair ────────────────────────────────────────────────────
+# For failures that simple bash fixes can't handle, dispatch to the openclaw
+# agent loop which has full tool access (filesystem, git, vault, plugins).
+if [[ $FAILED -gt 0 ]] && command -v openclaw &>/dev/null; then
+  section "agent-assisted repair"
+  GW_STATUS=$(openclaw gateway status 2>&1 || true)
+  if echo "$GW_STATUS" | grep -qi "running\|listening\|connected\|uptime"; then
+    if ask "Dispatch remaining $FAILED failure(s) to the openclaw agent loop for repair?"; then
+      # Build a summary of what failed
+      SMOKE_OUTPUT=$(mc-smoke 2>&1 || true)
+      FAILURES=$(echo "$SMOKE_OUTPUT" | grep '✗' | sed 's/^  ✗  /- /' || true)
+      AGENT_MSG="mc-doctor found $FAILED failure(s) that need repair. Here are the failing checks from mc-smoke:
+
+$FAILURES
+
+Please diagnose and fix each issue. You have access to the filesystem, vault, and all miniclaw tools. After fixing, run mc-smoke to verify."
+
+      openclaw agent --local --message "$AGENT_MSG" --timeout 300 2>&1 \
+        && fixed "agent repair completed — run mc-smoke to verify" \
+        || broke "agent repair failed or timed out"
+    else
+      skip "agent-assisted repair"
+    fi
+  else
+    broke "gateway not running — cannot use agent loop for repair (fix gateway first)"
+  fi
+fi
+
 # ── summary ───────────────────────────────────────────────────────────────────
 echo ""
 echo "────────────────────────────────────────"

@@ -335,15 +335,45 @@ m = json.load(open('$REPO_DIR/MANIFEST.json'))
 print(m.get('openclaw', {}).get('npm', '@miniclaw_official/openclaw'))
 " 2>/dev/null || echo "@miniclaw_official/openclaw")
 
+# Remove any Homebrew openclaw — we always use the npm fork
+if brew list openclaw &>/dev/null 2>&1; then
+  if [[ "$CHECK_ONLY" == true ]]; then
+    warn "Homebrew openclaw installed — will be removed in favour of npm fork"
+  else
+    info "Removing Homebrew openclaw (using npm fork instead)..."
+    run_quiet brew uninstall openclaw && ok "Removed Homebrew openclaw" \
+      || warn "Could not remove Homebrew openclaw — remove manually: brew uninstall openclaw"
+  fi
+fi
+
+# Check if the correct npm fork is installed (not upstream)
+CORRECT_FORK=false
 if command -v openclaw &>/dev/null; then
-  INSTALLED=$(openclaw --version 2>/dev/null | head -1 || echo "?")
-  ok "OpenClaw $INSTALLED already installed"
-elif [[ "$CHECK_ONLY" == true ]]; then
-  fail "OpenClaw not installed"
-else
-  info "Installing OpenClaw from $OPENCLAW_NPM_PKG..."
-  run_quiet npm install -g "$OPENCLAW_NPM_PKG" || die "OpenClaw install failed"
-  ok "OpenClaw $(openclaw --version 2>/dev/null | head -1) installed"
+  INSTALLED_PKG=$(npm list -g 2>/dev/null | grep -o '@miniclaw_official/openclaw' || true)
+  if [[ -n "$INSTALLED_PKG" ]]; then
+    CORRECT_FORK=true
+    INSTALLED=$(openclaw --version 2>/dev/null | head -1 || echo "?")
+    ok "OpenClaw $INSTALLED (fork: $OPENCLAW_NPM_PKG)"
+  fi
+fi
+
+if [[ "$CORRECT_FORK" == false ]]; then
+  if [[ "$CHECK_ONLY" == true ]]; then
+    if command -v openclaw &>/dev/null; then
+      warn "openclaw found but not the MiniClaw fork ($OPENCLAW_NPM_PKG)"
+    else
+      fail "OpenClaw not installed"
+    fi
+  else
+    # Uninstall upstream openclaw if present
+    if command -v openclaw &>/dev/null; then
+      info "Replacing upstream openclaw with MiniClaw fork..."
+      run_quiet npm uninstall -g openclaw 2>/dev/null || true
+    fi
+    info "Installing OpenClaw from $OPENCLAW_NPM_PKG..."
+    run_quiet npm install -g "$OPENCLAW_NPM_PKG" || die "OpenClaw install failed"
+    ok "OpenClaw $(openclaw --version 2>/dev/null | head -1) installed (fork: $OPENCLAW_NPM_PKG)"
+  fi
 fi
 
 # Init dirs if needed
@@ -442,6 +472,22 @@ ok "$PLUGIN_COUNT plugins installed"
 
 # ── Step 7: Patch openclaw.json ───────────────────────────────────────────────
 step "Step 7: openclaw.json"
+
+# Clean unknown top-level keys that cause openclaw config validation to fail
+python3 - "$STATE_DIR/openclaw.json" <<'CLEANEOF'
+import json, sys
+config_path = sys.argv[1]
+with open(config_path) as f:
+    cfg = json.load(f)
+known_keys = {"meta", "agents", "plugins", "auth", "gateway", "logging", "channels", "skills", "secrets", "browser", "canvas", "sandbox", "sessions"}
+removed = [k for k in list(cfg.keys()) if k not in known_keys]
+for k in removed:
+    del cfg[k]
+if removed:
+    with open(config_path, "w") as f:
+        json.dump(cfg, f, indent=2); f.write("\n")
+    print(f"  Removed unknown keys: {', '.join(removed)}")
+CLEANEOF
 
 python3 - "$STATE_DIR/openclaw.json" "$MINICLAW_DIR" "$STATE_DIR" <<'PYEOF'
 import json, sys, os
@@ -741,16 +787,16 @@ REG_PYEOF
 fi
 
 
-# ── Step 12: Brain board crons ────────────────────────────────────────────────
-step "Step 12: Brain board cron workers"
+# ── Step 12: Cron workers (from MANIFEST.json) ───────────────────────────────
+step "Step 12: Cron workers"
 
 # Write cron jobs directly to jobs.json so OpenClaw picks them up on startup.
-# No running gateway required.
+# Reads expected crons from MANIFEST.json — no running gateway required.
 CRON_DIR="$STATE_DIR/cron"
 CRON_FILE="$CRON_DIR/jobs.json"
 mkdir -p "$CRON_DIR"
 
-# Merge board worker jobs into jobs.json (preserves any existing jobs)
+# Merge cron jobs from MANIFEST into jobs.json (preserves any existing jobs)
 python3 << PYEOF
 import json, uuid, os, sys
 
@@ -766,47 +812,75 @@ except (FileNotFoundError, json.JSONDecodeError):
 
 existing_names = {j.get("name") for j in store.get("jobs", [])}
 
-workers = [
-    {
-        "name": "board-worker-backlog",
-        "schedule": {"kind": "cron", "expr": "*/5 * * * *"},
-        "sessionTarget": "isolated",
-        "model": "claude-haiku-4-5-20251001",
+# Read expected crons from MANIFEST.json
+manifest_path = os.path.join("$REPO_DIR", "MANIFEST.json")
+try:
+    with open(manifest_path) as f:
+        manifest = json.load(f)
+    manifest_crons = manifest.get("crons", [])
+except (FileNotFoundError, json.JSONDecodeError):
+    manifest_crons = []
+
+workers = []
+for mc in manifest_crons:
+    w = {
+        "name": mc["name"],
+        "schedule": mc["schedule"],
+        "sessionTarget": mc.get("sessionTarget", "isolated"),
+        "model": mc.get("model", "claude-haiku-4-5-20251001"),
         "payload": {
             "kind": "agentTurn",
-            "timeoutSeconds": 600,
-            "messageFile": "prompts/board-worker-backlog.md"
-        },
-        "delivery": {"mode": "none"},
-        "enabled": True
-    },
-    {
-        "name": "board-worker-in-progress",
-        "schedule": {"kind": "cron", "expr": "1-59/5 * * * *"},
-        "sessionTarget": "isolated",
-        "model": "claude-haiku-4-5-20251001",
-        "payload": {
-            "kind": "agentTurn",
-            "timeoutSeconds": 600,
-            "messageFile": "prompts/board-worker-in-progress.md"
-        },
-        "delivery": {"mode": "none"},
-        "enabled": True
-    },
-    {
-        "name": "board-worker-in-review",
-        "schedule": {"kind": "cron", "expr": "2-59/5 * * * *"},
-        "sessionTarget": "isolated",
-        "model": "claude-haiku-4-5-20251001",
-        "payload": {
-            "kind": "agentTurn",
-            "timeoutSeconds": 600,
-            "messageFile": "prompts/board-worker-in-review.md"
+            "timeoutSeconds": mc.get("timeoutSeconds", 600),
+            "messageFile": f"prompts/{mc['name']}.md"
         },
         "delivery": {"mode": "none"},
         "enabled": True
     }
-]
+    workers.append(w)
+
+# Fallback if MANIFEST had no crons
+if not workers:
+    workers = [
+        {
+            "name": "board-worker-backlog",
+            "schedule": {"kind": "cron", "expr": "*/5 * * * *"},
+            "sessionTarget": "isolated",
+            "model": "claude-haiku-4-5-20251001",
+            "payload": {
+                "kind": "agentTurn",
+                "timeoutSeconds": 600,
+                "messageFile": "prompts/board-worker-backlog.md"
+            },
+            "delivery": {"mode": "none"},
+            "enabled": True
+        },
+        {
+            "name": "board-worker-in-progress",
+            "schedule": {"kind": "cron", "expr": "1-59/5 * * * *"},
+            "sessionTarget": "isolated",
+            "model": "claude-haiku-4-5-20251001",
+            "payload": {
+                "kind": "agentTurn",
+                "timeoutSeconds": 600,
+                "messageFile": "prompts/board-worker-in-progress.md"
+            },
+            "delivery": {"mode": "none"},
+            "enabled": True
+        },
+        {
+            "name": "board-worker-in-review",
+            "schedule": {"kind": "cron", "expr": "2-59/5 * * * *"},
+            "sessionTarget": "isolated",
+            "model": "claude-haiku-4-5-20251001",
+            "payload": {
+                "kind": "agentTurn",
+                "timeoutSeconds": 600,
+                "messageFile": "prompts/board-worker-in-review.md"
+            },
+            "delivery": {"mode": "none"},
+            "enabled": True
+        }
+    ]
 
 added = 0
 for w in workers:
@@ -824,7 +898,7 @@ if added:
 else:
     print("  Board workers already in jobs.json")
 PYEOF
-ok "Board cron workers written to $CRON_FILE"
+ok "Cron workers written to $CRON_FILE"
 
 # Copy cron prompts
 if [[ -d "$REPO_DIR/cron/prompts" ]]; then
@@ -1056,6 +1130,34 @@ PLIST
 mkdir -p "$STATE_DIR/logs"
 launchctl load "$SETUP_PLIST" 2>/dev/null && ok "AM Setup LaunchAgent loaded (port 4210)" \
   || warn "LaunchAgent created — run: launchctl load $SETUP_PLIST"
+
+# ── Step 15c: OpenClaw Gateway LaunchAgent ───────────────────────────────────
+step "Step 15c: OpenClaw Gateway"
+
+# The gateway is the core process — it runs the telegram bot, cron workers,
+# and agent sessions.  `openclaw gateway install` creates a LaunchAgent plist
+# and loads it via launchctl.
+if command -v openclaw &>/dev/null; then
+  GW_PLIST="$HOME/Library/LaunchAgents/com.openclaw.gateway.plist"
+  if [[ -f "$GW_PLIST" ]]; then
+    info "Gateway LaunchAgent already exists — reinstalling"
+  fi
+  # openclaw gateway install creates the plist and loads it
+  if openclaw gateway install --force 2>/dev/null; then
+    ok "OpenClaw Gateway LaunchAgent installed"
+    # Give it a moment to start, then verify
+    sleep 2
+    if openclaw gateway status 2>/dev/null | grep -qi "running\|listening\|connected"; then
+      ok "Gateway is running"
+    else
+      warn "Gateway installed but may not be running yet — check: openclaw gateway status"
+    fi
+  else
+    warn "Gateway install returned non-zero — run: openclaw gateway install --force"
+  fi
+else
+  fail "openclaw not found — cannot install gateway"
+fi
 
 # ── Step 16: Import shared KB ─────────────────────────────────────────────────
 step "Step 16: Shared knowledge base"

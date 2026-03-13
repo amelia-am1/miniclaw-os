@@ -11,6 +11,6 @@ export default async function Home() {
   if (isSetupComplete()) {
     redirect("http://localhost:4220");
   } else {
-    redirect("/setup");
+    redirect("/setup/meet");
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 
 interface Props {
@@ -43,7 +43,18 @@ export default function StepMeetHer({
   const [selectedColor, setSelectedColor] = useState(accentColor);
   const [photoSrc, setPhotoSrc] = useState("/amelia.png");
   const [nickError, setNickError] = useState("");
+  const [evacPath, setEvacPath] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Check if there's a backed-up previous install
+  useEffect(() => {
+    fetch("/api/setup/install")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.evacuatedInstall) setEvacPath(data.evacuatedInstall);
+      })
+      .catch(() => {});
+  }, []);
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -97,6 +108,25 @@ export default function StepMeetHer({
         />
         <h2 className="text-3xl font-bold text-white">Meet your AM</h2>
       </div>
+
+      {/* Previous install notice */}
+      {evacPath && (
+        <div
+          className="rounded-xl px-4 py-3 text-sm"
+          style={{
+            background: `${selectedColor}11`,
+            border: `1px solid ${selectedColor}33`,
+          }}
+        >
+          <p className="font-medium text-white mb-1">Found your previous OpenClaw install</p>
+          <p className="text-[#888]">
+            Don&apos;t worry — we&apos;ve got you covered. Your original data has been copied to:
+          </p>
+          <p className="font-mono text-xs mt-1" style={{ color: selectedColor }}>
+            {evacPath}
+          </p>
+        </div>
+      )}
 
       {/* Color */}
       <div className="flex flex-col gap-1.5">

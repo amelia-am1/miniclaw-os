@@ -18,13 +18,20 @@ interface Check {
   detail?: string;
 }
 
+interface SmokeResult {
+  status: "pass" | "fail" | "warn";
+  label: string;
+}
+
 export default function StepInstalling({ state, onDone, accent }: Props) {
   const [checks, setChecks] = useState<Check[]>([
-    { id: "vault", label: "Saving your configuration", status: "pending" },
-    { id: "email", label: "Verifying email access", status: "pending" },
-    { id: "system", label: "Checking system health", status: "pending" },
-    { id: "complete", label: "Finishing setup", status: "pending" },
+    { id: "config", label: "Saving your configuration", status: "pending" },
+    { id: "gateway", label: "Starting the gateway", status: "pending" },
+    { id: "complete", label: "Finalizing setup", status: "pending" },
+    { id: "smoke", label: "Running system checks", status: "pending" },
   ]);
+  const [smokeResults, setSmokeResults] = useState<SmokeResult[]>([]);
+  const [smokeSummary, setSmokeSummary] = useState<{ passed: number; failed: number; warned: number } | null>(null);
 
   const updateCheck = (id: string, patch: Partial<Check>) => {
     setChecks((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
@@ -32,52 +39,94 @@ export default function StepInstalling({ state, onDone, accent }: Props) {
 
   useEffect(() => {
     const run = async () => {
-      // 1. Save to setup state
-      updateCheck("vault", { status: "running" });
-      await delay(600);
+      // 1. Save config + persist state
+      updateCheck("config", { status: "running" });
+      await delay(400);
       try {
         await fetch("/api/setup/state", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             assistantName: state.assistantName,
+            shortName: state.shortName,
             accentColor: state.accentColor,
             pronouns: state.pronouns,
             personaBlurb: state.personaBlurb,
           }),
         });
-        updateCheck("vault", { status: "ok", detail: "Config saved" });
+        updateCheck("config", { status: "ok", detail: "Config saved" });
       } catch {
-        updateCheck("vault", { status: "error", detail: "Failed to save config" });
+        updateCheck("config", { status: "error", detail: "Failed to save config" });
       }
 
-      // 2. Email check (credentials already verified in step 5)
-      updateCheck("email", { status: "running" });
-      await delay(800);
-      updateCheck("email", { status: "ok", detail: state.emailAddress });
-
-      // 3. System health
-      updateCheck("system", { status: "running" });
-      await delay(600);
+      // 2. Complete setup (registers telegram, starts gateway, etc.)
+      updateCheck("gateway", { status: "running" });
       try {
-        const res = await fetch("/api/health");
+        const res = await fetch("/api/setup/complete", { method: "POST" });
         const data = await res.json();
-        updateCheck("system", { status: "ok", detail: data.ok ? "All systems online" : "Partial" });
+        if (data.gateway?.ok) {
+          updateCheck("gateway", { status: "ok", detail: "Gateway running" });
+        } else {
+          updateCheck("gateway", { status: "ok", detail: data.gateway?.error || "Gateway installed — may need a moment" });
+        }
       } catch {
-        updateCheck("system", { status: "ok", detail: "Running" });
+        updateCheck("gateway", { status: "error", detail: "Could not start gateway" });
       }
 
-      // 4. Mark complete
+      // 3. Mark complete
       updateCheck("complete", { status: "running" });
-      await delay(500);
+      await delay(300);
+      updateCheck("complete", { status: "ok", detail: "Setup complete" });
+
+      // 4. Run mc-smoke via SSE
+      updateCheck("smoke", { status: "running" });
       try {
-        await fetch("/api/setup/complete", { method: "POST" });
-        updateCheck("complete", { status: "ok", detail: "Setup complete!" });
+        const res = await fetch("/api/setup/smoke");
+        if (!res.ok || !res.body) {
+          updateCheck("smoke", { status: "error", detail: "Could not run health checks" });
+          await delay(1500);
+          onDone();
+          return;
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let sseBuffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          sseBuffer += decoder.decode(value, { stream: true });
+          const parts = sseBuffer.split("\n\n");
+          sseBuffer = parts.pop() || "";
+
+          for (const part of parts) {
+            const dataLine = part.split("\n").find((l) => l.startsWith("data: "));
+            if (!dataLine) continue;
+            try {
+              const evt = JSON.parse(dataLine.slice(6));
+
+              if (evt.type === "check") {
+                setSmokeResults((prev) => [...prev, { status: evt.status, label: evt.label }]);
+              }
+
+              if (evt.type === "done") {
+                setSmokeSummary({ passed: evt.passed, failed: evt.failed, warned: evt.warned });
+                if (evt.failed === 0) {
+                  updateCheck("smoke", { status: "ok", detail: `${evt.passed} passed, ${evt.warned} warned` });
+                } else {
+                  updateCheck("smoke", { status: "error", detail: `${evt.failed} failed, ${evt.passed} passed` });
+                }
+              }
+            } catch { /* skip */ }
+          }
+        }
       } catch {
-        updateCheck("complete", { status: "error", detail: "Could not mark complete" });
+        updateCheck("smoke", { status: "error", detail: "Health check failed to run" });
       }
 
-      await delay(1000);
+      await delay(2000);
       onDone();
     };
 
@@ -88,35 +137,29 @@ export default function StepInstalling({ state, onDone, accent }: Props) {
   const allDone = checks.every((c) => c.status === "ok" || c.status === "error");
 
   return (
-    <div className="flex flex-col gap-8 items-center text-center">
+    <div className="flex flex-col gap-6 items-center text-center">
       <div>
-        <h2 className="text-3xl font-bold text-white mb-2">Installing...</h2>
-        <p className="text-[#888]">Setting up {state.assistantName} on your device</p>
+        <h2 className="text-3xl font-bold text-white mb-2">Finishing up...</h2>
+        <p className="text-[#888]">Starting {state.assistantName} and verifying everything works</p>
       </div>
 
-      {/* Progress checks */}
+      {/* Setup checks */}
       <div className="w-full flex flex-col gap-3">
         {checks.map((check) => (
           <div
             key={check.id}
-            className="flex items-center gap-4 px-5 py-4 rounded-xl"
+            className="flex items-center gap-4 px-5 py-4 rounded-xl transition-all"
             style={{
               background:
-                check.status === "ok"
-                  ? `${accent}11`
-                  : check.status === "error"
-                  ? "#FF525211"
-                  : check.status === "running"
-                  ? "rgba(255,255,255,0.05)"
-                  : "rgba(255,255,255,0.02)",
+                check.status === "ok" ? `${accent}11` :
+                check.status === "error" ? "#FF525211" :
+                check.status === "running" ? "rgba(255,255,255,0.05)" :
+                "rgba(255,255,255,0.02)",
               border:
-                check.status === "ok"
-                  ? `1px solid ${accent}33`
-                  : check.status === "error"
-                  ? "1px solid #FF525233"
-                  : check.status === "running"
-                  ? "1px solid rgba(255,255,255,0.1)"
-                  : "1px solid transparent",
+                check.status === "ok" ? `1px solid ${accent}33` :
+                check.status === "error" ? "1px solid #FF525233" :
+                check.status === "running" ? "1px solid rgba(255,255,255,0.1)" :
+                "1px solid transparent",
             }}
           >
             <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
@@ -136,12 +179,7 @@ export default function StepInstalling({ state, onDone, accent }: Props) {
               <div
                 className="text-sm font-medium"
                 style={{
-                  color:
-                    check.status === "ok"
-                      ? "#fff"
-                      : check.status === "running"
-                      ? "#fff"
-                      : "#666",
+                  color: check.status === "ok" || check.status === "running" ? "#fff" : "#666",
                 }}
               >
                 {check.label}
@@ -154,9 +192,32 @@ export default function StepInstalling({ state, onDone, accent }: Props) {
         ))}
       </div>
 
+      {/* Smoke test results (collapsed list) */}
+      {smokeResults.length > 0 && (
+        <details className="w-full text-left" open={smokeSummary?.failed !== undefined && smokeSummary.failed > 0}>
+          <summary className="text-xs text-[#555] cursor-pointer hover:text-[#888] transition-colors">
+            {smokeSummary
+              ? `${smokeSummary.passed} passed · ${smokeSummary.warned} warned · ${smokeSummary.failed} failed`
+              : `${smokeResults.length} checks so far...`}
+          </summary>
+          <div className="mt-2 rounded-lg bg-[#0a0a0a] border border-[rgba(255,255,255,0.06)] p-3 max-h-48 overflow-y-auto">
+            {smokeResults.map((r, i) => (
+              <div key={i} className="flex items-center gap-2 py-0.5 text-xs font-mono">
+                <span style={{
+                  color: r.status === "pass" ? "#4ade80" : r.status === "fail" ? "#FF5252" : "#fbbf24"
+                }}>
+                  {r.status === "pass" ? "✓" : r.status === "fail" ? "✗" : "⚠"}
+                </span>
+                <span className="text-[#888]">{r.label}</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+
       {allDone && (
         <p className="text-sm text-[#666]">
-          Preparing your dashboard...
+          Taking you to {state.assistantName}...
         </p>
       )}
     </div>
