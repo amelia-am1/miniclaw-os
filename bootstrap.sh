@@ -53,9 +53,12 @@ fi
 # ── Clone or update the repo ────────────────────────────────────────────────
 if [[ -d "$INSTALL_DIR/.git" ]]; then
   echo "  Updating MiniClaw..."
-  git -C "$INSTALL_DIR" fetch -q origin
-  git -C "$INSTALL_DIR" checkout -q "$MINICLAW_VERSION"
-  git -C "$INSTALL_DIR" pull -q origin "$MINICLAW_VERSION" 2>/dev/null || true
+  git -C "$INSTALL_DIR" fetch -q origin --tags
+  # MINICLAW_VERSION can be a tag (e.g. "stable") or a branch — handle both
+  git -C "$INSTALL_DIR" checkout -q "refs/tags/$MINICLAW_VERSION" 2>/dev/null \
+    || git -C "$INSTALL_DIR" checkout -q "$MINICLAW_VERSION" 2>/dev/null \
+    || git -C "$INSTALL_DIR" checkout -q "origin/$MINICLAW_VERSION" 2>/dev/null \
+    || { echo "  Error: could not checkout $MINICLAW_VERSION"; exit 1; }
 else
   echo "  Downloading MiniClaw..."
   mkdir -p "$(dirname "$INSTALL_DIR")"
