@@ -76,6 +76,9 @@ if [[ -n "$PORT_PID" ]]; then
   sleep 1
 fi
 
+# ── Reset setup state so the wizard runs fresh ──────────────────────────────
+rm -f "${HOME}/.openclaw/USER/setup-state.json"
+
 # ── Start the setup web app ─────────────────────────────────────────────────
 echo "  Starting setup at http://localhost:$SETUP_PORT"
 echo ""
