@@ -97,6 +97,10 @@ rm -rf "$EXTRACT_TMP"
 mkdir -p "$STATE_DIR/USER" "$STATE_DIR/logs"
 rm -f "$STATE_DIR/USER/setup-state.json"
 
+# ── Rebuild native modules for this machine's Node version ────────────────────
+echo "  Preparing native modules..."
+(cd "$WEB_DIR" && npm rebuild better-sqlite3 --silent >>"$LOG_FILE" 2>&1) || true
+
 # ── Kill existing on port (force — stale processes hold the old code in memory) ─
 launchctl unload "$HOME/Library/LaunchAgents/com.miniclaw.board-web.plist" 2>/dev/null || true
 rm -f "$STATE_DIR/.install-lock"
