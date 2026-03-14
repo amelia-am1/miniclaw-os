@@ -174,12 +174,13 @@ export function WelcomeWizard({ onDone }: { onDone: () => void }) {
   };
 
   const getTooltipStyle = (): React.CSSProperties => {
+    // Width is set by .tour-tooltip CSS class (380px) — don't override inline
+    const tw = 380;
+    const pad = 14;
+
     if (!targetRect || !current.target) {
       return { position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)" };
     }
-
-    const tw = 360;
-    const pad = 14;
 
     // For column targets, place tooltip over the next column to the right
     const nextCol = TOOLTIP_COL[current.target];
@@ -190,15 +191,14 @@ export function WelcomeWizard({ onDone }: { onDone: () => void }) {
         return {
           position: "fixed",
           top: nr.top + 60,
-          left: nr.left + nr.width / 2 - tw / 2,
-          width: tw,
+          left: clamp(nr.left + nr.width / 2 - tw / 2, pad, vpSize.w - tw - pad),
         };
       }
     }
 
     // Shipped: centered modal like the intro
     if (current.target === "shipped") {
-      return { position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: tw };
+      return { position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)" };
     }
 
     // Search / Projects: below the element
@@ -207,7 +207,7 @@ export function WelcomeWizard({ onDone }: { onDone: () => void }) {
     top = clamp(top, pad, vpSize.h - 240);
     left = clamp(left, pad, vpSize.w - tw - pad);
 
-    return { position: "fixed", top, left, width: tw };
+    return { position: "fixed", top, left };
   };
 
   return (
