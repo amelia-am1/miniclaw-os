@@ -28,13 +28,11 @@ function configureGateway(botId: string, botToken: string) {
     }
   } catch { /* start fresh */ }
 
-  // Store botId under meta (not top-level — top-level causes validation failure)
-  const meta = (cfg.meta ?? {}) as Record<string, unknown>;
-  meta.botId = botId;
-  cfg.meta = meta;
-
-  // Remove any legacy top-level botId
+  // Remove any botId from config — openclaw doesn't recognize it
   delete cfg.botId;
+  const meta = (cfg.meta ?? {}) as Record<string, unknown>;
+  delete meta.botId;
+  cfg.meta = meta;
 
   // Set gateway mode to local so `openclaw gateway` starts without --allow-unconfigured
   const gw = (cfg.gateway ?? {}) as Record<string, unknown>;
@@ -114,6 +112,9 @@ conn.close()
 function ensureGatewayRunning(): { ok: boolean; error?: string } {
   const ocBin = findBin("openclaw");
   if (!ocBin) return { ok: false, error: "openclaw not found on PATH" };
+
+  // Clean up any invalid config keys before starting
+  spawnSync(ocBin, ["doctor", "--fix"], { encoding: "utf-8", timeout: 15_000 });
 
   // Install the gateway LaunchAgent (creates plist + loads it)
   const installResult = spawnSync(ocBin, ["gateway", "install", "--force"], {

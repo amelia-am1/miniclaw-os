@@ -235,7 +235,7 @@ fi
 # ── gateway ──────────────────────────────────────────────────────────────────
 section "gateway"
 
-GW_PLIST="$HOME/Library/LaunchAgents/com.openclaw.gateway.plist"
+GW_PLIST="$HOME/Library/LaunchAgents/ai.openclaw.gateway.plist"
 
 if command -v openclaw &>/dev/null; then
   GW_STATUS=$(openclaw gateway status 2>&1 || true)
@@ -263,10 +263,10 @@ fi
 # ── LaunchAgents ─────────────────────────────────────────────────────────────
 section "LaunchAgents"
 
-for label in com.miniclaw.board-web com.openclaw.gateway; do
+for label in com.miniclaw.board-web ai.openclaw.gateway; do
   plist_path="$HOME/Library/LaunchAgents/$label.plist"
   if [[ ! -f "$plist_path" ]]; then
-    if [[ "$label" == "com.openclaw.gateway" ]]; then
+    if [[ "$label" == "ai.openclaw.gateway" ]]; then
       # gateway plist is managed by openclaw gateway install
       continue
     fi

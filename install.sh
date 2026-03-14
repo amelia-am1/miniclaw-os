@@ -1079,7 +1079,7 @@ step "Step 15c: OpenClaw Gateway"
 # and agent sessions.  `openclaw gateway install` creates a LaunchAgent plist
 # and loads it via launchctl.
 if command -v openclaw &>/dev/null; then
-  GW_PLIST="$HOME/Library/LaunchAgents/com.openclaw.gateway.plist"
+  GW_PLIST="$HOME/Library/LaunchAgents/ai.openclaw.gateway.plist"
   if [[ -f "$GW_PLIST" ]]; then
     info "Gateway LaunchAgent already exists — reinstalling"
   fi

@@ -350,14 +350,14 @@ fi
 # ── gateway ──────────────────────────────────────────────────────────────────
 section "gateway"
 
-GW_PLIST="$HOME/Library/LaunchAgents/com.openclaw.gateway.plist"
+GW_PLIST="$HOME/Library/LaunchAgents/ai.openclaw.gateway.plist"
 if [[ -f "$GW_PLIST" ]]; then
   pass "gateway LaunchAgent plist present"
 else
   fail "gateway LaunchAgent plist missing" "run: openclaw gateway install --force"
 fi
 
-if launchctl list 2>/dev/null | grep -q "com.openclaw.gateway"; then
+if launchctl list 2>/dev/null | grep -q "ai.openclaw.gateway"; then
   pass "gateway LaunchAgent loaded"
 else
   fail "gateway LaunchAgent not loaded" "run: launchctl load $GW_PLIST"
@@ -375,7 +375,7 @@ fi
 # ── LaunchAgents ─────────────────────────────────────────────────────────────
 section "LaunchAgents"
 
-for label in com.miniclaw.board-web com.openclaw.gateway; do
+for label in com.miniclaw.board-web ai.openclaw.gateway; do
   plist_path="$HOME/Library/LaunchAgents/$label.plist"
   if [[ ! -f "$plist_path" ]]; then
     fail "$label plist missing" "$plist_path"
