@@ -14,8 +14,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Board — MiniClaw",
-  description: "MiniClaw task board",
+  title: {
+    default: "MiniClaw Cognitive Framework",
+    template: "MiniClaw Cognitive Framework — %s",
+  },
+  description: "Your own AI. Your Mac. Your data.",
 };
 
 export default function RootLayout({
