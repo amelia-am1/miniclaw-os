@@ -13,6 +13,8 @@
   <a href="https://github.com/augmentedmike/miniclaw-os/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=for-the-badge" alt="Apache 2.0 License"></a>
 </p>
 
+> **Pre-Release Version** I am working as hard as I can to go from "it works on my machine" to it works on YOUR machine. Today is Saturday March 14 2026 and I am churning the shit out of this. My advice is - dont install until I remove this notice. If you do - do it as a developer, and feel free to "fill up" the issues and discussions in the meantime. mc-contribute knows how to submit bugs, prs, and even participate in discussions here. THANK YOU FOR YOUR PATIENCE! 
+
 > **Versioning:** Tagged versions are prerelease candidates until manually tested and approved by the human team; the bootstrap installer defaults to the latest human-approved stable release.
 
 > **Alpha Software.** Is this perfect software? Not even close — but it works great for us and a growing number of early adopters. Unlike traditional software, MiniClaw agents know how to debug, diagnose, and fix themselves. Much of the issue and PR activity here will be agents in the wild, self-reporting issues they and their humans run into. They write new tools to help themselves do new work consistently — including fixing themselves. See [mc-contribute](./docs/mc-contribute.md).
