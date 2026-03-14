@@ -194,17 +194,19 @@ export async function GET(req: Request) {
     // Update lastRunAtMs before firing (prevents double-fire if tick overlaps)
     updateCronJob(job.id, { lastRunAtMs: now });
 
-    for (const card of cards) {
-      try {
-        await fetch(`${base}/api/process/${column}/${card.id}`, {
+    // Fire all cards concurrently (up to maxConcurrent)
+    const results = await Promise.allSettled(
+      cards.map(card =>
+        fetch(`${base}/api/process/${column}/${card.id}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ prompt }),
-        });
-        fired.push(`${card.id} (${column})`);
-      } catch (e) {
-        skipped.push(`${card.id}: fetch failed — ${String(e)}`);
-      }
+        }).then(() => card.id)
+      )
+    );
+    for (const r of results) {
+      if (r.status === "fulfilled") fired.push(`${r.value} (${column})`);
+      else skipped.push(`${column}: fetch failed — ${String(r.reason)}`);
     }
   }
 
