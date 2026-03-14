@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { LogDisplay } from "@/components/log-display";
 
 interface Props {
   accent: string;
@@ -17,9 +18,6 @@ export default function InstallOverlay({ accent }: Props) {
   const [done, setDone] = useState(false);
   const [open, setOpen] = useState(false);
   const [dismissed, setDismissed] = useState(false);
-  const [showDebug, setShowDebug] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const termRef = useRef<HTMLDivElement>(null);
 
   // Drag state
   const [pos, setPos] = useState({ x: 0, y: 0 });
@@ -33,10 +31,6 @@ export default function InstallOverlay({ accent }: Props) {
       setPosInit(true);
     }
   }, [open, posInit]);
-
-  useEffect(() => {
-    if (termRef.current && open) termRef.current.scrollTop = termRef.current.scrollHeight;
-  }, [lines, open]);
 
   // Poll the log file
   useEffect(() => {
@@ -145,68 +139,24 @@ export default function InstallOverlay({ accent }: Props) {
                 {done ? "Install complete" : "Installing MiniClaw..."}
               </span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <label className="flex items-center gap-1 text-[10px] text-[#555] cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={showDebug}
-                  onChange={() => setShowDebug(!showDebug)}
-                  className="w-3 h-3"
-                />
-                debug
-              </label>
-              <button
-                onClick={async () => {
-                  await navigator.clipboard.writeText(lines.join("\n"));
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2000);
-                }}
-                className="w-6 h-6 rounded-full flex items-center justify-center text-[#555] hover:text-white hover:bg-[rgba(255,255,255,0.1)] transition-all text-xs"
-                title="Copy log to clipboard"
-              >
-                {copied ? "✓" : "⧉"}
-              </button>
-              <button
-                onClick={() => setOpen(false)}
-                className="w-6 h-6 rounded-full flex items-center justify-center text-[#555] hover:text-white hover:bg-[rgba(255,255,255,0.1)] transition-all text-xs"
-              >
-                ✕
-              </button>
-            </div>
+            <button
+              onClick={() => setOpen(false)}
+              className="w-6 h-6 rounded-full flex items-center justify-center text-[#555] hover:text-white hover:bg-[rgba(255,255,255,0.1)] transition-all text-xs"
+            >
+              ✕
+            </button>
           </div>
-          <div
-            ref={termRef}
-            className="font-mono text-[11px] leading-[18px] overflow-y-auto p-4"
-            style={{ height: 300, background: "#0a0a0a" }}
-          >
-            {lines.filter(l => showDebug || isImportantLine(l)).map((line, i) => (
-              <div key={i} className={lc(line)}>{strip(line)}</div>
-            ))}
-            {!done && <div className="animate-pulse" style={{ color: accent }}>▋</div>}
-          </div>
+          <LogDisplay
+            lines={lines}
+            height={Math.max(300, window.innerHeight - 200)}
+            showDebugToggle={true}
+            autoScroll={true}
+            running={!done}
+            accent={accent}
+          />
         </div>
       )}
     </>
   );
 }
 
-function isImportantLine(l: string): boolean {
-  const s = l.replace(/\x1b\[[0-9;]*m/g, "");
-  if (s.startsWith("──")) return true;
-  if (s.includes("[✓]") || s.includes("[✗]") || s.includes("[!]") || s.includes("[i]")) return true;
-  if (s.includes("✓") || s.includes("✗") || s.includes("⚠")) return true;
-  if (s.startsWith("miniclaw-os install")) return true;
-  if (s.includes("Installed") || s.includes("Installing")) return true;
-  if (s.includes("Registered") || s.includes("Seeded")) return true;
-  return false;
-}
-
-function strip(s: string) { return s.replace(/\x1b\[[0-9;]*m/g, ""); }
-function lc(l: string): string {
-  if (l.includes("[✓]") || l.includes("✓")) return "text-[#4ade80]";
-  if (l.includes("[✗]") || l.includes("✗")) return "text-[#FF5252]";
-  if (l.includes("[!]") || l.includes("⚠")) return "text-[#fbbf24]";
-  if (l.includes("[i]")) return "text-[#60a5fa]";
-  if (l.startsWith("──")) return "text-white font-bold mt-2";
-  return "text-[#888]";
-}
