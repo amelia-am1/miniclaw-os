@@ -17,7 +17,9 @@
 
 > **Alpha Software.** Is this perfect software? Not even close — but it works great for me and a dozen people I know. And unlike software before AM, she not only knows how to debug, diagnose, and fix herself, but she has a built-in imperative to do it. She is autohealing software. Much of the issue and PR activity here will be Amelias in the wild, self-reporting issues they and their humans run into. And she is predisposed to writing new tools to help her do new work consistently — including fixing herself. See [mc-contribute](./docs/mc-contribute.md).
 
-**MiniClaw** is a personal AI that lives on your Mac — not in someone else's cloud. It has a real personality, remembers your life, and can actually *do* things: draft emails, write code, manage projects, run tasks overnight. Your data stays on your machine — LLM inference calls go out over SSL to your chosen provider, but nothing else leaves.
+**MiniClaw** is a personal AI that lives on its own Mac — not in someone else's cloud. It has a real personality, remembers your life, and can actually *do* things: draft emails, write code, manage projects, run tasks overnight. Your data stays on your machine — LLM inference calls go out over SSL to your chosen provider, but nothing else leaves.
+
+> **⚠️ Security Warning:** We do NOT recommend you use this on your own Mac as the agent will have access to anything you do. At the BARE minimum, create a second Mac user account for your agent and install it there, not on your personal account. Your agent needs its own email, GitHub, and other accounts. Do not use your own — it could get banned.
 
 [Getting Started](#install) · [Features](./FEATURES.md) · [Plugins](#plugins) · [Docs](https://docs.openclaw.ai) · [GitHub](https://github.com/augmentedmike/miniclaw-os) · [miniclaw.bot](https://miniclaw.bot)
 
@@ -36,6 +38,9 @@ Imagine having a brilliant friend who knows everything — and they're *always* 
 - **Ask it to do things.** "Draft a reply to that email from Sarah."
 - **It works in the background.** Checks your calendar, monitors your inbox, runs tasks overnight.
 - **It remembers you.** What you said yesterday, last week, last year.
+- **It builds software.** Full-stack web development, code reviews, PRs, deployments — it writes its own tools to get better at helping you.
+- **It does deep research.** School papers, market analysis, competitive intelligence — it digs through sources and synthesizes what matters.
+- **It runs your business.** Executive decision support, process automation, customer management. It can run a store — we're working on getting it on VendingBench.
 - **Privacy-first.** Your data lives on your machine. LLM calls go out over SSL — nothing else does.
 
 ---
