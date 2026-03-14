@@ -71,8 +71,8 @@ export default function StepMeetHer({
 
   const handleNext = () => {
     onChange({
-      assistantName: nameInput.trim() || "Amelia",
-      shortName: shortInput.trim() || "Am",
+      assistantName: nameInput.trim() || "MiniClaw",
+      shortName: shortInput.trim() || "mc",
       pronouns: selectedPronouns,
       accentColor: selectedColor,
     });
@@ -180,7 +180,7 @@ export default function StepMeetHer({
           type="text"
           value={nameInput}
           onChange={(e) => setNameInput(e.target.value)}
-          placeholder="Amelia"
+          placeholder="e.g. Nova, Atlas, Luna..."
           maxLength={32}
           className="w-full px-4 py-3 rounded-xl bg-[#1a1a1a] border text-white text-lg font-medium placeholder-[#444] focus:outline-none transition-all"
           style={{ borderColor: nameInput ? selectedColor : "rgba(255,255,255,0.1)" }}
@@ -205,7 +205,7 @@ export default function StepMeetHer({
               setNickError("");
             }
           }}
-          placeholder="Am"
+          placeholder="e.g. Nova, mc..."
           maxLength={16}
           className="w-full px-4 py-3 rounded-xl bg-[#1a1a1a] border text-white text-lg font-medium placeholder-[#444] focus:outline-none transition-all"
           style={{ borderColor: nickError ? "#FF5252" : shortInput ? selectedColor : "rgba(255,255,255,0.1)" }}
@@ -213,9 +213,6 @@ export default function StepMeetHer({
         {nickError && (
           <span className="text-xs text-[#FF5252]">{nickError}</span>
         )}
-        <span className="text-xs text-[#555]">
-          This becomes ~/{shortInput.toLowerCase() || "am"} on your machine
-        </span>
       </div>
 
       <button

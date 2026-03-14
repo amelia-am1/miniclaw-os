@@ -132,7 +132,9 @@ export default function StepInstalling({ state, onDone, accent }: Props) {
       }
 
       // 5. Run mc-smoke
-      updateCheck("smoke", { status: "running" });
+      updateCheck("smoke", { status: "running", detail: "Starting checks..." });
+      let smokePassed = 0;
+      let smokeFailed = 0;
       try {
         const res = await fetch("/api/setup/smoke");
         if (res.ok && res.body) {
@@ -150,28 +152,35 @@ export default function StepInstalling({ state, onDone, accent }: Props) {
               if (!dl) continue;
               try {
                 const evt = JSON.parse(dl.slice(6));
+                if (evt.type === "check") {
+                  updateCheck("smoke", { detail: evt.label });
+                }
                 if (evt.type === "done") {
+                  smokePassed = evt.passed;
+                  smokeFailed = evt.failed;
                   if (evt.failed === 0) {
                     updateCheck("smoke", { status: "ok", detail: `${evt.passed} passed` });
                   } else {
-                    updateCheck("smoke", { status: "error", detail: `${evt.failed} failed` });
+                    updateCheck("smoke", { status: "error", detail: `${evt.failed} failed, ${evt.passed} passed` });
                   }
                 }
               } catch { /* skip */ }
             }
           }
         } else {
-          updateCheck("smoke", { status: "ok", detail: "Skipped" });
+          updateCheck("smoke", { status: "error", detail: "Could not run checks" });
         }
       } catch {
-        updateCheck("smoke", { status: "ok", detail: "Skipped" });
+        updateCheck("smoke", { status: "error", detail: "System checks failed" });
       }
 
+      // HALT if ANY step failed — never auto-advance on errors
       const hasErrors = checksRef.current.some((c) => c.status === "error");
       if (!hasErrors) {
         await delay(2000);
         onDone();
       }
+      // If errors: the UI shows "Continue anyway" button — user decides
     };
 
     run();
@@ -185,7 +194,7 @@ export default function StepInstalling({ state, onDone, accent }: Props) {
     <div className="flex flex-col gap-6 items-center text-center">
       <div>
         <h2 className="text-3xl font-bold text-white mb-2">Finishing up...</h2>
-        <p className="text-[#888]">Installing and configuring {state.assistantName}</p>
+        <p className="text-[#888]">Installing and configuring {state.shortName || state.assistantName}</p>
       </div>
 
       <div className="w-full flex flex-col gap-3">

@@ -54,8 +54,8 @@ export default function SetupWizard() {
   const pathname = usePathname();
   const [step, setStepState] = useState<Step>(() => stepFromPath(pathname));
   const [state, setState] = useState<WizardState>({
-    assistantName: "Amelia",
-    shortName: "Am",
+    assistantName: "",
+    shortName: "",
     pronouns: "she/her",
     accentColor: "#00E5CC",
     personaBlurb: "",
