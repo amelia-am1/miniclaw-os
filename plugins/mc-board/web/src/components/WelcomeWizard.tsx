@@ -124,12 +124,27 @@ export function WelcomeWizard({ onDone }: { onDone: () => void }) {
     return () => window.removeEventListener("resize", measure);
   }, [measure]);
 
-  const enableCron = (column: string) => {
-    fetch(`/api/cron`, {
-      method: "POST",
+  const enableCron = async (column: string) => {
+    const id = `board-${column}-triage`;
+    const labels: Record<string, string> = {
+      backlog: "Backlog Triage",
+      "in-progress": "In Progress Triage",
+      "in-review": "In Review Triage",
+    };
+    // Try PATCH first (job may already exist), fall back to POST (create)
+    const res = await fetch("/api/cron", {
+      method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ column, enabled: true, minutes: 5 }),
-    }).catch(() => {});
+      body: JSON.stringify({ id, enabled: true }),
+    }).catch(() => null);
+    if (!res || res.status === 404) {
+      await fetch("/api/cron", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, name: labels[column] || column, schedule: "*/5 * * * *", enabled: true }),
+      }).catch(() => {});
+    }
+    localStorage.setItem(`mc-board:${column}-triage:enabled`, "true");
   };
 
   const handleNext = () => {
