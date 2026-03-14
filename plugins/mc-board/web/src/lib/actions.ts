@@ -1,34 +1,83 @@
-import { execFileSync } from "node:child_process";
+import { getDb } from "./data";
 
-const OPENCLAW = process.env.OPENCLAW_BIN ?? "openclaw";
-const STATE_DIR = process.env.OPENCLAW_STATE_DIR ?? require("node:path").join(require("node:os").homedir(), ".openclaw");
+const db = () => {
+  const d = getDb();
+  if (!d) throw new Error("Board DB not available");
+  return d;
+};
 
-function runBoard(args: string[]): string {
-  return execFileSync(OPENCLAW, ["mc-board", ...args], {
-    encoding: "utf-8",
-    timeout: 30000,
-    env: { ...process.env, OPENCLAW_STATE_DIR: STATE_DIR },
-  });
-}
-
-export function moveCard(id: string, target: string, force = false): string {
-  const args = ["move", id, target];
-  if (force) args.push("--force");
-  return runBoard(args);
+export function moveCard(id: string, target: string, _force = false): string {
+  const now = new Date().toISOString();
+  db().prepare("UPDATE cards SET col = ?, updated_at = ? WHERE id = ?").run(target, now, id);
+  db().prepare("INSERT INTO card_history (card_id, col, moved_at) VALUES (?, ?, ?)").run(id, target, now);
+  return `Moved ${id} to ${target}`;
 }
 
 export function pickupCard(id: string, worker: string): string {
-  return runBoard(["pickup", id, "--worker", worker]);
+  const card = db().prepare("SELECT id, title, col, project_id FROM cards WHERE id = ?").get(id) as { id: string; title: string; col: string; project_id: string | null } | undefined;
+  if (!card) throw new Error(`Card ${id} not found`);
+  const now = new Date().toISOString();
+  db().prepare("INSERT OR REPLACE INTO active_work (card_id, project_id, title, worker, col, picked_up_at) VALUES (?, ?, ?, ?, ?, ?)").run(id, card.project_id, card.title, worker, card.col, now);
+  db().prepare("INSERT INTO pickup_log (card_id, project_id, title, worker, col, action, at) VALUES (?, ?, ?, ?, ?, ?, ?)").run(id, card.project_id, card.title, worker, card.col, "pickup", now);
+  return `Picked up ${id}`;
 }
 
 export function releaseCard(id: string, worker: string): string {
-  return runBoard(["release", id, "--worker", worker]);
+  const now = new Date().toISOString();
+  const card = db().prepare("SELECT project_id, title, col FROM active_work WHERE card_id = ?").get(id) as { project_id: string | null; title: string; col: string } | undefined;
+  db().prepare("DELETE FROM active_work WHERE card_id = ?").run(id);
+  if (card) {
+    db().prepare("INSERT INTO pickup_log (card_id, project_id, title, worker, col, action, at) VALUES (?, ?, ?, ?, ?, ?, ?)").run(id, card.project_id, card.title, worker, card.col, "release", now);
+  }
+  return `Released ${id}`;
 }
 
 export function updateCard(id: string, updates: Record<string, string>): string {
-  const args = ["update", id];
+  const now = new Date().toISOString();
+  const sets: string[] = ["updated_at = ?"];
+  const vals: (string | number)[] = [now];
+
   for (const [k, v] of Object.entries(updates)) {
-    args.push(`--${k}`, v);
+    // Map CLI flag names to DB column names
+    const colMap: Record<string, string> = {
+      priority: "priority",
+      tags: "tags",
+      notes: "notes",
+      research: "research",
+      review: "review_notes",
+      criteria: "acceptance_criteria",
+      plan: "implementation_plan",
+      description: "problem_description",
+      log: "work_log",
+      title: "title",
+    };
+    const col = colMap[k];
+    if (col) {
+      // Tags need to be JSON array
+      if (k === "tags") {
+        const arr = v.split(",").map(t => t.trim()).filter(Boolean);
+        sets.push(`${col} = ?`);
+        vals.push(JSON.stringify(arr));
+      } else {
+        sets.push(`${col} = ?`);
+        vals.push(v);
+      }
+    }
   }
-  return runBoard(args);
+
+  // Handle move_to
+  if (updates.move_to) {
+    sets.push("col = ?");
+    vals.push(updates.move_to);
+  }
+
+  vals.push(id);
+  db().prepare(`UPDATE cards SET ${sets.join(", ")} WHERE id = ?`).run(...vals);
+
+  // If moved, add history entry
+  if (updates.move_to) {
+    db().prepare("INSERT INTO card_history (card_id, col, moved_at) VALUES (?, ?, ?)").run(id, updates.move_to, now);
+  }
+
+  return `Updated ${id}`;
 }
