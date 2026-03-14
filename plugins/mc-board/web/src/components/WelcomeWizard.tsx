@@ -7,6 +7,7 @@ interface Step {
   title: string;
   body: string;
   target?: string;
+  action?: "enable-backlog" | "enable-in-progress" | "enable-in-review";
 }
 
 const STEPS: Step[] = [
@@ -20,14 +21,32 @@ const STEPS: Step[] = [
     body: "New cards land here. A card can be a task, a feature, a research query — anything you want me to work on. During each heartbeat cycle, I'll look at the backlog, sort by importance, and pick up cards to process. For each one, I'll do the research, pre-planning, and create simple acceptance criteria so we both know when it's done.",
   },
   {
+    title: "Backlog Controls",
+    target: "backlog",
+    body: "The on/off button enables the automatic backlog scheduler. The timer (5m, 10m, etc.) sets how often I check for new cards. The Triage button runs a manual triage right now. Let's turn it on.",
+    action: "enable-backlog",
+  },
+  {
     title: "In Progress",
     target: "in-progress",
     body: "Once a card has been fully planned and all the data is filled in, it moves here. This is where I do the actual work — writing the document, building the feature, completing the research, whatever the card calls for. When the acceptance criteria are met, the card gets picked up and moved to review.",
   },
   {
+    title: "In Progress Controls",
+    target: "in-progress",
+    body: "Same controls — on/off for the automatic worker, heartbeat timer, and a Work button to manually process cards. I pick up cards and do one unit of work per cycle. Let's turn it on.",
+    action: "enable-in-progress",
+  },
+  {
     title: "In Review",
     target: "in-review",
     body: "I'll review the entire work history, the acceptance criteria, and any relevant standards or practices. If something doesn't pass, the card goes back for additional work. If everything checks out, it moves to Shipped. For software with a git repo, this is where the branch and commit happen.",
+  },
+  {
+    title: "In Review Controls",
+    target: "in-review",
+    body: "The review worker verifies completed work and either ships it or sends it back. Let's turn this one on too.",
+    action: "enable-in-review",
   },
   {
     title: "Shipped",
@@ -80,7 +99,29 @@ export function WelcomeWizard({ onDone }: { onDone: () => void }) {
     return () => window.removeEventListener("resize", measure);
   }, [measure]);
 
+  const enableCron = (column: string) => {
+    fetch(`/api/cron`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ column, enabled: true, minutes: 5 }),
+    }).catch(() => {});
+  };
+
+  const handleNext = () => {
+    const cur = STEPS[step];
+    if (cur.action === "enable-backlog") enableCron("backlog");
+    if (cur.action === "enable-in-progress") enableCron("in-progress");
+    if (cur.action === "enable-in-review") enableCron("in-review");
+    setStep(s => s + 1);
+  };
+
   const finish = () => {
+    const cur = STEPS[step];
+    if (cur.action) {
+      if (cur.action === "enable-backlog") enableCron("backlog");
+      if (cur.action === "enable-in-progress") enableCron("in-progress");
+      if (cur.action === "enable-in-review") enableCron("in-review");
+    }
     fetch("/api/welcome", { method: "POST" }).catch(() => {});
     onDone();
   };
@@ -186,7 +227,7 @@ export function WelcomeWizard({ onDone }: { onDone: () => void }) {
             {step === 0 && (
               <button className="welcome-btn welcome-btn-ghost" onClick={finish}>Skip</button>
             )}
-            <button className="welcome-btn welcome-btn-primary" onClick={isLast ? finish : () => setStep(s => s + 1)}>
+            <button className="welcome-btn welcome-btn-primary" onClick={isLast ? finish : handleNext}>
               {isLast ? "Let's go" : "Next"}
             </button>
           </div>
