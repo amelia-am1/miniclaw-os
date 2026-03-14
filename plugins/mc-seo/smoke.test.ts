@@ -1,4 +1,4 @@
-import { test, expect } from "bun:test";
+import { test, expect } from "vitest";
 import { existsSync } from "node:fs";
 import { resolveConfig } from "./src/config.js";
 

@@ -8,7 +8,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi, mock } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from "vitest";
 import { createLogger, type LogEntry, type Logger } from "./logger.js";
 
 // ── Env stubbing (bun:test doesn't have vi.stubEnv / vi.unstubAllEnvs) ───

@@ -1,4 +1,4 @@
-import { test, expect } from "bun:test";
+import { test, expect } from "vitest";
 import register from "./index.js";
 import { createMemoTools } from "./tools/definitions.js";
 

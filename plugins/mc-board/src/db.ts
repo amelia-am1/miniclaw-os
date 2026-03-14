@@ -1,12 +1,12 @@
 /**
  * db.ts — SQLite database initialization and schema for mc-board.
  *
- * Uses bun:sqlite (synchronous, built-in).
+ * Uses better-sqlite3 (Node-compatible, synchronous).
  * Single DB file at: <stateDir>/board.db
  * WAL mode for concurrent reads from web + CLI.
  */
 
-import { Database } from "bun:sqlite";
+import Database from "better-sqlite3";
 import * as fs from "node:fs";
 import * as path from "node:path";
 

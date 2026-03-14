@@ -1,4 +1,4 @@
-import { test, expect } from "bun:test";
+import { test, expect } from "vitest";
 import register from "./index.js";
 import { createContributeTools } from "./tools/definitions.js";
 import { registerContributeCommands } from "./cli/commands.js";

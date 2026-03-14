@@ -18,7 +18,7 @@ import {
   mock,
   spyOn,
   type Mock,
-} from "bun:test";
+} from "vitest";
 import { registerBrainCommands } from "./commands.js";
 import { CardStore } from "../src/store.js";
 import { openDb } from "../src/db.js";

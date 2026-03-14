@@ -15,7 +15,7 @@ import * as path from "node:path";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import { spawn } from "node:child_process";
-import { Database } from "bun:sqlite";
+import Database from "better-sqlite3";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 
 interface VoiceConfig {
