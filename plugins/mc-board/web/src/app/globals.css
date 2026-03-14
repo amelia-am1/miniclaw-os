@@ -538,15 +538,16 @@ a { color: inherit; }
   border-radius: 12px;
   padding: 24px;
   box-shadow: 0 16px 48px rgba(0,0,0,.6);
-  max-width: 400px;
-  width: max-content;
+  max-width: 420px;
+  width: 380px;
   min-width: 280px;
 }
 .tour-title { font-size: 17px; font-weight: 700; color: #fafafa; margin: 0 0 8px; }
 .tour-text { font-size: 13px; color: #a1a1aa; line-height: 1.7; margin: 0 0 20px; }
-.tour-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.tour-actions { display: flex; gap: 8px; }
-.welcome-dots { display: flex; gap: 6px; align-items: center; }
+.tour-footer { display: flex; flex-direction: column; gap: 12px; }
+.tour-footer-row { display: flex; align-items: center; justify-content: space-between; }
+.tour-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.welcome-dots { display: flex; gap: 5px; align-items: center; }
 .welcome-dot { width: 7px; height: 7px; border-radius: 50%; background: #3f3f46; transition: background .2s; }
 .welcome-dot.active { background: #fafafa; }
 .welcome-dot.done { background: #71717a; }

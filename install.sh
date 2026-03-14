@@ -1162,6 +1162,137 @@ else
   ok "auth-profiles.json already exists"
 fi
 
+# ── Step 15e: Personalize workspace from setup wizard ────────────────────────
+step "Step 15e: Agent identity"
+
+SETUP_STATE="$STATE_DIR/USER/setup-state.json"
+WORKSPACE_DIR="$STATE_DIR/workspace"
+
+# Copy MiniClaw workspace templates (root + refs/) if they exist in the repo
+MC_WORKSPACE_TEMPLATES="$REPO_DIR/workspace"
+if [[ -d "$MC_WORKSPACE_TEMPLATES" ]]; then
+  mkdir -p "$WORKSPACE_DIR" "$WORKSPACE_DIR/refs" "$WORKSPACE_DIR/memory"
+  # Root files (always-loaded by the gateway)
+  for tpl in "$MC_WORKSPACE_TEMPLATES"/*.md; do
+    [[ -f "$tpl" ]] || continue
+    dest="$WORKSPACE_DIR/$(basename "$tpl")"
+    [[ ! -f "$dest" ]] && cp "$tpl" "$dest"
+  done
+  # Reference files (loaded on demand)
+  if [[ -d "$MC_WORKSPACE_TEMPLATES/refs" ]]; then
+    for tpl in "$MC_WORKSPACE_TEMPLATES/refs"/*.md; do
+      [[ -f "$tpl" ]] || continue
+      dest="$WORKSPACE_DIR/refs/$(basename "$tpl")"
+      [[ ! -f "$dest" ]] && cp "$tpl" "$dest"
+    done
+  fi
+  ok "Workspace templates installed ($(ls "$WORKSPACE_DIR"/*.md 2>/dev/null | wc -l | tr -d ' ') root + $(ls "$WORKSPACE_DIR/refs/"*.md 2>/dev/null | wc -l | tr -d ' ') refs)"
+fi
+
+if [[ -f "$SETUP_STATE" && -d "$WORKSPACE_DIR" ]]; then
+  python3 - "$SETUP_STATE" "$WORKSPACE_DIR" "$MINICLAW_DIR/MANIFEST.json" <<'PERSONALIZE_PYEOF'
+import json, sys, os
+from datetime import date
+
+state_path, workspace, manifest_path = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(state_path) as f:
+    state = json.load(f)
+
+name = state.get("assistantName", "")
+short = state.get("shortName", name)
+pronouns = state.get("pronouns", "they/them")
+blurb = state.get("personaBlurb", "")
+
+if not name:
+    print("  No assistant name in setup state — skipping")
+    sys.exit(0)
+
+# Parse pronouns into subject/possessive
+pmap = {
+    "she/her": ("she", "her"),
+    "he/him": ("he", "his"),
+    "they/them": ("they", "their"),
+}
+subj, poss = pmap.get(pronouns, ("they", "their"))
+
+# Read version
+version = "0.1.0"
+try:
+    with open(manifest_path) as f:
+        version = json.load(f).get("version", version)
+except Exception:
+    pass
+
+today = date.today().isoformat()
+
+# Template replacements for all workspace files
+replacements = {
+    "{{AGENT_NAME}}": name,
+    "{{AGENT_SHORT}}": short,
+    "{{HUMAN_NAME}}": "my human",
+    "{{PRONOUNS}}": pronouns,
+    "{{PRONOUNS_SUBJECT}}": subj,
+    "{{PRONOUNS_POSSESSIVE}}": poss,
+    "{{VERSION}}": version,
+    "{{DATE}}": today,
+}
+
+for fname in os.listdir(workspace):
+    if not fname.endswith(".md"):
+        continue
+    fpath = os.path.join(workspace, fname)
+    with open(fpath) as f:
+        content = f.read()
+    changed = False
+    for placeholder, value in replacements.items():
+        if placeholder in content:
+            content = content.replace(placeholder, value)
+            changed = True
+    if changed:
+        with open(fpath, "w") as f:
+            f.write(content)
+
+# Update IDENTITY.md — fill in blanks from default template
+identity_path = os.path.join(workspace, "IDENTITY.md")
+if os.path.exists(identity_path):
+    with open(identity_path) as f:
+        content = f.read()
+    if "_(pick something you like)_" in content:
+        content = content.replace(
+            "- **Name:**\n  _(pick something you like)_",
+            f"- **Name:** {name}")
+        content = content.replace(
+            "- **Creature:**\n  _(AI? robot? familiar? ghost in the machine? something weirder?)_",
+            "- **Creature:** AI companion")
+        content = content.replace(
+            "- **Vibe:**\n  _(how do you come across? sharp? warm? chaotic? calm?)_",
+            f"- **Vibe:** {blurb if blurb else 'warm, helpful, curious'}")
+        content = content.replace(
+            "- **Emoji:**\n  _(your signature — pick one that feels right)_",
+            "- **Emoji:** 🦀")
+        with open(identity_path, "w") as f:
+            f.write(content)
+
+# Update SOUL.md — inject name/pronouns
+soul_path = os.path.join(workspace, "SOUL.md")
+if os.path.exists(soul_path):
+    with open(soul_path) as f:
+        soul = f.read()
+    if name not in soul:
+        header = f"## My Identity\n\nMy name is **{name}** ({pronouns}). My short name is **{short}**.\nI run on MiniClaw v{version}.\n\n"
+        soul = soul.replace(
+            "# SOUL.md - Who You Are\n",
+            f"# SOUL.md - Who You Are\n\n{header}")
+        with open(soul_path, "w") as f:
+            f.write(soul)
+
+print(f"  {name} ({pronouns}) — MiniClaw v{version}")
+PERSONALIZE_PYEOF
+  ok "Workspace personalized from setup wizard"
+else
+  info "No setup state or workspace — agent will personalize on first conversation"
+fi
+
 # ── Step 16: Import shared KB ─────────────────────────────────────────────────
 step "Step 16: Shared knowledge base"
 

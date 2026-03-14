@@ -183,6 +183,13 @@ MiniClaw is modular. Each plugin handles one job — and handles it well. You ca
 
 ---
 
+## Future Enhancements
+
+- Token usage display and autotuning
+- Full health checks with every subsystem verified on command
+
+---
+
 ## Troubleshooting
 
 Something broken?

@@ -260,16 +260,20 @@ export function WelcomeWizard({ onDone }: { onDone: () => void }) {
               <div key={i} className={`welcome-dot${i === step ? " active" : i < step ? " done" : ""}`} />
             ))}
           </div>
-          <div className="tour-actions">
-            {step > 0 && (
-              <button className="welcome-btn welcome-btn-ghost" onClick={() => setStep(s => s - 1)}>Back</button>
-            )}
-            {step === 0 && (
-              <button className="welcome-btn welcome-btn-ghost" onClick={finish}>Skip</button>
-            )}
-            <button className="welcome-btn welcome-btn-primary" onClick={isLast ? finish : handleNext}>
-              {isLast ? "Let's go" : "Next"}
-            </button>
+          <div className="tour-footer-row">
+            {!isLast ? (
+              <button onClick={finish} style={{ background: "none", border: "none", color: "#52525b", fontSize: 11, cursor: "pointer", padding: 4 }}>
+                Skip tutorial
+              </button>
+            ) : <span />}
+            <div className="tour-actions">
+              {step > 0 && (
+                <button className="welcome-btn welcome-btn-ghost" onClick={() => setStep(s => s - 1)}>Back</button>
+              )}
+              <button className="welcome-btn welcome-btn-primary" onClick={isLast ? finish : handleNext}>
+                {isLast ? "Let's go" : "Next"}
+              </button>
+            </div>
           </div>
         </div>
       </div>

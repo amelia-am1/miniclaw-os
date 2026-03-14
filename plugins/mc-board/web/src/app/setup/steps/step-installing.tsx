@@ -226,7 +226,12 @@ export default function StepInstalling({ onNext }: Props) {
       </div>
 
       {allDone && !hasErrors && (
-        <p className="text-sm text-[#666]">Taking you to {state.assistantName}...</p>
+        <div className="w-full flex flex-col gap-3 items-center">
+          <div className="w-full py-3 rounded-xl font-semibold text-center animate-pulse" style={{ background: `${accent}22`, border: `1px solid ${accent}`, color: accent }}>
+            ✓ All checks passed
+          </div>
+          <p className="text-sm text-[#666]">Taking you to {state.assistantName}...</p>
+        </div>
       )}
 
       {allDone && hasErrors && (
@@ -234,7 +239,7 @@ export default function StepInstalling({ onNext }: Props) {
           <p className="text-sm text-[#888]">
             Some checks had issues. You can continue — these can be fixed later with <span className="font-mono text-[#aaa]">mc-doctor</span>.
           </p>
-          <button onClick={onNext} className="w-full py-3 rounded-xl font-semibold transition-all hover:opacity-90 active:scale-[0.98]" style={{ background: accent, color: "#0f0f0f" }}>
+          <button onClick={onNext} className="w-full py-3 rounded-xl font-semibold transition-all hover:opacity-90 active:scale-[0.98] animate-[flash-red_1s_ease-in-out_2]" style={{ background: "#FF5252", color: "#fff" }}>
             Continue anyway →
           </button>
         </div>
