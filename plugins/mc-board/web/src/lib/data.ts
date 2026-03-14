@@ -25,7 +25,7 @@ export function getDbPath(): string { return resolveDbPath(); }
 // Lazy singleton connection — opened on first call, reused for the lifetime of the process.
 let _db: Database.Database | null = null;
 
-function getDb(): Database.Database | null {
+export function getDb(): Database.Database | null {
   if (_db) return _db;
   const dbPath = resolveDbPath();
   if (!fs.existsSync(dbPath)) return null;
