@@ -75,19 +75,8 @@ export default function StepMeetHer({
   const [photoSrc, setPhotoSrc] = useState(preset.avatar);
   const [isCustomPhoto, setIsCustomPhoto] = useState(false);
   const [nickError, setNickError] = useState("");
-  const [evacPath, setEvacPath] = useState<string | null>(null);
   const [showPicker, setShowPicker] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-
-  // Check if there's a backed-up previous install
-  useEffect(() => {
-    fetch("/api/setup/install")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.evacuatedInstall) setEvacPath(data.evacuatedInstall);
-      })
-      .catch(() => {});
-  }, []);
 
   const handleShuffle = () => {
     const next = randomPreset(presetIdx);
@@ -137,24 +126,6 @@ export default function StepMeetHer({
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Previous install notice */}
-      {evacPath && (
-        <div
-          className="rounded-xl px-4 py-3 text-sm"
-          style={{
-            background: `${selectedColor}11`,
-            border: `1px solid ${selectedColor}33`,
-          }}
-        >
-          <p className="font-medium text-white mb-1">Found your previous OpenClaw install</p>
-          <p className="text-[#888]">
-            Don&apos;t worry — your original data has been copied to:
-          </p>
-          <p className="font-mono text-xs mt-1" style={{ color: selectedColor }}>
-            {evacPath}
-          </p>
-        </div>
-      )}
 
       {/* Avatar + shuffle */}
       <div className="flex flex-col items-center gap-3">
@@ -185,7 +156,7 @@ export default function StepMeetHer({
             🎲
           </button>
         </div>
-        <h2 className="text-3xl font-bold text-white">Meet your AM</h2>
+        <h2 className="text-3xl font-bold text-white">Create your assistant</h2>
       </div>
 
       {/* Avatar picker */}

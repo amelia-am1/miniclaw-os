@@ -116,7 +116,7 @@ export default function StepEmail({ email, appPassword, onChange, onNext, onBack
           </li>
         </ul>
         <p className="text-xs text-[#666] mt-1">
-          We recommend creating a dedicated Gmail address for your AM (e.g. amelia.am@gmail.com) so she has her own identity.
+          We recommend creating a dedicated Gmail address for your assistant (e.g. myassistant@gmail.com) so it has its own identity.
         </p>
       </div>
 

@@ -23,8 +23,8 @@ export interface SetupState {
 
 const defaults: SetupState = {
   complete: false,
-  assistantName: "Amelia",
-  shortName: "Am",
+  assistantName: "",
+  shortName: "",
   accentColor: "#00E5CC",
   pronouns: "she/her",
   personaBlurb: "",

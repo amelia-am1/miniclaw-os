@@ -99,7 +99,7 @@ export default function StepTelegram({
           type="text"
           value={usernameInput}
           onChange={(e) => setUsernameInput(e.target.value)}
-          placeholder="@amelia_am420_bot"
+          placeholder="@my_assistant_bot"
           className="w-full px-4 py-3 rounded-xl bg-[#1a1a1a] border border-[rgba(255,255,255,0.1)] text-white text-sm placeholder-[#444] focus:outline-none"
           style={{ borderColor: usernameInput ? `${accent}66` : undefined }}
           disabled={status === "ok"}

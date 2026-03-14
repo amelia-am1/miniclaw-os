@@ -176,9 +176,9 @@ export async function POST(req: Request) {
  */
 export async function GET() {
   // Check if an evacuated install exists (for the "we backed up your data" banner)
+  // Only match what bootstrap.sh creates: .openclaw/projects/miniclaw-os.previous-*
   const evacPatterns = [
-    path.join(process.env.HOME || "", ".openclaw_original"),
-    path.join(process.env.HOME || "", ".openclaw-backup-*"),
+    path.join(STATE_DIR, "projects", "miniclaw-os.previous-*"),
   ];
 
   let evacPath: string | null = null;
