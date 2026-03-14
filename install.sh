@@ -115,28 +115,13 @@ elif [[ -d "$STATE_DIR" && ! -d "$STATE_DIR/miniclaw" && \
   if [[ "$CHECK_ONLY" == true ]]; then
     warn "Migration needed -- run without --check to proceed"
   else
-    MIGRATE_CONFIRM=""
-    if { true < /dev/tty; } 2>/dev/null; then
-      read -rp "  Archive and migrate? (y/N): " MIGRATE_CONFIRM < /dev/tty
-    elif [ -t 0 ]; then
-      read -rp "  Archive and migrate? (y/N): " MIGRATE_CONFIRM
-    else
-      MIGRATE_CONFIRM="y"
-      info "No terminal -- proceeding automatically"
-    fi
+    NEEDS_MIGRATION=true
 
-    if [[ "$MIGRATE_CONFIRM" == "y" || "$MIGRATE_CONFIRM" == "Y" ]]; then
-      NEEDS_MIGRATION=true
+    info "Archiving $STATE_DIR -> $ARCHIVE_DIR"
+    cp -a "$STATE_DIR" "$ARCHIVE_DIR"
+    ok "Archived to $ARCHIVE_DIR"
 
-      info "Archiving $STATE_DIR -> $ARCHIVE_DIR"
-      cp -a "$STATE_DIR" "$ARCHIVE_DIR"
-      ok "Archived to $ARCHIVE_DIR"
-
-      catalog_old_install "$ARCHIVE_DIR"
-    else
-      echo "  Aborted. Your existing install is untouched."
-      exit 0
-    fi
+    catalog_old_install "$ARCHIVE_DIR"
   fi
 elif [[ -d "$STATE_DIR/miniclaw" ]]; then
   ok "MiniClaw already installed -- updating in place"
