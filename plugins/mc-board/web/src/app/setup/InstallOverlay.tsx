@@ -90,8 +90,11 @@ export default function InstallOverlay({ accent }: Props) {
             return;
           }
         } catch { /* fall through */ }
-        setPhase("error");
-        setLines((p) => [...p, `Server error: ${res.status}`]);
+        // Auto-retry after 5s (repo may still be downloading)
+        setLines((p) => [...p, "Waiting for install to be ready..."]);
+        await new Promise((r) => setTimeout(r, 5000));
+        startedRef.current = false;
+        startInstall();
         return;
       }
 
@@ -135,8 +138,11 @@ export default function InstallOverlay({ accent }: Props) {
         }
       }
     } catch (err) {
-      setPhase("error");
-      setLines((p) => [...p, `Connection failed: ${err instanceof Error ? err.message : "unknown"}`]);
+      // Auto-retry on connection errors
+      setLines((p) => [...p, "Waiting for install to be ready..."]);
+      await new Promise((r) => setTimeout(r, 5000));
+      startedRef.current = false;
+      startInstall();
     }
   }, []);
 

@@ -51,10 +51,23 @@ export async function POST(req: Request) {
     }
   }
 
-  const repoDir = findRepoDir();
+  // Wait up to 60s for the repo to be cloned (bootstrap clones in background)
+  let repoDir = findRepoDir();
   if (!repoDir) {
-    return new Response(JSON.stringify({ ok: false, error: "Cannot find miniclaw-os repo" }), {
-      status: 500,
+    const fs = require("node:fs");
+    const STATE_DIR_LOCAL = process.env.OPENCLAW_STATE_DIR ?? path.join(process.env.HOME || "", ".openclaw");
+    const expected = path.join(STATE_DIR_LOCAL, "projects", "miniclaw-os", "install.sh");
+    for (let i = 0; i < 60; i++) {
+      await new Promise((r) => setTimeout(r, 1000));
+      if (fs.existsSync(expected)) {
+        repoDir = path.dirname(expected);
+        break;
+      }
+    }
+  }
+  if (!repoDir) {
+    return new Response(JSON.stringify({ ok: false, error: "Repo still downloading — click Retry in a moment" }), {
+      status: 503,
       headers: { "Content-Type": "application/json" },
     });
   }
