@@ -69,47 +69,31 @@ if [[ -d "$INSTALL_DIR" ]]; then
 fi
 
 # ── Download and extract pre-built web app ───────────────────────────────────
-echo "  Downloading..."
+# ── Download pre-built app (13MB) ─────────────────────────────────────────────
+echo "  Downloading (13MB)..."
 ZIP_TMP="/tmp/miniclaw-installer-$$.zip"
-/usr/bin/curl -fsSL "$ZIP_URL" -o "$ZIP_TMP" 2>>"$LOG_FILE"
+/usr/bin/curl -fsSL --progress-bar "$ZIP_URL" -o "$ZIP_TMP" 2>&1
 
+echo "  Extracting..."
 EXTRACT_TMP="/tmp/miniclaw-extract-$$"
 rm -rf "$EXTRACT_TMP"
 mkdir -p "$EXTRACT_TMP"
 unzip -q -o "$ZIP_TMP" -d "$EXTRACT_TMP"
 rm -f "$ZIP_TMP"
 
-# Find the miniclaw-web dir (handle spaces in path)
 BUNDLED_WEB="$EXTRACT_TMP/Install MiniClaw.app/Contents/Resources/miniclaw-web"
 if [[ -d "$BUNDLED_WEB" && -f "$BUNDLED_WEB/server.js" ]]; then
-  echo "  Installing app..."
   rm -rf "$WEB_DIR"
   mkdir -p "$STATE_DIR"
   mv "$BUNDLED_WEB" "$WEB_DIR"
-  echo "  ✓ App installed"
 else
-  echo "  Pre-built app not found — building from source..."
-  mkdir -p "$(dirname "$INSTALL_DIR")"
-  git clone -q --depth 1 "$REPO_URL" "$INSTALL_DIR" 2>>"$LOG_FILE"
-  APP_SRC="$INSTALL_DIR/plugins/mc-board/web"
-  (cd "$APP_SRC" && npm install --silent >>"$LOG_FILE" 2>&1)
-  (cd "$APP_SRC" && npx next build >>"$LOG_FILE" 2>&1) || true
-  rm -rf "$WEB_DIR"
-  mkdir -p "$WEB_DIR"
-  cp -a "$APP_SRC/.next/standalone/." "$WEB_DIR/"
-  cp -r "$APP_SRC/.next/static" "$WEB_DIR/.next/static"
-  cp -r "$APP_SRC/public" "$WEB_DIR/public"
-  echo "  ✓ App built"
+  echo "  ERROR: Pre-built app not in zip. Try again or use the .app installer."
+  rm -rf "$EXTRACT_TMP"
+  exit 1
 fi
 rm -rf "$EXTRACT_TMP"
 
-# Clone repo in background (for install.sh later)
-(
-  mkdir -p "$(dirname "$INSTALL_DIR")"
-  [[ -d "$INSTALL_DIR/.git" ]] || git clone -q --depth 1 "$REPO_URL" "$INSTALL_DIR" 2>>"$LOG_FILE"
-) &
-
-# ── Setup state ──────────────────────────────────────────────────────────────
+# ── Prep state dir ───────────────────────────────────────────────────────────
 mkdir -p "$STATE_DIR/USER" "$STATE_DIR/logs"
 rm -f "$STATE_DIR/USER/setup-state.json"
 
@@ -170,21 +154,16 @@ PLIST
 
 launchctl load "$PLIST" 2>/dev/null
 
-# ── Wait for app ─────────────────────────────────────────────────────────────
-echo "  Waiting for app to start..."
-for i in $(seq 1 15); do
-  if curl -sf "http://localhost:$APP_PORT/api/health" &>/dev/null; then
-    echo "  ✓ Ready"
-    break
-  fi
-  sleep 1
-done
-
-# ── Open browser ─────────────────────────────────────────────────────────────
-echo ""
-echo "  Opening http://myam.localhost:$APP_PORT"
-echo ""
+# ── Open browser immediately — server starts in ~40ms ────────────────────────
+sleep 1
+echo "  ✓ Opening browser..."
 open "http://myam.localhost:$APP_PORT"
+
+# Clone repo in background (for install.sh later)
+(
+  mkdir -p "$(dirname "$INSTALL_DIR")"
+  [[ -d "$INSTALL_DIR/.git" ]] || git clone -q --depth 1 "$REPO_URL" "$INSTALL_DIR" 2>>"$LOG_FILE"
+) &
 
 # ── Done ─────────────────────────────────────────────────────────────────────
 if $IS_APP; then
