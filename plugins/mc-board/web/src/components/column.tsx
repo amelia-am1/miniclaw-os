@@ -2,11 +2,11 @@
 
 import { useMemo, useState, useCallback } from "react";
 import type { BoardCard, Column as ColumnType, Project } from "@/lib/types";
-import { ColumnShell } from "./ColumnShell";
-import { TriageControls } from "./TriageControls";
-import { CardItem } from "./CardItem";
-import { TriageModal } from "./TriageModal";
-import { WorkModal } from "./WorkModal";
+import { ColumnShell } from "./column-shell";
+import { TriageControls } from "./triage-controls";
+import { CardItem } from "./card-item";
+import { TriageModal } from "./triage-modal";
+import { WorkModal } from "./work-modal";
 import { useTriageColumn } from "@/hooks/useTriageColumn";
 
 const TRIAGE_COLUMNS = new Set<ColumnType>(["backlog", "in-progress", "in-review"]);

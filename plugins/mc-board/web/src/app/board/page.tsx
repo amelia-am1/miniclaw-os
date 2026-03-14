@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { AppShell } from "@/components/AppShell";
+import { AppShell } from "@/components/app-shell";
 
 export default async function BoardPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const sp = await searchParams;

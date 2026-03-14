@@ -1,4 +1,4 @@
-import { AppShell } from "@/components/AppShell";
+import { AppShell } from "@/components/app-shell";
 
 // Handles:
 //   /board/c/crd_xxx                    → open card

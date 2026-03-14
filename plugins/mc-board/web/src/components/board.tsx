@@ -2,10 +2,10 @@
 
 import useSWR from "swr";
 import { BoardData, BoardCard, Project } from "@/lib/types";
-import { Column } from "./Column";
-import { CardModal } from "./CardModal";
-import { WatchModal } from "./WatchModal";
-import { SummaryModal } from "./SummaryModal";
+import { Column } from "./column";
+import { CardModal } from "./card-modal";
+import { WatchModal } from "./watch-modal";
+import { SummaryModal } from "./summary-modal";
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());

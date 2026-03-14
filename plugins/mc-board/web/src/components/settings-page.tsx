@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { WizardProvider, useWizard } from "@/app/setup/wizard-context";
-import StepTelegram from "@/app/setup/steps/StepTelegram";
-import StepGithub from "@/app/setup/steps/StepGithub";
-import StepEmail from "@/app/setup/steps/StepEmail";
-import StepGemini from "@/app/setup/steps/StepGemini";
-import StepAnthropic from "@/app/setup/steps/StepAnthropic";
+import StepTelegram from "@/app/setup/steps/step-telegram";
+import StepGithub from "@/app/setup/steps/step-github";
+import StepEmail from "@/app/setup/steps/step-email";
+import StepGemini from "@/app/setup/steps/step-gemini";
+import StepAnthropic from "@/app/setup/steps/step-anthropic";
 
 type SettingKey = "telegram" | "github" | "email" | "gemini" | "anthropic" | null;
 

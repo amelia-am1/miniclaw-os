@@ -6,8 +6,8 @@ import useSWR from "swr";
 import { marked } from "marked";
 import { markedHighlight } from "marked-highlight";
 import hljs from "highlight.js";
-import { Modal } from "./Modal";
-import { FileViewModal } from "./FileViewModal";
+import { Modal } from "./modal";
+import { FileViewModal } from "./file-view-modal";
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
 

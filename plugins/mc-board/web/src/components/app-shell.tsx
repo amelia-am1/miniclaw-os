@@ -1,12 +1,12 @@
 "use client";
 import { useState, useCallback, useEffect } from "react";
-import { Board } from "./Board";
-import { MemoryTab } from "./MemoryTab";
-import { RolodexTab } from "./RolodexTab";
-import { SettingsPage } from "./SettingsPage";
-import { Modal } from "./Modal";
-import { ChatPanel } from "./ChatPanel";
-import { WelcomeWizard, useWelcomeWizard } from "./WelcomeWizard";
+import { Board } from "./board";
+import { MemoryTab } from "./memory-tab";
+import { RolodexTab } from "./rolodex-tab";
+import { SettingsPage } from "./settings-page";
+import { Modal } from "./modal";
+import { ChatPanel } from "./chat-panel";
+import { WelcomeWizard, useWelcomeWizard } from "./welcome-wizard";
 import { Project, BoardCard } from "@/lib/types";
 
 type Tab = "board" | "memory" | "rolodex" | "settings";

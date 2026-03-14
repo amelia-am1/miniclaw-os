@@ -4,15 +4,15 @@ import { useState, useCallback, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import { useWizard } from "./wizard-context";
-import InstallOverlay from "./InstallOverlay";
-import StepMeetHer from "./steps/StepMeetHer";
-import StepTelegram from "./steps/StepTelegram";
-import StepGithub from "./steps/StepGithub";
-import StepAnthropic from "./steps/StepAnthropic";
-import StepEmail from "./steps/StepEmail";
-import StepGemini from "./steps/StepGemini";
-import StepInstalling from "./steps/StepInstalling";
-import StepDone from "./steps/StepDone";
+import InstallOverlay from "./install-overlay";
+import StepMeetHer from "./steps/step-meet";
+import StepTelegram from "./steps/step-telegram";
+import StepGithub from "./steps/step-github";
+import StepAnthropic from "./steps/step-anthropic";
+import StepEmail from "./steps/step-email";
+import StepGemini from "./steps/step-gemini";
+import StepInstalling from "./steps/step-installing";
+import StepDone from "./steps/step-done";
 
 // Re-export for backward compat (step components that import WizardState)
 export type { WizardState } from "./wizard-context";

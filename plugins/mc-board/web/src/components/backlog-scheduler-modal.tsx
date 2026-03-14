@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Modal } from "./Modal";
+import { Modal } from "./modal";
 
 interface Props {
   onClose: () => void;

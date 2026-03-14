@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Modal } from "./Modal";
+import { Modal } from "./modal";
 
 interface KbEntry { id: string; key: string; value: string; updated_at?: string; created_at?: string; }
 interface QmdEntry { filename: string; title: string; preview: string; modified: string; }
