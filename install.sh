@@ -41,11 +41,11 @@ die()  { fail "$1"; exit 1; }
 # Run a command quietly — output goes to log file only, not terminal
 run_quiet() { "$@" >>"$LOG_FILE" 2>&1; }
 
-# Progress helpers: show [ ] line, then overwrite with result
-progress() { echo -ne "  ${BLUE}[ ]${NC} $1\r"; }
-progress_ok()   { echo -e "  ${GREEN}[✓]${NC} $1\033[K"; }
-progress_fail() { echo -e "  ${RED}[✗]${NC} $1\033[K"; }
-progress_warn() { echo -e "  ${YELLOW}[!]${NC} $1\033[K"; }
+# Progress helpers: simple line output (no \r overwriting — breaks in log files)
+progress() { echo -ne "  ${BLUE}[·]${NC} $1\r"; }
+progress_ok()   { echo -e "\r  ${GREEN}[✓]${NC} $1                    "; }
+progress_fail() { echo -e "\r  ${RED}[✗]${NC} $1                    "; }
+progress_warn() { echo -e "\r  ${YELLOW}[!]${NC} $1                    "; }
 
 echo ""
 echo -e "${BOLD}miniclaw-os installer${NC}"

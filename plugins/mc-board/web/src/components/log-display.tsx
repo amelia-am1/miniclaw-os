@@ -135,7 +135,14 @@ function isImportantLine(l: string): boolean {
 }
 
 function strip(s: string): string {
-  return s.replace(/\x1b\[[0-9;]*m/g, "");
+  // Strip ANSI codes, carriage returns, and erase sequences
+  let clean = s.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
+  // Handle \r by keeping only the text after the last \r
+  if (clean.includes("\r")) {
+    const parts = clean.split("\r");
+    clean = parts[parts.length - 1];
+  }
+  return clean.trim();
 }
 
 function lineColor(l: string): string {
