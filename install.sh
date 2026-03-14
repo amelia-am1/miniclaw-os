@@ -314,8 +314,15 @@ fi
 # Check if the correct npm fork is installed (not upstream)
 CORRECT_FORK=false
 if command -v openclaw &>/dev/null; then
-  INSTALLED_PKG=$(npm list -g 2>/dev/null | grep -o '@miniclaw_official/openclaw' || true)
+  INSTALLED_PKG=$(npm list -g 2>/dev/null | grep -o '@miniclaw_official/openclaw@[^ ]*' || true)
   if [[ -n "$INSTALLED_PKG" ]]; then
+    INSTALLED_VER=$(echo "$INSTALLED_PKG" | sed 's/.*@//')
+    # Check if installed version has the root-alias fix (>= 2026.3.9)
+    if [[ "$INSTALLED_VER" == *"-mc."* || "$INSTALLED_VER" < "2026.3.9" ]]; then
+      info "Updating OpenClaw fork from $INSTALLED_VER to latest..."
+      run_quiet npm install -g "$OPENCLAW_NPM_PKG@latest" && ok "Updated to $(openclaw --version 2>/dev/null | head -1)" \
+        || warn "Update failed — run: npm install -g $OPENCLAW_NPM_PKG@latest"
+    fi
     CORRECT_FORK=true
     INSTALLED=$(openclaw --version 2>/dev/null | head -1 || echo "?")
     ok "OpenClaw $INSTALLED (fork: $OPENCLAW_NPM_PKG)"
