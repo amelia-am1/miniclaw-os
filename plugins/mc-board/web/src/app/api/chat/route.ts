@@ -16,12 +16,24 @@ function getAuthToken(): string {
   const profilePath = path.join(stateDir, "agents", "main", "agent", "auth-profiles.json");
   try {
     const data = JSON.parse(fs.readFileSync(profilePath, "utf-8")) as {
-      profiles?: Record<string, { token?: string }>;
+      profiles?: Record<string, { access?: string; token?: string }>;
     };
-    const token =
-      data.profiles?.["anthropic:max-subscription"]?.token ??
-      data.profiles?.["anthropic:default"]?.token;
-    if (token) return token;
+    if (data.profiles) {
+      // Try all profiles — look for OAuth access token or static token
+      for (const profile of Object.values(data.profiles)) {
+        if (profile.access) return profile.access;
+        if (profile.token) return profile.token;
+      }
+    }
+  } catch {}
+  // Fallback: read from macOS Keychain (Claude Code credentials)
+  try {
+    const { execSync } = require("node:child_process");
+    const raw = execSync('security find-generic-password -s "Claude Code-credentials" -w', {
+      encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+    const creds = JSON.parse(raw);
+    if (creds?.claudeAiOauth?.accessToken) return creds.claudeAiOauth.accessToken;
   } catch {}
   return process.env.ANTHROPIC_API_KEY ?? "";
 }
@@ -32,7 +44,7 @@ function getSystemPrompt(): string {
   try {
     return fs.readFileSync(personaPath, "utf-8");
   } catch {
-    return "You are AM, a helpful assistant embedded in a task board. Be direct, concise, and honest.";
+    return "You are a helpful assistant embedded in a task board. Be direct, concise, and honest.";
   }
 }
 
