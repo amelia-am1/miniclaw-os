@@ -65,7 +65,20 @@ export default function StepInstalling({ state, onDone, accent }: Props) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({}),
         });
-        if (res.ok && res.body) {
+        if (res.status === 409) {
+          // Install already running (e.g. from a previous page visit) — poll until done
+          updateCheck("install", { detail: "Install in progress..." });
+          while (true) {
+            await delay(3000);
+            try {
+              const status = await fetch("/api/setup/install").then(r => r.json());
+              if (!status.running) {
+                updateCheck("install", { status: "ok", detail: "Installed" });
+                break;
+              }
+            } catch { /* keep polling */ }
+          }
+        } else if (res.ok && res.body) {
           const reader = res.body.getReader();
           const decoder = new TextDecoder();
           let sseBuffer = "";
@@ -92,6 +105,22 @@ export default function StepInstalling({ state, onDone, accent }: Props) {
                 }
               } catch { /* skip */ }
             }
+          }
+        } else if (res.status === 503) {
+          // Repo still cloning — wait and retry
+          updateCheck("install", { detail: "Waiting for download..." });
+          await delay(5000);
+          updateCheck("install", { status: "running", detail: "Retrying..." });
+          // Recursive retry via re-running the whole step
+          const retry = await fetch("/api/setup/install", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({}),
+          });
+          if (retry.ok) {
+            updateCheck("install", { status: "ok", detail: "Installed" });
+          } else {
+            updateCheck("install", { status: "error", detail: "Could not start install" });
           }
         } else {
           updateCheck("install", { status: "error", detail: "Could not start install" });
