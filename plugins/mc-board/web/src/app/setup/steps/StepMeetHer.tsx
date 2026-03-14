@@ -75,8 +75,19 @@ export default function StepMeetHer({
   const [photoSrc, setPhotoSrc] = useState(preset.avatar);
   const [isCustomPhoto, setIsCustomPhoto] = useState(false);
   const [nickError, setNickError] = useState("");
+  const [evacPath, setEvacPath] = useState<string | null>(null);
   const [showPicker, setShowPicker] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Check if bootstrap evacuated a real previous .openclaw install
+  useEffect(() => {
+    fetch("/api/setup/install")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.evacuatedInstall) setEvacPath(data.evacuatedInstall);
+      })
+      .catch(() => {});
+  }, []);
 
   const handleShuffle = () => {
     const next = randomPreset(presetIdx);
@@ -204,6 +215,25 @@ export default function StepMeetHer({
         onChange={handlePhotoUpload}
         className="hidden"
       />
+
+      {/* Previous install notice */}
+      {evacPath && (
+        <div
+          className="rounded-xl px-4 py-3 text-sm"
+          style={{
+            background: `${selectedColor}11`,
+            border: `1px solid ${selectedColor}33`,
+          }}
+        >
+          <p className="font-medium text-white mb-1">Found your previous OpenClaw install</p>
+          <p className="text-[#888]">
+            Don&apos;t worry — your original data has been copied to:
+          </p>
+          <p className="font-mono text-xs mt-1" style={{ color: selectedColor }}>
+            {evacPath}
+          </p>
+        </div>
+      )}
 
       {/* Color */}
       <div className="flex flex-col gap-1.5">
