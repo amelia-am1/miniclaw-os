@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect } from "react";
+import { useWizard } from "../wizard-context";
 
-interface Props {
-  name: string;
-  accent: string;
-}
+export default function StepDone() {
+  const { state, accent } = useWizard();
+  const name = state.shortName || state.assistantName;
 
-export default function StepDone({ name, accent }: Props) {
   useEffect(() => {
     const t = setTimeout(() => {
       window.location.href = "/board";

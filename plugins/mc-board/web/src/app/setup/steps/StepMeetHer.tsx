@@ -2,18 +2,9 @@
 
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
+import { useWizard } from "../wizard-context";
 
 interface Props {
-  name: string;
-  shortName: string;
-  pronouns: string;
-  accentColor: string;
-  onChange: (p: {
-    assistantName?: string;
-    shortName?: string;
-    pronouns?: string;
-    accentColor?: string;
-  }) => void;
   onNext: () => void;
 }
 
@@ -57,21 +48,16 @@ function randomPreset(exclude?: number): number {
   return idx;
 }
 
-export default function StepMeetHer({
-  name,
-  shortName,
-  pronouns,
-  accentColor,
-  onChange,
-  onNext,
-}: Props) {
+export default function StepMeetHer({ onNext }: Props) {
+  const { state, update, accent } = useWizard();
+
   const [presetIdx, setPresetIdx] = useState(() => randomPreset());
   const preset = PRESETS[presetIdx];
 
-  const [nameInput, setNameInput] = useState(name || preset.name);
-  const [shortInput, setShortInput] = useState(shortName || preset.nick);
-  const [selectedPronouns, setSelectedPronouns] = useState(pronouns || preset.pronouns);
-  const [selectedColor, setSelectedColor] = useState(accentColor);
+  const [nameInput, setNameInput] = useState(state.assistantName || preset.name);
+  const [shortInput, setShortInput] = useState(state.shortName || preset.nick);
+  const [selectedPronouns, setSelectedPronouns] = useState(state.pronouns || preset.pronouns);
+  const [selectedColor, setSelectedColor] = useState(accent);
   const [photoSrc, setPhotoSrc] = useState(preset.avatar);
   const [isCustomPhoto, setIsCustomPhoto] = useState(false);
   const [nickError, setNickError] = useState("");
@@ -122,11 +108,11 @@ export default function StepMeetHer({
 
   const handleColorChange = (hex: string) => {
     setSelectedColor(hex);
-    onChange({ accentColor: hex });
+    update({ accentColor: hex });
   };
 
   const handleNext = () => {
-    onChange({
+    update({
       assistantName: nameInput.trim() || "MiniClaw",
       shortName: shortInput.trim() || "mc",
       pronouns: selectedPronouns,

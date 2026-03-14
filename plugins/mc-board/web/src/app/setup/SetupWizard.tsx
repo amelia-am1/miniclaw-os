@@ -40,7 +40,7 @@ function stepFromPath(pathname: string): Step {
 export default function SetupWizard() {
   const router = useRouter();
   const pathname = usePathname();
-  const { state, update, accent } = useWizard();
+  const { accent } = useWizard();
 
   const [step, setStepState] = useState<Step>(() => stepFromPath(pathname));
 
@@ -127,30 +127,14 @@ export default function SetupWizard() {
       )}
 
       <div className="w-full max-w-xl step-enter" key={step}>
-        {step === "meet" && (
-          <StepMeetHer name={state.assistantName} shortName={state.shortName} pronouns={state.pronouns} accentColor={accent} onChange={update} onNext={next} />
-        )}
-        {step === "telegram" && (
-          <StepTelegram botUsername={state.telegramBotUsername} botToken={state.telegramBotToken} chatId={state.telegramChatId} assistantName={state.shortName || state.assistantName} onChange={update} onNext={next} onBack={back} accent={accent} />
-        )}
-        {step === "github" && (
-          <StepGithub ghToken={state.ghToken} assistantName={state.shortName || state.assistantName} onChange={(v) => update({ ghToken: v })} onNext={next} onBack={back} accent={accent} />
-        )}
-        {step === "email" && (
-          <StepEmail email={state.emailAddress} appPassword={state.appPassword} onChange={update} onNext={next} onBack={back} accent={accent} />
-        )}
-        {step === "gemini" && (
-          <StepGemini apiKey={state.geminiKey} onChange={(v) => update({ geminiKey: v })} onNext={next} onBack={back} accent={accent} />
-        )}
-        {step === "anthropic" && (
-          <StepAnthropic setupToken={state.anthropicToken} onChange={(v) => update({ anthropicToken: v })} onNext={next} onBack={back} accent={accent} assistantName={state.shortName || state.assistantName} />
-        )}
-        {step === "installing" && (
-          <StepInstalling state={state} onDone={next} accent={accent} />
-        )}
-        {step === "done" && (
-          <StepDone name={state.shortName || state.assistantName} accent={accent} />
-        )}
+        {step === "meet" && <StepMeetHer onNext={next} />}
+        {step === "telegram" && <StepTelegram onNext={next} onBack={back} />}
+        {step === "github" && <StepGithub onNext={next} onBack={back} />}
+        {step === "email" && <StepEmail onNext={next} onBack={back} />}
+        {step === "gemini" && <StepGemini onNext={next} onBack={back} />}
+        {step === "anthropic" && <StepAnthropic onNext={next} onBack={back} />}
+        {step === "installing" && <StepInstalling onNext={next} />}
+        {step === "done" && <StepDone />}
       </div>
     </div>
   );

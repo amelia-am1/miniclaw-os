@@ -1,14 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useWizard } from "../wizard-context";
 
 interface Props {
-  email: string;
-  appPassword: string;
-  onChange: (p: { emailAddress?: string; appPassword?: string }) => void;
   onNext: () => void;
   onBack: () => void;
-  accent: string;
 }
 
 type Status = "idle" | "checking" | "ok" | "error";
@@ -18,9 +15,11 @@ function isGmail(email: string): boolean {
   return domain === "gmail.com" || domain === "googlemail.com";
 }
 
-export default function StepEmail({ email, appPassword, onChange, onNext, onBack, accent }: Props) {
-  const [emailInput, setEmailInput] = useState(email);
-  const [passwordInput, setPasswordInput] = useState(appPassword);
+export default function StepEmail({ onNext, onBack }: Props) {
+  const { state, update, accent } = useWizard();
+
+  const [emailInput, setEmailInput] = useState(state.emailAddress);
+  const [passwordInput, setPasswordInput] = useState(state.appPassword);
   const [smtpHost, setSmtpHost] = useState("");
   const [smtpPort, setSmtpPort] = useState("587");
   const [status, setStatus] = useState<Status>("idle");
@@ -74,7 +73,7 @@ export default function StepEmail({ email, appPassword, onChange, onNext, onBack
       });
       const data = await res.json();
       if (data.ok) {
-        onChange({ emailAddress: emailInput.trim(), appPassword: passwordInput.trim() });
+        update({ emailAddress: emailInput.trim(), appPassword: passwordInput.trim() });
         setStatus("ok");
         setTimeout(onNext, 800);
       } else {

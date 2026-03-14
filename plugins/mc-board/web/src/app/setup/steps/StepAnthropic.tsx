@@ -1,26 +1,20 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useWizard } from "../wizard-context";
 
 interface Props {
-  setupToken: string;
-  onChange: (v: string) => void;
   onNext: () => void;
   onBack: () => void;
-  accent: string;
-  assistantName: string;
 }
 
 type Status = "idle" | "waiting" | "ok" | "error";
 type Page = "explain" | "plans" | "connect";
 
-export default function StepAnthropic({
-  onChange,
-  onNext,
-  onBack,
-  accent,
-  assistantName,
-}: Props) {
+export default function StepAnthropic({ onNext, onBack }: Props) {
+  const { state, update, accent } = useWizard();
+  const assistantName = state.shortName || state.assistantName;
+
   const [page, setPage] = useState<Page>("explain");
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState("");
@@ -38,7 +32,7 @@ export default function StepAnthropic({
       });
       const data = await res.json();
       if (data.ok) {
-        onChange("token-pasted");
+        update({ anthropicToken: "token-pasted" });
         setStatus("ok");
         setTimeout(onNext, 600);
       } else {
@@ -62,7 +56,7 @@ export default function StepAnthropic({
         const data = await res.json();
         if (data.authed) {
           if (pollRef.current) clearInterval(pollRef.current);
-          onChange("oauth-complete");
+          update({ anthropicToken: "oauth-complete" });
           setStatus("ok");
           setTimeout(onNext, 600);
         }
@@ -71,7 +65,7 @@ export default function StepAnthropic({
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [status, onChange, onNext]);
+  }, [status, update, onNext]);
 
   const handleConnect = async () => {
     setStatus("waiting");

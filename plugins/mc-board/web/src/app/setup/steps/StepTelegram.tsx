@@ -1,37 +1,22 @@
 "use client";
 
 import { useState } from "react";
+import { useWizard } from "../wizard-context";
 
 interface Props {
-  botUsername: string;
-  botToken: string;
-  chatId: string;
-  assistantName: string;
-  onChange: (p: {
-    telegramBotUsername?: string;
-    telegramBotToken?: string;
-    telegramChatId?: string;
-  }) => void;
   onNext: () => void;
   onBack: () => void;
-  accent: string;
 }
 
 type Status = "idle" | "testing" | "ok" | "error";
 
-export default function StepTelegram({
-  botUsername,
-  botToken,
-  chatId,
-  assistantName,
-  onChange,
-  onNext,
-  onBack,
-  accent,
-}: Props) {
-  const [usernameInput, setUsernameInput] = useState(botUsername);
-  const [tokenInput, setTokenInput] = useState(botToken);
-  const [chatIdInput, setChatIdInput] = useState(chatId);
+export default function StepTelegram({ onNext, onBack }: Props) {
+  const { state, update, accent } = useWizard();
+  const assistantName = state.shortName || state.assistantName;
+
+  const [usernameInput, setUsernameInput] = useState(state.telegramBotUsername);
+  const [tokenInput, setTokenInput] = useState(state.telegramBotToken);
+  const [chatIdInput, setChatIdInput] = useState(state.telegramChatId);
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -55,7 +40,7 @@ export default function StepTelegram({
       });
       const data = await res.json();
       if (data.ok) {
-        onChange({
+        update({
           telegramBotUsername: usernameInput.trim(),
           telegramBotToken: tokenInput.trim(),
           telegramChatId: chatIdInput.trim(),

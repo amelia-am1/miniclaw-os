@@ -1,12 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import type { WizardState } from "../SetupWizard";
+import { useWizard } from "../wizard-context";
 
 interface Props {
-  state: WizardState;
-  onDone: () => void;
-  accent: string;
+  onNext: () => void;
 }
 
 type CheckStatus = "pending" | "running" | "ok" | "error";
@@ -18,7 +16,9 @@ interface Check {
   detail?: string;
 }
 
-export default function StepInstalling({ state, onDone, accent }: Props) {
+export default function StepInstalling({ onNext }: Props) {
+  const { state, accent } = useWizard();
+
   const [checks, setChecks] = useState<Check[]>([
     { id: "config", label: "Saving your preferences", status: "pending" },
     { id: "install", label: "Waiting for install to finish", status: "pending" },
@@ -178,7 +178,7 @@ export default function StepInstalling({ state, onDone, accent }: Props) {
       const hasErrors = checksRef.current.some((c) => c.status === "error");
       if (!hasErrors) {
         await delay(2000);
-        onDone();
+        onNext();
       }
       // If errors: the UI shows "Continue anyway" button — user decides
     };
@@ -234,7 +234,7 @@ export default function StepInstalling({ state, onDone, accent }: Props) {
           <p className="text-sm text-[#888]">
             Some checks had issues. You can continue — these can be fixed later with <span className="font-mono text-[#aaa]">mc-doctor</span>.
           </p>
-          <button onClick={onDone} className="w-full py-3 rounded-xl font-semibold transition-all hover:opacity-90 active:scale-[0.98]" style={{ background: accent, color: "#0f0f0f" }}>
+          <button onClick={onNext} className="w-full py-3 rounded-xl font-semibold transition-all hover:opacity-90 active:scale-[0.98]" style={{ background: accent, color: "#0f0f0f" }}>
             Continue anyway →
           </button>
         </div>

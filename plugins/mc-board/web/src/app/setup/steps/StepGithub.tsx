@@ -1,27 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import { useWizard } from "../wizard-context";
 
 interface Props {
-  ghToken: string;
-  assistantName: string;
-  onChange: (v: string) => void;
   onNext: () => void;
   onBack: () => void;
-  accent: string;
 }
 
 type Status = "idle" | "testing" | "ok" | "error";
 
-export default function StepGithub({
-  ghToken,
-  assistantName,
-  onChange,
-  onNext,
-  onBack,
-  accent,
-}: Props) {
-  const [tokenInput, setTokenInput] = useState(ghToken);
+export default function StepGithub({ onNext, onBack }: Props) {
+  const { state, update, accent } = useWizard();
+  const assistantName = state.shortName || state.assistantName;
+
+  const [tokenInput, setTokenInput] = useState(state.ghToken);
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [ghUser, setGhUser] = useState("");
@@ -45,7 +38,7 @@ export default function StepGithub({
       });
       const data = await res.json();
       if (data.ok) {
-        onChange(token);
+        update({ ghToken: token });
         setGhUser(data.username || "");
         setStatus("ok");
         setTimeout(onNext, 1200);
@@ -60,7 +53,7 @@ export default function StepGithub({
   };
 
   const handleSkip = () => {
-    onChange("");
+    update({ ghToken: "" });
     onNext();
   };
 

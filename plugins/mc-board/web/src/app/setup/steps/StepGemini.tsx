@@ -1,19 +1,19 @@
 "use client";
 
 import { useState } from "react";
+import { useWizard } from "../wizard-context";
 
 interface Props {
-  apiKey: string;
-  onChange: (v: string) => void;
   onNext: () => void;
   onBack: () => void;
-  accent: string;
 }
 
 type Status = "idle" | "saving" | "ok";
 
-export default function StepGemini({ apiKey, onChange, onNext, onBack, accent }: Props) {
-  const [input, setInput] = useState(apiKey);
+export default function StepGemini({ onNext, onBack }: Props) {
+  const { state, update, accent } = useWizard();
+
+  const [input, setInput] = useState(state.geminiKey);
   const [status, setStatus] = useState<Status>("idle");
 
   const handleSave = async () => {
@@ -31,7 +31,7 @@ export default function StepGemini({ apiKey, onChange, onNext, onBack, accent }:
       });
       const data = await res.json();
       if (data.ok) {
-        onChange(input.trim());
+        update({ geminiKey: input.trim() });
         setStatus("ok");
         setTimeout(onNext, 600);
       } else {
@@ -43,7 +43,7 @@ export default function StepGemini({ apiKey, onChange, onNext, onBack, accent }:
   };
 
   const handleSkip = () => {
-    onChange("");
+    update({ geminiKey: "" });
     onNext();
   };
 
