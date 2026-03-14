@@ -45,7 +45,7 @@ function configureGateway(botId: string, botToken: string) {
     enabled: true,
     botToken: botToken,
     dmPolicy: "pairing",
-    groupPolicy: "allowlist",
+    groupPolicy: "open",
     streaming: "partial",
   };
   cfg.channels = channels;
