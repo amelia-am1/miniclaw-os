@@ -454,54 +454,25 @@ if removed:
     print(f"  Removed unknown keys: {', '.join(removed)}")
 CLEANEOF
 
-python3 - "$STATE_DIR/openclaw.json" "$MINICLAW_DIR" "$STATE_DIR" <<'PYEOF'
-import json, sys, os
-
-config_path, mcl_dir = sys.argv[1], sys.argv[2]
-plugins_dir = os.path.join(mcl_dir, "plugins")
-
-with open(config_path) as f:
-    cfg = json.load(f)
-
-p = cfg.setdefault("plugins", {})
-p.setdefault("enabled", True)
-p.setdefault("allow", [])
-p.setdefault("load", {}).setdefault("paths", [])
-p.setdefault("entries", {})
-
-state_dir = sys.argv[3] if len(sys.argv) > 3 else os.path.expanduser("~/.openclaw")
-
-# Per-plugin config overrides (only for plugins that need non-empty config)
-plugin_config_overrides = {
-    "mc-board": { "cardsDir": state_dir + "/USER/brain/cards", "qmdBin": "~/.bun/bin/qmd", "qmdCollection": "mc-board", "webPort": 4220 },
-    "mc-context": { "windowMinutes": 60, "windowMinMessages": 10, "maxImagesInHistory": 2, "applyToChannels": True, "applyToDMs": True, "replaceMessages": True },
-    "mc-designer": { "apiKey": "", "model": "gemini-3.1-flash-image-preview", "mediaDir": state_dir + "/media/designer", "defaultWidth": 1024, "defaultHeight": 1024, "vaultBin": mcl_dir + "/vault/cli" },
-    "mc-kb": { "dbDir": state_dir + "/USER/brain/kb", "modelPath": "~/.cache/qmd/models/hf_ggml-org_embeddinggemma-300M-Q8_0.gguf", "qmdBin": "~/.bun/bin/qmd", "qmdCollection": "kb", "contextN": 3, "contextThreshold": 0.75 },
-    "mc-queue": { "enabled": True, "haikuModel": "claude-haiku-4-5-20251001", "maxToolCallsPerTurn": 3, "applyToChannels": True, "applyToDMs": True, "tgLogChatId": "", "tgBotName": "", "boardUrl": "" },
-    "mc-trust": { "agentId": "am", "trustDir": state_dir + "/trust", "vaultBin": mcl_dir + "/vault/cli", "sessionTtlMs": 3600000 },
-}
-
-# Register ALL plugins found in the plugins directory
-registered = []
-for name in sorted(os.listdir(plugins_dir)):
-    plugin_path = os.path.join(plugins_dir, name)
-    if not os.path.isdir(plugin_path):
-        continue
-    if name == "shared":
-        continue
-    if name not in p["allow"]: p["allow"].append(name)
-    if plugin_path not in p["load"]["paths"]: p["load"]["paths"].append(plugin_path)
-    if name not in p["entries"]:
-        cfg = plugin_config_overrides.get(name, {})
-        p["entries"][name] = {"enabled": True, "config": cfg}
-    registered.append(name)
-
-with open(config_path, "w") as f:
-    json.dump(cfg, f, indent=2); f.write("\n")
-
-print(f"  registered: {', '.join(registered)}")
-PYEOF
-ok "openclaw.json patched"
+# Register plugins using openclaw's proper plugin install command
+PLUGINS_DIR="$MINICLAW_DIR/plugins"
+REGISTERED=0
+for plugin_dir in "$PLUGINS_DIR"/mc-*/; do
+  [[ -d "$plugin_dir" ]] || continue
+  plugin_name="$(basename "$plugin_dir")"
+  [[ "$plugin_name" == "shared" ]] && continue
+  # Only install if plugin has a proper manifest
+  if [[ -f "$plugin_dir/openclaw.plugin.json" ]]; then
+    if run_quiet openclaw plugins install "$plugin_dir"; then
+      REGISTERED=$((REGISTERED + 1))
+    else
+      warn "Failed to register $plugin_name"
+    fi
+  else
+    warn "$plugin_name missing openclaw.plugin.json — skipped"
+  fi
+done
+ok "Registered $REGISTERED plugins via openclaw plugins install"
 
 # ── Step 8: CLI tools → SYSTEM/bin ────────────────────────────────────────────
 step "Step 8: CLI tools"
