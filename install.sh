@@ -394,7 +394,7 @@ for migrated in "${MIGRATED_PLUGINS[@]}"; do
   ok "Copied $migrated"
 done
 
-# Copy plugins to $MINICLAW_DIR/plugins/ (deps handled by openclaw plugins install in Step 7)
+# Copy plugins to $MINICLAW_DIR/plugins/
 PLUGIN_COUNT=0
 for plugin_src in "$REPO_DIR/plugins"/*/; do
   plugin_name="$(basename "$plugin_src")"
@@ -404,8 +404,8 @@ for plugin_src in "$REPO_DIR/plugins"/*/; do
 done
 ok "$PLUGIN_COUNT plugins copied"
 
-# ── Step 7: Patch openclaw.json ───────────────────────────────────────────────
-step "Step 7: openclaw.json"
+# ── Step 7: Install plugins to extensions + patch openclaw.json ──────────────
+step "Step 7: Plugin registration"
 
 # Clean unknown top-level keys that cause openclaw config validation to fail
 python3 - "$STATE_DIR/openclaw.json" <<'CLEANEOF'
@@ -423,26 +423,99 @@ if removed:
     print(f"  Removed unknown keys: {', '.join(removed)}")
 CLEANEOF
 
-# Register plugins using openclaw's proper plugin install command
+# Install plugins directly to extensions/ — no `openclaw plugins install` needed.
+# If bootstrap staged pre-built plugins (with node_modules), use those.
+# Otherwise fall back to copying from miniclaw/plugins/ and running npm install.
+PREBUILT_DIR="$STATE_DIR/.plugins-prebuilt"
+EXTENSIONS_DIR="$STATE_DIR/extensions"
 PLUGINS_DIR="$MINICLAW_DIR/plugins"
+mkdir -p "$EXTENSIONS_DIR"
+
+# If pre-built plugins exist, install shared node_modules at extensions root
+if [[ -d "$PREBUILT_DIR/node_modules" ]]; then
+  info "Installing shared dependencies (pre-built)..."
+  rsync -a "$PREBUILT_DIR/node_modules/" "$EXTENSIONS_DIR/node_modules/"
+  [[ -f "$PREBUILT_DIR/package.json" ]] && cp "$PREBUILT_DIR/package.json" "$EXTENSIONS_DIR/package.json"
+  ok "Shared node_modules installed"
+fi
+
 REGISTERED=0
 for plugin_dir in "$PLUGINS_DIR"/mc-*/; do
   [[ -d "$plugin_dir" ]] || continue
   plugin_name="$(basename "$plugin_dir")"
   [[ "$plugin_name" == "shared" ]] && continue
-  # Only install if plugin has a proper manifest
-  if [[ -f "$plugin_dir/openclaw.plugin.json" ]]; then
-    if run_quiet openclaw plugins install "$plugin_dir"; then
-      ok "Registered $plugin_name"
-      REGISTERED=$((REGISTERED + 1))
-    else
-      warn "Failed to register $plugin_name"
-    fi
+  [[ ! -f "$plugin_dir/openclaw.plugin.json" ]] && { warn "$plugin_name missing manifest — skipped"; continue; }
+
+  ext_dest="$EXTENSIONS_DIR/$plugin_name"
+
+  if [[ -d "$PREBUILT_DIR/$plugin_name" ]]; then
+    # Use pre-built plugin source (deps are in shared node_modules above)
+    rsync -a "$PREBUILT_DIR/$plugin_name/" "$ext_dest/"
+    # Also copy anything from source that prebuilt excluded (e.g. web/ for mc-board)
+    rsync -a --ignore-existing "$plugin_dir/" "$ext_dest/"
   else
-    warn "$plugin_name missing openclaw.plugin.json — skipped"
+    # Fallback: copy source and install deps per-plugin
+    rsync -a --exclude='node_modules' --exclude='.git' "$plugin_dir/" "$ext_dest/"
+    if [[ -f "$ext_dest/package.json" ]]; then
+      dep_count=$(python3 -c "import json; print(len(json.load(open('$ext_dest/package.json')).get('dependencies',{})))" 2>/dev/null || echo "0")
+      if [[ "$dep_count" -gt 0 ]]; then
+        (cd "$ext_dest" && npm install --omit=dev 2>>"$LOG_FILE") || warn "npm install failed for $plugin_name"
+      fi
+    fi
   fi
+
+  ok "Installed $plugin_name"
+  REGISTERED=$((REGISTERED + 1))
 done
-ok "Registered $REGISTERED plugins via openclaw plugins install"
+
+# Clean up pre-built staging
+rm -rf "$PREBUILT_DIR"
+
+# Write all plugin entries to openclaw.json in one shot
+python3 - "$STATE_DIR/openclaw.json" "$EXTENSIONS_DIR" <<'REGEOF'
+import json, sys, os, glob
+from datetime import datetime, timezone
+
+config_path = sys.argv[1]
+extensions_dir = sys.argv[2]
+
+with open(config_path) as f:
+    cfg = json.load(f)
+
+plugins = cfg.setdefault("plugins", {})
+entries = plugins.setdefault("entries", {})
+installs = plugins.setdefault("installs", {})
+
+now = datetime.now(timezone.utc).isoformat()
+
+for manifest_path in sorted(glob.glob(os.path.join(extensions_dir, "mc-*", "openclaw.plugin.json"))):
+    plugin_dir = os.path.dirname(manifest_path)
+    plugin_name = os.path.basename(plugin_dir)
+    try:
+        with open(manifest_path) as f:
+            manifest = json.load(f)
+        plugin_id = manifest.get("id", plugin_name)
+        version = manifest.get("version", "0.1.0")
+    except (json.JSONDecodeError, KeyError):
+        continue
+
+    entries[plugin_id] = {"enabled": True}
+    installs[plugin_id] = {
+        "source": "path",
+        "sourcePath": plugin_dir,
+        "installPath": plugin_dir,
+        "version": version,
+        "installedAt": now
+    }
+
+with open(config_path, "w") as f:
+    json.dump(cfg, f, indent=2)
+    f.write("\n")
+
+print(f"  Registered {len([k for k in entries if k.startswith('mc-')])} plugins in openclaw.json")
+REGEOF
+
+ok "Registered $REGISTERED plugins (direct install, no openclaw CLI)"
 
 # ── Step 8: CLI tools → SYSTEM/bin ────────────────────────────────────────────
 step "Step 8: CLI tools"

@@ -32,9 +32,10 @@ Seed data: `plugins/mc-board/seed.sql`
 ## Openclaw plugins
 
 - Each plugin MUST have `openclaw.plugin.json` with an `id` field
-- Each plugin MUST have `"openclaw": { "extensions": ["./index.ts"] }` in `package.json`
+- Each plugin MUST have `package.json` with `"openclaw": { "extensions": ["./index.ts"] }`
 - Config schema `required` should be empty `[]` — plugins with missing keys get disabled, not rejected
-- Plugins are registered via `openclaw plugins install <path>` during install.sh
+- Plugins are pre-built in `release.sh` (deps installed, native modules compiled) and shipped in the zip
+- install.sh copies pre-built plugins directly to `~/.openclaw/extensions/` and writes `openclaw.json` entries — no `openclaw plugins install` CLI needed
 
 ## Testing
 

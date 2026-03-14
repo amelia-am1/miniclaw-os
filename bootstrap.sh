@@ -70,7 +70,7 @@ fi
 
 # ── Download and extract pre-built web app ───────────────────────────────────
 # ── Download pre-built app (13MB) ─────────────────────────────────────────────
-echo "  Downloading (13MB)..."
+echo "  Downloading (~113MB)..."
 ZIP_TMP="/tmp/miniclaw-installer-$$.zip"
 /usr/bin/curl -fL# "$ZIP_URL" -o "$ZIP_TMP"
 
@@ -82,6 +82,7 @@ unzip -q -o "$ZIP_TMP" -d "$EXTRACT_TMP"
 rm -f "$ZIP_TMP"
 
 BUNDLED_WEB="$EXTRACT_TMP/Install MiniClaw.app/Contents/Resources/miniclaw-web"
+BUNDLED_PLUGINS="$EXTRACT_TMP/Install MiniClaw.app/Contents/Resources/plugins-prebuilt"
 if [[ -d "$BUNDLED_WEB" && -f "$BUNDLED_WEB/server.js" ]]; then
   rm -rf "$WEB_DIR"
   mkdir -p "$STATE_DIR"
@@ -90,6 +91,14 @@ else
   echo "  ERROR: Pre-built app not in zip. Try again or use the .app installer."
   rm -rf "$EXTRACT_TMP"
   exit 1
+fi
+
+# Stage pre-built plugins for install.sh to use
+PREBUILT_STAGING="$STATE_DIR/.plugins-prebuilt"
+rm -rf "$PREBUILT_STAGING"
+if [[ -d "$BUNDLED_PLUGINS" ]]; then
+  mv "$BUNDLED_PLUGINS" "$PREBUILT_STAGING"
+  echo "  ✓ Pre-built plugins staged"
 fi
 rm -rf "$EXTRACT_TMP"
 
