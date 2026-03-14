@@ -45,21 +45,7 @@ Imagine having a brilliant friend who knows everything — and they're *always* 
 
 ## Install
 
-### Web installer (recommended)
-
-Visit **[miniclaw.bot/install](https://miniclaw.bot/install)** and follow the instructions.
-
-### Terminal one-liner
-
-Open Terminal (Cmd+Space → type "Terminal" → Enter) and paste:
-
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/augmentedmike/miniclaw-os/main/bootstrap.sh)
-```
-
-Your browser opens automatically when it's ready. The setup wizard walks you through everything — Telegram, GitHub, email, Claude subscription.
-
-**Safe to re-run** — it skips anything already installed.
+Install instructions coming soon. We're actively testing the installer right now.
 
 ---
 
