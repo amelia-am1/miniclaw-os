@@ -150,7 +150,7 @@ cat > "$PLIST" << PLIST
     <key>HOSTNAME</key>
     <string>0.0.0.0</string>
     <key>PATH</key>
-    <string>$(dirname "$NODE_BIN"):/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <string>$HOME/.local/bin:$(dirname "$NODE_BIN"):/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$HOME/.bun/bin</string>
     <key>OPENCLAW_STATE_DIR</key>
     <string>$STATE_DIR</string>
     <key>MINICLAW_OS_DIR</key>

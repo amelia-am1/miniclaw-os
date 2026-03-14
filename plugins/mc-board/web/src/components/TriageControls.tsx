@@ -25,6 +25,7 @@ export function TriageControls({
   return (
     <>
       <button
+        data-tour="cron-toggle"
         onClick={handleToggleCron}
         title={cronEnabled ? "Disable scheduler" : "Enable scheduler"}
         style={{
@@ -45,6 +46,7 @@ export function TriageControls({
       </button>
 
       <select
+        data-tour="cron-interval"
         onClick={e => e.stopPropagation()}
         value={cronMinutes}
         onChange={handleMinutesChange}
