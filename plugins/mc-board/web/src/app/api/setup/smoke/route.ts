@@ -21,12 +21,15 @@ export async function GET() {
       };
 
       const home = process.env.HOME || "";
+      const stateDir = process.env.OPENCLAW_STATE_DIR || `${home}/.openclaw`;
       const proc = spawn("bash", ["-lc", "mc-smoke"], {
         env: {
           ...process.env,
           TERM: "dumb",
           NO_COLOR: "1",
           FORCE_COLOR: "0",
+          PATH: `${stateDir}/miniclaw/SYSTEM/bin:${home}/.bun/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${process.env.PATH || ""}`,
+          OPENCLAW_STATE_DIR: stateDir,
         },
         stdio: ["pipe", "pipe", "pipe"],
       });
