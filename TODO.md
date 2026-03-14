@@ -4,13 +4,13 @@
 
 - [x] 1. Publish openclaw 2026.3.10 (mc-* security scan skip + root-alias fix)
 - [x] 2. Fix plugins not loading — removed required fields from mc-designer, mc-substack, mc-trust
-- [ ] 3. Wire LogDisplay component into InstallOverlay + TriageModal
-- [ ] 4. Welcome wizard cron enable — verify jobs get created
+- [x] 3. Wire LogDisplay component into InstallOverlay + TriageModal
+- [ ] 4. Welcome wizard cron enable — needs clean test to verify
 
-## After clean test passes
+## Ready for clean test
 
-- [ ] 5. Verify triage apply works (`openclaw mc-board update`) with plugins loaded
-- [ ] 6. Rebuild release zip + full clean e2e test
+- [ ] 5. Rebuild release zip + full clean e2e test
+- [ ] 6. Verify triage apply works (`openclaw mc-board update`) with plugins loaded
 - [ ] 7. Yank old openclaw npm versions
 
 ## Nice to have
