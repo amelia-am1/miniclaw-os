@@ -1116,6 +1116,52 @@ else
   fail "openclaw not found — cannot install gateway"
 fi
 
+# ── Step 15d: Sync Claude Code credentials to gateway ────────────────────────
+step "Step 15d: Claude auth"
+
+# OpenClaw gateway needs auth-profiles.json to call the Anthropic API.
+# If the user is logged into Claude Code, their OAuth token is in the macOS
+# Keychain under "Claude Code-credentials". Sync it to the gateway's agent dir.
+AGENT_DIR="$STATE_DIR/agents/main/agent"
+AUTH_PROFILES="$AGENT_DIR/auth-profiles.json"
+
+if [[ ! -f "$AUTH_PROFILES" ]]; then
+  # Try reading from macOS Keychain (Claude Code stores creds there)
+  KEYCHAIN_CREDS=$(security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null || true)
+  if [[ -n "$KEYCHAIN_CREDS" ]]; then
+    mkdir -p "$AGENT_DIR"
+    echo "$KEYCHAIN_CREDS" | python3 -c "
+import json, sys, os
+raw = sys.stdin.read().strip()
+creds = json.loads(raw)
+oauth = creds.get('claudeAiOauth', {})
+if not oauth.get('accessToken'):
+    print('  No OAuth token found in keychain')
+    sys.exit(0)
+store = {
+    'version': 1,
+    'profiles': {
+        'claude-cli': {
+            'type': 'oauth',
+            'provider': 'anthropic',
+            'access': oauth['accessToken'],
+            'refresh': oauth.get('refreshToken', ''),
+            'expires': oauth.get('expiresAt', 0),
+        }
+    }
+}
+with open('$AUTH_PROFILES', 'w') as f:
+    json.dump(store, f, indent=2)
+print('  Synced from Claude Code keychain')
+" && ok "Claude credentials synced from Keychain" \
+    || warn "Could not parse Claude Code credentials"
+  else
+    warn "No Claude Code credentials in Keychain — run: openclaw login (or log into Claude Code first)"
+  fi
+else
+  ok "auth-profiles.json already exists"
+fi
+
 # ── Step 16: Import shared KB ─────────────────────────────────────────────────
 step "Step 16: Shared knowledge base"
 
