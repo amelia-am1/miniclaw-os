@@ -63,6 +63,7 @@ function TriageColumnHeader({ column, topCards, onOpenTriage, onOpenWork }: Tria
 
   return (
     <TriageControls
+      column={column}
       {...triage}
       maxConcurrent={maxConcurrent}
       onMaxConcurrentChange={handleMaxChange}

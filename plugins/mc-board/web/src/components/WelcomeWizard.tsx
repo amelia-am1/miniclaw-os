@@ -21,10 +21,25 @@ const STEPS: Step[] = [
     body: "New cards land here. A card can be a task, a feature, a research query — anything you want me to work on. During each heartbeat cycle, I'll look at the backlog, sort by importance, and pick up cards to process. For each one, I'll do the research, pre-planning, and create simple acceptance criteria so we both know when it's done.",
   },
   {
-    title: "Backlog Controls",
-    target: "backlog",
-    body: "The on/off button enables the automatic backlog scheduler. The timer (5m, 10m, etc.) sets how often I check for new cards. The Triage button runs a manual triage right now. Let's turn it on.",
+    title: "On / Off",
+    target: "backlog-toggle",
+    body: "This turns the automatic backlog scheduler on or off. When it's on, I'll automatically check for new cards on a timer. Let's turn it on.",
     action: "enable-backlog",
+  },
+  {
+    title: "Heartbeat Interval",
+    target: "backlog-interval",
+    body: "This controls how often I check the backlog — every 1, 5, 10, 15, 30, or 60 minutes. 5 minutes is a good default.",
+  },
+  {
+    title: "Max Concurrent",
+    target: "backlog-max",
+    body: "How many cards I'll work on at the same time during each heartbeat. Start with 3 — you can adjust later.",
+  },
+  {
+    title: "Triage Button",
+    target: "backlog-triage",
+    body: "Click this to manually run a triage right now — I'll review the backlog, prioritize cards, and fill in details. You don't need to click this if the scheduler is on.",
   },
   {
     title: "In Progress",
@@ -32,10 +47,15 @@ const STEPS: Step[] = [
     body: "Once a card has been fully planned and all the data is filled in, it moves here. This is where I do the actual work — writing the document, building the feature, completing the research, whatever the card calls for. When the acceptance criteria are met, the card gets picked up and moved to review.",
   },
   {
-    title: "In Progress Controls",
-    target: "in-progress",
-    body: "Same controls — on/off for the automatic worker, heartbeat timer, and a Work button to manually process cards. I pick up cards and do one unit of work per cycle. Let's turn it on.",
+    title: "In Progress: On / Off",
+    target: "in-progress-toggle",
+    body: "Same idea — turn this on so I automatically pick up planned cards and do the work. Let's enable it.",
     action: "enable-in-progress",
+  },
+  {
+    title: "Work Button",
+    target: "in-progress-work",
+    body: "Click this to manually kick off work on the top cards right now. Useful when you want immediate results instead of waiting for the next heartbeat.",
   },
   {
     title: "In Review",
@@ -43,10 +63,15 @@ const STEPS: Step[] = [
     body: "I'll review the entire work history, the acceptance criteria, and any relevant standards or practices. If something doesn't pass, the card goes back for additional work. If everything checks out, it moves to Shipped. For software with a git repo, this is where the branch and commit happen.",
   },
   {
-    title: "In Review Controls",
-    target: "in-review",
+    title: "In Review: On / Off",
+    target: "in-review-toggle",
     body: "The review worker verifies completed work and either ships it or sends it back. Let's turn this one on too.",
     action: "enable-in-review",
+  },
+  {
+    title: "Review Work Button",
+    target: "in-review-work",
+    body: "Click this to manually review and verify cards right now. It checks acceptance criteria and either ships or sends back.",
   },
   {
     title: "Shipped",

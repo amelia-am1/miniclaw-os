@@ -3,6 +3,7 @@
 import type { TriageColumnState } from "@/hooks/useTriageColumn";
 
 interface Props extends TriageColumnState {
+  column?: string;
   onOpenTriage: () => void;
   onOpenWork?: () => void;
   hasWorkCards?: boolean;
@@ -14,18 +15,20 @@ interface Props extends TriageColumnState {
 }
 
 export function TriageControls({
+  column,
   cronEnabled, cronMinutes, cronLoaded,
   handleToggleCron, handleMinutesChange,
   onOpenTriage, onOpenWork, hasWorkCards, hasTriageCards, launching,
   maxConcurrent, onMaxConcurrentChange,
   showTriageButton = true,
 }: Props) {
+  const t = (id: string) => column ? `${column}-${id}` : undefined;
   if (!cronLoaded) return null;
 
   return (
     <>
       <button
-        data-tour="cron-toggle"
+        data-tour={t("toggle")}
         onClick={handleToggleCron}
         title={cronEnabled ? "Disable scheduler" : "Enable scheduler"}
         style={{
@@ -46,7 +49,7 @@ export function TriageControls({
       </button>
 
       <select
-        data-tour="cron-interval"
+        data-tour={t("interval")}
         onClick={e => e.stopPropagation()}
         value={cronMinutes}
         onChange={handleMinutesChange}
@@ -63,6 +66,7 @@ export function TriageControls({
       </select>
 
       <select
+        data-tour={t("max")}
         onClick={e => e.stopPropagation()}
         value={maxConcurrent}
         onChange={e => onMaxConcurrentChange(parseInt(e.target.value, 10))}
@@ -81,6 +85,7 @@ export function TriageControls({
 
       {showTriageButton && (
         <button
+          data-tour={t("triage")}
           onClick={e => { e.stopPropagation(); if (hasTriageCards) onOpenTriage(); }}
           disabled={!hasTriageCards}
           title={hasTriageCards ? "Triage backlog cards" : "No cards to triage"}
@@ -93,6 +98,7 @@ export function TriageControls({
 
       {onOpenWork && (
         <button
+          data-tour={t("work")}
           onClick={e => { e.stopPropagation(); if (hasWorkCards) onOpenWork(); }}
           disabled={launching || !hasWorkCards}
           title={hasWorkCards ? `Work top ${maxConcurrent} card${maxConcurrent === 1 ? "" : "s"}` : "No cards to work"}
