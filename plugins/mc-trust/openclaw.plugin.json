@@ -11,6 +11,6 @@
       "vaultBin":   { "type": "string", "description": "Path to vault CLI binary" },
       "sessionTtlMs": { "type": "number", "description": "Session TTL in ms after handshake (default 3600000)" }
     },
-    "required": ["agentId"]
+    "required": []
   }
 }

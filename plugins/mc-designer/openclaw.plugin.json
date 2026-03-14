@@ -12,6 +12,6 @@
       "defaultWidth":   { "type": "number" },
       "defaultHeight":  { "type": "number" }
     },
-    "required": ["apiKey"]
+    "required": []
   }
 }
