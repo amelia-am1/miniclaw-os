@@ -99,7 +99,10 @@ rm -f "$STATE_DIR/USER/setup-state.json"
 
 # ── Rebuild native modules for this machine's Node version ────────────────────
 echo "  Preparing native modules..."
-(cd "$WEB_DIR" && npm rebuild better-sqlite3 --silent >>"$LOG_FILE" 2>&1) || true
+SQLITE_DIR=$(find "$WEB_DIR/.next/node_modules" -name "better-sqlite3-*" -type d 2>/dev/null | head -1)
+if [[ -n "$SQLITE_DIR" && -f "$SQLITE_DIR/package.json" ]]; then
+  (cd "$SQLITE_DIR" && PATH="$(dirname "$NODE_BIN"):/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH" npm install --ignore-scripts=false >>"$LOG_FILE" 2>&1) || true
+fi
 
 # ── Kill existing on port (force — stale processes hold the old code in memory) ─
 launchctl unload "$HOME/Library/LaunchAgents/com.miniclaw.board-web.plist" 2>/dev/null || true
