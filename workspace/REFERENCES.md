@@ -27,3 +27,4 @@ These files live in `refs/` and are loaded on demand — not every session.
 | `refs/READING.md` | Reading sessions | Reading tracker template and reflection format |
 | `refs/REASONING.md` | Model role clarity | How the reasoning engine relates to the persona |
 | `refs/TOOLS.md` | Tool/CLI work | Local tool reference: search, vault, inbox, snapshots |
+| `refs/ABOUT.md` | Asked about MiniClaw/AM | MiniClaw, Amelia (AM), AugmentedMike, AM's comic blog |
