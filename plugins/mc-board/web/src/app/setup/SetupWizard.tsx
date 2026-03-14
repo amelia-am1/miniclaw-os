@@ -53,21 +53,34 @@ export default function SetupWizard() {
   const router = useRouter();
   const pathname = usePathname();
   const [step, setStepState] = useState<Step>(() => stepFromPath(pathname));
-  const [state, setState] = useState<WizardState>({
-    assistantName: "",
-    shortName: "",
-    pronouns: "she/her",
-    accentColor: "#00E5CC",
-    personaBlurb: "",
-    anthropicToken: "",
-    emailAddress: "",
-    appPassword: "",
-    geminiKey: "",
-    ghToken: "",
-    telegramBotUsername: "",
-    telegramBotToken: "",
-    telegramChatId: "",
+  const [state, setState] = useState<WizardState>(() => {
+    const defaults: WizardState = {
+      assistantName: "",
+      shortName: "",
+      pronouns: "she/her",
+      accentColor: "#00E5CC",
+      personaBlurb: "",
+      anthropicToken: "",
+      emailAddress: "",
+      appPassword: "",
+      geminiKey: "",
+      ghToken: "",
+      telegramBotUsername: "",
+      telegramBotToken: "",
+      telegramChatId: "",
+    };
+    if (typeof window === "undefined") return defaults;
+    try {
+      const saved = sessionStorage.getItem("mc-wizard-state");
+      if (saved) return { ...defaults, ...JSON.parse(saved) };
+    } catch {}
+    return defaults;
   });
+
+  // Persist wizard state to sessionStorage on every change
+  useEffect(() => {
+    try { sessionStorage.setItem("mc-wizard-state", JSON.stringify(state)); } catch {}
+  }, [state]);
 
   // Sync step from URL on pathname change
   useEffect(() => {
