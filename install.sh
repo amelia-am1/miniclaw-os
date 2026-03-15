@@ -280,17 +280,18 @@ brew_install python@3 python3
 brew_install jq
 brew_install age
 
-# Git Butler (required for isolated per-card virtual branches)
-GITBUTLER_BIN="/Applications/GitButler.app/Contents/MacOS/gitbutler-tauri"
-if [[ -x "$GITBUTLER_BIN" ]]; then
-  ok "Git Butler already installed"
+# Tailscale (required for remote access, mc-human VNC sessions, and board card links)
+if command -v tailscale &>/dev/null && pgrep -x tailscaled &>/dev/null 2>&1; then
+  ok "Tailscale already installed and running"
+elif [[ -d "/Applications/Tailscale.app" ]]; then
+  ok "Tailscale.app already installed"
 elif [[ "$CHECK_ONLY" == true ]]; then
-  fail "Git Butler not found ($GITBUTLER_BIN)"
+  warn "Tailscale not found — remote access and mc-human will not work"
 else
-  info "Installing Git Butler..."
-  run_quiet brew install --cask gitbutler \
-    && ok "Git Butler installed" \
-    || warn "Git Butler install failed — download from https://gitbutler.com"
+  info "Installing Tailscale..."
+  run_quiet brew install --cask tailscale \
+    && ok "Tailscale installed" \
+    || warn "Tailscale install failed — download from https://tailscale.com/download/mac"
 fi
 
 # ── Step 3: Claude Code ──────────────────────────────────────────────────────
@@ -1381,6 +1382,60 @@ print('  Synced from Claude Code keychain')
   fi
 else
   ok "auth-profiles.json already exists"
+fi
+
+# ── Step 15d2: Tailscale login ───────────────────────────────────────────────
+step "Step 15d2: Tailscale remote access"
+
+# Tailscale enables: mc-human VNC sessions, board card deep links from phone,
+# and remote access to the agent from outside the local network.
+TAILSCALE_BIN="$(command -v tailscale 2>/dev/null || echo '')"
+TAILSCALE_APP="/Applications/Tailscale.app"
+
+if [[ -d "$TAILSCALE_APP" ]]; then
+  # Open the Tailscale app so the daemon starts
+  open -a Tailscale 2>/dev/null || true
+  sleep 2
+  # Check if already logged in
+  if "$TAILSCALE_BIN" status 2>/dev/null | grep -q "Logged in"; then
+    ok "Tailscale is connected"
+  else
+    info "Tailscale installed — please log in via the Tailscale menu bar icon, then press Enter"
+    read -r -p "    Press Enter after logging into Tailscale... " || true
+    if "$TAILSCALE_BIN" status 2>/dev/null | grep -q "Logged in\|[0-9]\{1,3\}\.[0-9]"; then
+      ok "Tailscale connected"
+    else
+      warn "Tailscale not yet connected — run 'tailscale up' and log in after install"
+    fi
+  fi
+elif [[ -n "$TAILSCALE_BIN" ]]; then
+  warn "Tailscale CLI found but Tailscale.app not installed — install from https://tailscale.com/download/mac for full functionality"
+else
+  warn "Tailscale not installed — install from https://tailscale.com/download/mac (needed for remote access and mc-human)"
+fi
+
+# ── Step 15d3: macOS power settings (always-on) ──────────────────────────────
+step "Step 15d3: Always-on power settings"
+
+# For Mac mini / desktop use: prevent disk sleep and enable auto-restart after power failure.
+# These settings ensure the agent stays available 24/7.
+MACHINE_MODEL=$(sysctl -n hw.model 2>/dev/null || echo "")
+if [[ "$MACHINE_MODEL" == *"Mac"* ]] || [[ "$MACHINE_MODEL" == *"mini"* ]]; then
+  CURRENT_DISKSLEEP=$(pmset -g | grep disksleep | awk '{print $2}')
+  CURRENT_AUTORESTART=$(pmset -g | grep autorestart | awk '{print $2}')
+
+  if [[ "$CURRENT_DISKSLEEP" == "0" && "$CURRENT_AUTORESTART" == "1" ]]; then
+    ok "Power settings already configured (disksleep=0, autorestart=1)"
+  else
+    info "Configuring always-on power settings (requires sudo)..."
+    if sudo pmset -a disksleep 0 autorestart 1 2>/dev/null; then
+      ok "Power settings: disksleep=0, autorestart=1 (agent will restart after power failure)"
+    else
+      warn "Could not set power settings — run manually: sudo pmset -a disksleep 0 autorestart 1"
+    fi
+  fi
+else
+  ok "Laptop/portable detected — skipping always-on power settings"
 fi
 
 # ── Step 15e: Personalize workspace from setup wizard ────────────────────────
