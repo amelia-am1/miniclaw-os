@@ -22,17 +22,13 @@ All git and GitHub operations use `gh` CLI and standard git commands under the h
 
 ---
 
-## Runtime: Node.js Only — No Bun
+## Coding Standards
 
-MiniClaw is a **Node.js-only** project. Do not use Bun, `bun:*` imports, `Bun.serve()`, `Bun.file()`, `bun:sqlite`, `bun:test`, or any Bun-specific APIs. All contributions must use:
+All contributions must follow the project's [Coding Axioms](../CODING_AXIOMS.md) — language-independent principles rooted in functional programming, composition, and clarity. Read them before contributing.
 
-- `better-sqlite3` for SQLite (not `bun:sqlite`)
-- `vitest` for tests (not `bun:test`)
-- `node:fs`, `node:path`, `node:child_process` for system APIs
-- `npm install -g` for global packages (not `bun install -g`)
-- `npx tsx` for running TypeScript (not `bun`)
+Key points: fail loudly, don't over-engineer, declarative over imperative, side effects at the edges, delete don't deprecate, tests prove behavior not coverage.
 
-PRs containing Bun references will be rejected. The ESLint config enforces `no-restricted-imports` for `bun:*` in TypeScript files. Shell scripts are manually reviewed.
+**Runtime: Node.js only.** No Bun. No `bun:*` imports, no `Bun.serve()`, no `bun:sqlite`, no `bun:test`. Use `better-sqlite3`, `vitest`, `node:fs`, `npm install -g`, `npx tsx`. The ESLint config enforces this in TypeScript. PRs with Bun references will be rejected.
 
 ---
 
