@@ -1,23 +1,19 @@
 # MiniClaw TODO
 
-## Failing tests
+## Tests
 
-- [ ] mc-authenticator — vitest config can't load (missing shared deps)
-- [ ] mc-booking — vitest config can't load
-- [ ] mc-context — vitest config can't load
-- [ ] mc-designer — vitest config can't load
-- [ ] mc-docs — vitest config can't load
-- [ ] mc-square — vitest config can't load
-- [ ] mc-stripe — vitest config can't load
-- [ ] mc-trust — vitest config can't load
-- [ ] mc-email — 1 failing, 1 passing
-- [ ] mc-kb — 2 failing
-- [ ] mc-reddit — 2 failing
-- [ ] mc-seo — 1 failing, 1 passing
-- [ ] mc-voice — 2 failing
+- [x] All 26 plugin test suites passing (568 tests)
+- [ ] Write core/shared library tests (no tests exist yet)
+- [ ] Improve coverage — many plugins have only smoke tests (2 tests)
+- [ ] GitHub Action: run tests on release, add pass/fail badge to README
 
-## Clean test
+## Chat (next release)
 
-- [ ] Full clean e2e test on fresh machine
-- [ ] Verify triage apply works (`openclaw mc-board update`) with plugins loaded
-- [ ] GitHub Action for tests on release + badge
+- [ ] Chat daemon — persistent Claude Code session over Unix socket
+- [ ] Chat UI in board — connect to daemon, stream responses
+- [ ] node-pty broken on Node 24 — need alternative PTY approach
+
+## Clean install test
+
+- [ ] Full clean e2e test on fresh machine with latest release
+- [ ] Verify agent runs are tracked for all card processing paths
