@@ -290,6 +290,14 @@ function spawnFullAgent(row, card, project) {
     "",
     "You are a full autonomous agent. Use tools freely to do the actual work.",
     "Update the card via: openclaw mc-board update / move / release",
+    "",
+    "## Available CLI tools (use via Bash)",
+    "- `openclaw mc-board` — board management (create, update, move, show, board)",
+    "- `openclaw mc-rolodex` — contact management (add, search, list, update, remove)",
+    "- `openclaw mc-kb` — knowledge base (search, add, update, get)",
+    "- `openclaw mc-email` — email (send, inbox, triage)",
+    "- `openclaw mc-vault` — secrets (get, set, list)",
+    "- `openclaw mc-backup` — backups (now, list, restore)",
     `Log progress to: ${path.join(STATE_DIR, "logs", "cards", row.card_id + ".log")}`,
   ].filter(Boolean).join("\n"));
 
