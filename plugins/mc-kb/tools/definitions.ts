@@ -115,7 +115,11 @@ export function createKbTools(
         summary?: string; tags?: string; source?: string; severity?: string;
       }) => {
         const start = Date.now();
-        logger.debug(`mc-kb/tool kb_add: type=${input.type} title="${input.title}"`);
+        // Defensive defaults — the LLM sometimes omits required fields
+        const type = input.type || "fact";
+        const title = input.title || "Untitled";
+        const content = input.content || "";
+        logger.debug(`mc-kb/tool kb_add: type=${type} title="${title}"`);
         try {
           const tags = input.tags
             ? input.tags.split(",").map((t) => t.trim()).filter(Boolean)
@@ -124,16 +128,16 @@ export function createKbTools(
           // Generate embedding if embedder is ready (null = not ready, falls back to FTS-only)
           let vector: Float32Array | undefined;
           try {
-            const v = await embedder.embed(`${input.title}\n${input.summary ?? ""}\n${input.content.slice(0, 512)}`);
+            const v = await embedder.embed(`${title}\n${input.summary ?? ""}\n${content.slice(0, 512)}`);
             vector = v ?? undefined;
           } catch (e) {
             logger.warn(`mc-kb/tool kb_add: embedding failed (FTS-only fallback): ${e}`);
           }
 
           const entry = store.add({
-            type: input.type as Parameters<typeof store.add>[0]["type"],
-            title: input.title,
-            content: input.content,
+            type: type as Parameters<typeof store.add>[0]["type"],
+            title: title,
+            content: content,
             summary: input.summary,
             tags,
             source: input.source ?? "agent",
