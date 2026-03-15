@@ -28,7 +28,7 @@ const OPENCLAW_BIN  = process.env.OPENCLAW_BIN ?? "openclaw";
 const POLL_MS       = parseInt(process.env.AGENT_RUNNER_POLL_MS ?? "5000", 10);
 const TICK_MS       = parseInt(process.env.AGENT_RUNNER_TICK_MS ?? "60000", 10);
 const BOARD_PORT    = process.env.BOARD_PORT ?? "4220";
-const JOBS_FILE     = process.env.BOARD_CRON_JOBS ?? path.join(STATE_DIR, "cron", "jobs.json");
+const JOBS_FILE     = process.env.BOARD_CRON_JOBS ?? path.join(STATE_DIR, "USER", "brain", "board-cron.json");
 
 // Read MAX_CONCURRENT dynamically from jobs.json (max across all board-*-triage jobs).
 // Falls back to AGENT_RUNNER_MAX_CONCURRENT env var, then 3.

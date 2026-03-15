@@ -1144,6 +1144,21 @@ else
   warn "seed.sql not found — no starter data"
 fi
 
+# Seed board cron config — separate from gateway's cron/jobs.json so it doesn't get overwritten
+BOARD_CRON="$BOARD_DB_DIR/board-cron.json"
+if [[ ! -f "$BOARD_CRON" ]]; then
+  cat > "$BOARD_CRON" << 'CRONSEED'
+{
+  "board-backlog-triage": { "name": "Backlog Triage", "schedule": "*/5 * * * *", "enabled": true, "maxConcurrent": 3 },
+  "board-in-progress-triage": { "name": "In Progress Triage", "schedule": "*/5 * * * *", "enabled": true, "maxConcurrent": 3 },
+  "board-in-review-triage": { "name": "In Review Triage", "schedule": "*/5 * * * *", "enabled": true, "maxConcurrent": 3 }
+}
+CRONSEED
+  ok "Board cron config seeded"
+else
+  ok "Board cron config already exists"
+fi
+
 # Copy default triage/work prompts to USER brain (editable by user/agent)
 PROMPTS_DEFAULTS="$REPO_DIR/plugins/mc-board/prompts/defaults"
 PROMPTS_USER="$STATE_DIR/USER/brain/prompts"

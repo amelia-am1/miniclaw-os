@@ -18,11 +18,27 @@ interface Props {
 }
 
 export function ChatPanel({ open, onClose, pendingContext, onContextConsumed, projectId, activeCardId }: Props) {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(() => {
+    if (typeof window === "undefined") return [];
+    try { return JSON.parse(localStorage.getItem("mc-chat-messages") || "[]"); } catch { return []; }
+  });
   const [draft, setDraft] = useState("");
   const [context, setContext] = useState<string | null>(null);
   const [streaming, setStreaming] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem("mc-chat-session") || null;
+  });
+  const [visibleCount, setVisibleCount] = useState(10); // show last N messages
+
+  // Persist messages and session to localStorage
+  useEffect(() => {
+    try { localStorage.setItem("mc-chat-messages", JSON.stringify(messages)); } catch {}
+  }, [messages]);
+  useEffect(() => {
+    if (sessionId) localStorage.setItem("mc-chat-session", sessionId);
+    else localStorage.removeItem("mc-chat-session");
+  }, [sessionId]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -56,6 +72,7 @@ export function ChatPanel({ open, onClose, pendingContext, onContextConsumed, pr
       }
       setMessages([]);
       setSessionId(null);
+      setVisibleCount(10);
       setDraft("");
       return;
     }
@@ -244,7 +261,19 @@ export function ChatPanel({ open, onClose, pendingContext, onContextConsumed, pr
                 Right-click any card, section, or attachment<br />to inject context here.
               </div>
             )}
-            {messages.map((msg, i) => (
+            {messages.length > visibleCount && (
+              <button
+                onClick={() => setVisibleCount(v => v + 10)}
+                style={{
+                  background: "none", border: "1px solid #27272a", borderRadius: 6,
+                  color: "#52525b", fontSize: 11, padding: "4px 12px", cursor: "pointer",
+                  alignSelf: "center", fontFamily: "inherit",
+                }}
+              >
+                Show older ({messages.length - visibleCount} more)
+              </button>
+            )}
+            {messages.slice(-visibleCount).map((msg, i) => (
               <div key={i} style={{
                 display: "flex",
                 flexDirection: "column",
