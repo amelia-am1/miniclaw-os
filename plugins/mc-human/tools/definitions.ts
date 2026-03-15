@@ -98,8 +98,14 @@ export function createHumanTools(cfg: HumanConfig, logger: Logger): AnyAgentTool
             throw new Error(`session create failed: ${createRes.status}`);
           }
           const data = await createRes.json() as { ok: boolean; url: string; token: string };
-          sessionUrl = data.url;
           sessionToken = data.token;
+          // If publicUrl is configured, rewrite the sidecar's LAN URL to use it
+          if (cfg.publicUrl) {
+            const base = cfg.publicUrl.replace(/\/+$/, "");
+            sessionUrl = `${base}/?token=${encodeURIComponent(sessionToken)}`;
+          } else {
+            sessionUrl = data.url;
+          }
         } catch (err) {
           throw new Error(`mc-human: failed to create session: ${err}`);
         }
