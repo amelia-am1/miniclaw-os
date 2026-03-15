@@ -9,9 +9,39 @@ import { ChatPanel } from "./chat-panel";
 import { WelcomeWizard, useWelcomeWizard } from "./welcome-wizard";
 import { Project, BoardCard } from "@/lib/types";
 
+import useSWR from "swr";
+
 type Tab = "board" | "memory" | "rolodex" | "settings";
 interface Toast { id: number; icon: string; title: string; sub?: string; exiting?: boolean; }
 interface Counts { backlog: number; inProgress: number; inReview: number; shipped: number; }
+
+const fetcher = (url: string) => fetch(url).then(r => r.json());
+
+function fmtK(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+  return String(n);
+}
+
+function DailyStats() {
+  const { data } = useSWR<{
+    total_runs: number; total_tokens: number; total_cost_usd: number;
+    subscription_cost_usd: number; plan: string; multiplier: number;
+  }>("/api/stats/runs", fetcher, { refreshInterval: 30000 });
+
+  if (!data || data.total_runs === 0) return null;
+
+  return (
+    <>
+      <span className="stat-pill" title={`${data.total_tokens.toLocaleString()} tokens today`}>
+        tokens<b>{fmtK(data.total_tokens)}</b>
+      </span>
+      <span className="stat-pill" title={`${data.plan} — API: $${data.total_cost_usd.toFixed(2)}`} style={{ color: "#4ade80" }}>
+        cost<b>${data.subscription_cost_usd.toFixed(2)}</b>
+      </span>
+    </>
+  );
+}
 
 const TAB_PATHS: Record<Tab, string> = { board: "/board", memory: "/memory", rolodex: "/rolodex", settings: "/settings" };
 
@@ -230,6 +260,7 @@ export function AppShell({ initialTab, initialCardId, initialProjectId }: { init
             <span className="stat-pill">in&nbsp;progress<b>{counts.inProgress}</b></span>
             <span className="stat-pill">in&nbsp;review<b>{counts.inReview}</b></span>
             <span className="stat-pill">shipped<b>{counts.shipped}</b></span>
+            <DailyStats />
           </div>
         )}
 
