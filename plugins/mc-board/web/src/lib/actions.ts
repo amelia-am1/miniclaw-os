@@ -24,10 +24,24 @@ export function pickupCard(id: string, worker: string): string {
 
 export function releaseCard(id: string, worker: string): string {
   const now = new Date().toISOString();
-  const card = db().prepare("SELECT project_id, title, col FROM active_work WHERE card_id = ?").get(id) as { project_id: string | null; title: string; col: string } | undefined;
+  const active = db().prepare("SELECT project_id, title, col, picked_up_at FROM active_work WHERE card_id = ?").get(id) as { project_id: string | null; title: string; col: string; picked_up_at: string } | undefined;
   db().prepare("DELETE FROM active_work WHERE card_id = ?").run(id);
-  if (card) {
-    db().prepare("INSERT INTO pickup_log (card_id, project_id, title, worker, col, action, at) VALUES (?, ?, ?, ?, ?, ?, ?)").run(id, card.project_id, card.title, worker, card.col, "release", now);
+  if (active) {
+    db().prepare("INSERT INTO pickup_log (card_id, project_id, title, worker, col, action, at) VALUES (?, ?, ?, ?, ?, ?, ?)").run(id, active.project_id, active.title, worker, active.col, "release", now);
+
+    // Record agent_run if the runner didn't already write one for this pickup
+    const startedAt = active.picked_up_at;
+    const durationMs = new Date(now).getTime() - new Date(startedAt).getTime();
+    const runId = `${startedAt.replace(/[:.]/g, "-").slice(0, 19)}-${id}`;
+    const existing = db().prepare("SELECT id FROM agent_runs WHERE id = ?").get(runId);
+    if (!existing) {
+      try {
+        db().prepare(
+          `INSERT INTO agent_runs (id, card_id, column, started_at, ended_at, duration_ms, exit_code, tool_call_count, tool_calls, log_file, debug_log_file)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).run(runId, id, active.col, startedAt, now, durationMs, 0, 0, "[]", "", "");
+      } catch {}
+    }
   }
   return `Released ${id}`;
 }
