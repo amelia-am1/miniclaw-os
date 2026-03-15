@@ -1414,30 +1414,6 @@ else
   warn "Tailscale not installed — install from https://tailscale.com/download/mac (needed for remote access and mc-human)"
 fi
 
-# ── Step 15d3: macOS power settings (always-on) ──────────────────────────────
-step "Step 15d3: Always-on power settings"
-
-# For Mac mini / desktop use: prevent disk sleep and enable auto-restart after power failure.
-# These settings ensure the agent stays available 24/7.
-MACHINE_MODEL=$(sysctl -n hw.model 2>/dev/null || echo "")
-if [[ "$MACHINE_MODEL" == *"Mac"* ]] || [[ "$MACHINE_MODEL" == *"mini"* ]]; then
-  CURRENT_DISKSLEEP=$(pmset -g | grep disksleep | awk '{print $2}')
-  CURRENT_AUTORESTART=$(pmset -g | grep autorestart | awk '{print $2}')
-
-  if [[ "$CURRENT_DISKSLEEP" == "0" && "$CURRENT_AUTORESTART" == "1" ]]; then
-    ok "Power settings already configured (disksleep=0, autorestart=1)"
-  else
-    info "Configuring always-on power settings (requires sudo)..."
-    if sudo pmset -a disksleep 0 autorestart 1 2>/dev/null; then
-      ok "Power settings: disksleep=0, autorestart=1 (agent will restart after power failure)"
-    else
-      warn "Could not set power settings — run manually: sudo pmset -a disksleep 0 autorestart 1"
-    fi
-  fi
-else
-  ok "Laptop/portable detected — skipping always-on power settings"
-fi
-
 # ── Step 15e: Personalize workspace from setup wizard ────────────────────────
 step "Step 15e: Agent identity"
 
