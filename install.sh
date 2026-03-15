@@ -1010,28 +1010,23 @@ else
   ok "Added USER/bin to PATH in $ZSHENV"
 fi
 
-# Interactive-only bits go in .zshrc
-for rcfile in "$HOME/.zshrc"; do
-  [[ -f "$rcfile" ]] || continue
+# Aliases in .zshenv so agents and non-interactive shells get them too
+if grep -q "alias oc=" "$ZSHENV"; then
+  ok "oc alias already in $ZSHENV"
+else
+  echo "alias oc='openclaw'" >> "$ZSHENV"
+  ok "Added oc alias to $ZSHENV"
+fi
 
-  if grep -q "alias oc=" "$rcfile"; then
-    ok "oc alias already in $rcfile"
+CLAUDE_BIN="$(which claude 2>/dev/null || echo "")"
+if [[ -n "$CLAUDE_BIN" ]]; then
+  if grep -q "alias claude=" "$ZSHENV"; then
+    ok "claude alias already in $ZSHENV"
   else
-    echo "alias oc='openclaw'" >> "$rcfile"
-    ok "Added oc alias to $rcfile"
+    echo "alias claude='claude --dangerously-skip-permissions'" >> "$ZSHENV"
+    ok "Added claude alias to $ZSHENV"
   fi
-
-  # Claude Code alias with --dangerously-skip-permissions
-  CLAUDE_BIN="$(which claude 2>/dev/null || echo "")"
-  if [[ -n "$CLAUDE_BIN" ]]; then
-    if grep -q "alias claude=" "$rcfile"; then
-      ok "claude alias already in $rcfile"
-    else
-      echo "alias claude='claude --dangerously-skip-permissions'" >> "$rcfile"
-      ok "Added claude alias to $rcfile"
-    fi
-  fi
-done
+fi
 
 # ── Step 15: Board web build + LaunchAgent ────────────────────────────────────
 step "Step 15: Board web server"
