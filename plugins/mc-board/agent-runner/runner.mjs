@@ -26,7 +26,9 @@ const DB_PATH   = process.env.BOARD_DB_PATH ?? path.join(STATE_DIR, "USER", "bra
 const CLAUDE_BIN    = process.env.CLAUDE_BIN ?? "claude";
 const OPENCLAW_BIN  = process.env.OPENCLAW_BIN ?? "openclaw";
 const POLL_MS       = parseInt(process.env.AGENT_RUNNER_POLL_MS ?? "5000", 10);
-const JOBS_FILE     = process.env.BOARD_CRON_JOBS ?? path.join(STATE_DIR, "miniclaw", "cron", "jobs.json");
+const TICK_MS       = parseInt(process.env.AGENT_RUNNER_TICK_MS ?? "60000", 10);
+const BOARD_PORT    = process.env.BOARD_PORT ?? "4220";
+const JOBS_FILE     = process.env.BOARD_CRON_JOBS ?? path.join(STATE_DIR, "cron", "jobs.json");
 
 // Read MAX_CONCURRENT dynamically from jobs.json (max across all board-*-triage jobs).
 // Falls back to AGENT_RUNNER_MAX_CONCURRENT env var, then 3.
@@ -546,6 +548,24 @@ resetStaleRunning();
 
 setInterval(poll, POLL_MS);
 poll(); // immediate first poll
+
+// ---- Tick: periodically call /api/cron/tick to enqueue eligible cards ----
+
+async function tick() {
+  try {
+    const res = await fetch(`http://127.0.0.1:${BOARD_PORT}/api/cron/tick`);
+    if (!res.ok) { log(`tick: HTTP ${res.status}`); return; }
+    const data = await res.json();
+    if (data.fired?.length > 0) log(`tick: enqueued ${data.fired.join(", ")}`);
+    if (data.released?.length > 0) log(`tick: released stale ${data.released.join(", ")}`);
+    if (data.reactivelyFired?.length > 0) log(`tick: reactive ${data.reactivelyFired.join(", ")}`);
+  } catch (err) {
+    // Board web server may not be up — non-fatal
+  }
+}
+
+setInterval(tick, TICK_MS);
+tick(); // immediate first tick
 
 // Graceful shutdown
 process.on("SIGTERM", () => { log("SIGTERM — shutting down"); process.exit(0); });

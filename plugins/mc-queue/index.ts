@@ -58,6 +58,8 @@ const SOUL_CONTEXT = [
   .filter(Boolean)
   .join("\n\n");
 
+const TELEGRAM_INSTRUCTIONS = readWorkspaceFile("refs/telegram.md");
+
 // ---- Session classifier ----
 
 function isMessagingSession(sessionKey?: string): boolean {
@@ -273,24 +275,11 @@ export default function register(api: OpenClawPluginApi) {
       ? `[WHO YOU ARE]\n${SOUL_CONTEXT}\n\n`
       : "";
 
+    const telegramInstructions = TELEGRAM_INSTRUCTIONS
+      || "You are a helpful assistant handling Telegram messages. Be direct, concise, and honest.";
+
     return {
-      prependContext: `${soulSection}[QUEUE TRIAGE — mc-queue plugin]
-You are handling an incoming message from your human. Classify it, then respond naturally. Do not announce the classification.
-
-IMMEDIATE — answerable from conversation history or general knowledge, no tools needed:
-→ Just answer. No preamble.
-
-QUICK LOOKUP — needs memory/KB search or a simple single-tool check:
-→ Say something natural first ("Let me think..." or "One sec...")
-→ Do ONE tool call to look it up
-→ Reply with what you found ("Ok, found it — ...")
-
-TASK — research, building, writing, deploying, anything multi-step:
-→ Use brain_create_card to create a HIGH priority board card with the full task context
-→ Acknowledge naturally ("Ok, let me put that on the board and queue it" or similar)
-→ Stop. Don't do the work here. The cron workers pick it up within 5 minutes.
-
-You are running as Haiku — fast, responsive. Long work goes to cron. Your job is to be quick and human.`,
+      prependContext: `${soulSection}[TELEGRAM — mc-queue plugin]\n${telegramInstructions}`,
     };
   });
 

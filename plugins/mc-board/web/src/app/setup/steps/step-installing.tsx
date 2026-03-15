@@ -23,7 +23,7 @@ export default function StepInstalling({ onNext }: Props) {
     { id: "config", label: "Saving your preferences", status: "pending" },
     { id: "install", label: "Waiting for install to finish", status: "pending" },
     { id: "secrets", label: "Saving your credentials", status: "pending" },
-    { id: "gateway", label: "Starting the gateway", status: "pending" },
+    { id: "gateway", label: ["Configuring Telegram", "Connecting to gateway", "Hacking the matrix", "Coming online"][Math.floor(Math.random() * 4)], status: "pending" },
     { id: "smoke", label: "Running system checks", status: "pending" },
   ]);
 

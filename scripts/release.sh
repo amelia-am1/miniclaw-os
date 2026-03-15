@@ -31,7 +31,12 @@ STABLE=false
 # Read version
 VERSION=$(python3 -c "import json; print(json.load(open('$REPO_DIR/MANIFEST.json'))['version'])")
 TAG="v$VERSION"
-echo "Releasing miniclaw-os $TAG"
+NODE_VER="$(node --version)"
+NODE_MAJOR="$(echo "$NODE_VER" | tr -d 'v' | cut -d. -f1)"
+echo "Releasing miniclaw-os $TAG (Node $NODE_VER)"
+
+# Record the Node version used to build — install.sh will enforce this
+echo "$NODE_MAJOR" > "$REPO_DIR/.node-version"
 
 # 1. Build
 echo "  Building board web..."
@@ -100,6 +105,7 @@ cp "$REPO_DIR/dist/Install MiniClaw.app/Contents/Info.plist" "$APP/Contents/Info
 printf '#!/bin/bash\nexec bash "$(dirname "$0")/../../Resources/bootstrap.sh"\n' > "$APP/Contents/MacOS/install"
 chmod +x "$APP/Contents/MacOS/install"
 cp "$REPO_DIR/bootstrap.sh" "$APP/Contents/Resources/bootstrap.sh"
+cp "$REPO_DIR/.node-version" "$APP/Contents/Resources/.node-version"
 cp -a "$DIST/miniclaw-web" "$APP/Contents/Resources/miniclaw-web"
 cp -a "$PLUGINS_PREBUILT" "$APP/Contents/Resources/plugins-prebuilt"
 

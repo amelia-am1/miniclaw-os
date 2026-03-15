@@ -22,6 +22,7 @@ export function ChatPanel({ open, onClose, pendingContext, onContextConsumed, pr
   const [draft, setDraft] = useState("");
   const [context, setContext] = useState<string | null>(null);
   const [streaming, setStreaming] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -44,6 +45,21 @@ export function ChatPanel({ open, onClose, pendingContext, onContextConsumed, pr
     const text = draft.trim();
     if (!text || streaming) return;
 
+    // Handle /clear — reset session and UI
+    if (text === "/clear") {
+      if (sessionId) {
+        fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: "/clear", sessionId }),
+        }).catch(() => {});
+      }
+      setMessages([]);
+      setSessionId(null);
+      setDraft("");
+      return;
+    }
+
     const userMessage: Message = { role: "user", content: text };
     const capturedContext = context;
 
@@ -63,7 +79,8 @@ export function ChatPanel({ open, onClose, pendingContext, onContextConsumed, pr
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: [...messages, userMessage],
+          message: text,
+          sessionId: sessionId ?? undefined,
           context: capturedContext ?? undefined,
           projectId: projectId ?? undefined,
           activeCardId: activeCardId ?? undefined,
@@ -97,13 +114,35 @@ export function ChatPanel({ open, onClose, pendingContext, onContextConsumed, pr
         for (const part of parts) {
           if (!part.startsWith("data: ")) continue;
           try {
-            const evt = JSON.parse(part.slice(6)) as { type: string; text?: string; message?: string };
-            if (evt.type === "delta" && evt.text) {
+            const evt = JSON.parse(part.slice(6)) as { type: string; text?: string; message?: string; name?: string; detail?: string; sessionId?: string };
+            if (evt.type === "session" && evt.sessionId) {
+              setSessionId(evt.sessionId);
+            } else if (evt.type === "delta" && evt.text) {
               setMessages(prev => {
                 const copy = [...prev];
                 const last = copy[copy.length - 1];
                 if (last.role === "assistant") {
                   copy[copy.length - 1] = { ...last, content: last.content + evt.text };
+                }
+                return copy;
+              });
+            } else if (evt.type === "tool") {
+              const toolLine = `\n> ${evt.name}${evt.detail ? ` ${evt.detail}` : ""}\n`;
+              setMessages(prev => {
+                const copy = [...prev];
+                const last = copy[copy.length - 1];
+                if (last.role === "assistant") {
+                  copy[copy.length - 1] = { ...last, content: last.content + toolLine };
+                }
+                return copy;
+              });
+            } else if (evt.type === "system") {
+              const sysLine = `\n⚠ ${evt.text}\n`;
+              setMessages(prev => {
+                const copy = [...prev];
+                const last = copy[copy.length - 1];
+                if (last.role === "assistant") {
+                  copy[copy.length - 1] = { ...last, content: last.content + sysLine };
                 }
                 return copy;
               });
@@ -130,7 +169,7 @@ export function ChatPanel({ open, onClose, pendingContext, onContextConsumed, pr
       setStreaming(false);
       abortRef.current = null;
     }
-  }, [draft, context, messages, streaming]);
+  }, [draft, context, sessionId, streaming, projectId, activeCardId]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -169,7 +208,7 @@ export function ChatPanel({ open, onClose, pendingContext, onContextConsumed, pr
               <span style={{
                 fontSize: 10, padding: "1px 6px", borderRadius: 3,
                 background: "#1a2a1a", color: "#4ade80", fontWeight: 600,
-              }}>Haiku</span>
+              }}>Claude Code</span>
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               {messages.length > 0 && (

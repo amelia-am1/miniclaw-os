@@ -88,7 +88,7 @@ export default function StepAnthropic({ onNext, onBack }: Props) {
           <p className="text-lg text-[#888]">
             {assistantName} needs a brain to work &mdash; that brain is Claude,
             made by a company called Anthropic. Every time{" "}
-            {assistantName.toLowerCase()} does something for you, it costs a
+            {assistantName} does something for you, it costs a
             tiny bit of processing power.
           </p>
         </div>
@@ -154,7 +154,7 @@ export default function StepAnthropic({ onNext, onBack }: Props) {
             <span className="text-white">flat monthly price</span> &mdash;
             you&apos;ll never get a surprise bill. When your plan&apos;s
             allowance runs out for the month,{" "}
-            {assistantName.toLowerCase()} simply pauses until it resets.
+            {assistantName} simply pauses until it resets.
             And these plans keep getting better &mdash; you get more
             compute for the same price as the technology improves.
           </p>
@@ -188,7 +188,7 @@ export default function StepAnthropic({ onNext, onBack }: Props) {
             Pick your plan
           </h2>
           <p className="text-lg text-[#888]">
-            Choose based on how much you expect {assistantName.toLowerCase()} to
+            Choose based on how much you expect {assistantName} to
             do. You can change your plan anytime on claude.ai.
           </p>
         </div>
@@ -302,7 +302,7 @@ export default function StepAnthropic({ onNext, onBack }: Props) {
         <p className="text-lg text-[#888]">
           Click the button below and sign in to your Claude account in the
           browser window that opens. Once you&apos;re signed in,{" "}
-          {assistantName.toLowerCase()} will be connected automatically.
+          {assistantName} will be connected automatically.
         </p>
       </div>
 

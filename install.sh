@@ -226,23 +226,47 @@ brew_install() {
 # ── Step 2: Core deps ─────────────────────────────────────────────────────────
 step "Step 2: Core dependencies"
 
-# Node.js
-if command -v node &>/dev/null && [[ $(node --version | tr -d 'v' | cut -d. -f1) -ge 18 ]]; then
-  ok "Node.js $(node --version) already installed"
+# Node.js — pin to the major version the release was built with
+REQUIRED_NODE_MAJOR=24
+if [[ -f "$REPO_DIR/.node-version" ]]; then
+  REQUIRED_NODE_MAJOR=$(cat "$REPO_DIR/.node-version" | tr -d '[:space:]')
+fi
+
+if command -v node &>/dev/null; then
+  CURRENT_NODE_MAJOR=$(node --version | tr -d 'v' | cut -d. -f1)
+  if [[ "$CURRENT_NODE_MAJOR" -eq "$REQUIRED_NODE_MAJOR" ]]; then
+    ok "Node.js $(node --version) (matches required v$REQUIRED_NODE_MAJOR)"
+  else
+    warn "Node.js $(node --version) found but release requires v$REQUIRED_NODE_MAJOR — installing..."
+    run_quiet brew install "node@$REQUIRED_NODE_MAJOR"
+    run_quiet brew link --overwrite "node@$REQUIRED_NODE_MAJOR" || true
+    NODE_PATH="$BREW_PREFIX/opt/node@$REQUIRED_NODE_MAJOR/bin"
+    [[ -d "$NODE_PATH" && ":$PATH:" != *":$NODE_PATH:"* ]] && export PATH="$NODE_PATH:$PATH"
+    for p in "$HOME/.zprofile" "$HOME/.zshrc"; do
+      grep -q "node@$REQUIRED_NODE_MAJOR" "$p" 2>/dev/null \
+        || echo "export PATH=\"$BREW_PREFIX/opt/node@$REQUIRED_NODE_MAJOR/bin:\$PATH\"" >> "$p"
+    done
+    ok "Node.js $(node --version) installed"
+  fi
 elif [[ "$CHECK_ONLY" == true ]]; then
-  warn "Node.js 18+ not found"
+  warn "Node.js v$REQUIRED_NODE_MAJOR not found"
 else
-  info "Installing Node.js 22 LTS..."
-  run_quiet brew install node@22
-  run_quiet brew link --overwrite node@22 || true
-  NODE_PATH="$BREW_PREFIX/opt/node@22/bin"
+  info "Installing Node.js $REQUIRED_NODE_MAJOR..."
+  run_quiet brew install "node@$REQUIRED_NODE_MAJOR"
+  run_quiet brew link --overwrite "node@$REQUIRED_NODE_MAJOR" || true
+  NODE_PATH="$BREW_PREFIX/opt/node@$REQUIRED_NODE_MAJOR/bin"
   [[ -d "$NODE_PATH" && ":$PATH:" != *":$NODE_PATH:"* ]] && export PATH="$NODE_PATH:$PATH"
   for p in "$HOME/.zprofile" "$HOME/.zshrc"; do
-    grep -q 'node@22' "$p" 2>/dev/null \
-      || echo "export PATH=\"$BREW_PREFIX/opt/node@22/bin:\$PATH\"" >> "$p"
+    grep -q "node@$REQUIRED_NODE_MAJOR" "$p" 2>/dev/null \
+      || echo "export PATH=\"$BREW_PREFIX/opt/node@$REQUIRED_NODE_MAJOR/bin:\$PATH\"" >> "$p"
   done
   ok "Node.js $(node --version) installed"
 fi
+
+# Pin NODE_BIN for all subsequent operations (rebuilds, plists, etc.)
+NODE_BIN="$(which node)"
+NODE_DIR="$(dirname "$NODE_BIN")"
+NPM_BIN="$NODE_DIR/npm"
 
 brew_install git
 brew_install python@3 python3
@@ -468,12 +492,23 @@ for plugin_dir in "$PLUGINS_DIR"/mc-*/; do
   REGISTERED=$((REGISTERED + 1))
 done
 
-# Rebuild native modules for this machine's Node version
-if [[ -d "$EXTENSIONS_DIR/node_modules/better-sqlite3" ]]; then
-  info "Rebuilding native modules for Node $(node --version)..."
-  (cd "$EXTENSIONS_DIR" && npm rebuild better-sqlite3 2>>"$LOG_FILE") \
-    && ok "better-sqlite3 rebuilt for Node $(node --version)" \
-    || warn "better-sqlite3 rebuild failed — gateway plugins may not load"
+# Rebuild ALL better-sqlite3 native modules for the pinned Node version.
+info "Rebuilding native modules for Node $("$NODE_BIN" --version) (ABI $("$NODE_BIN" -e 'console.log(process.versions.modules)'))..."
+REBUILD_COUNT=0
+while IFS= read -r -d '' bs3_pkg; do
+  bs3_dir="$(dirname "$bs3_pkg")"
+  parent="$(dirname "$(dirname "$bs3_dir")")"
+  rm -rf "$bs3_dir/build" 2>/dev/null
+  if (cd "$parent" && PATH="$NODE_DIR:$PATH" "$NPM_BIN" rebuild better-sqlite3 2>>"$LOG_FILE"); then
+    REBUILD_COUNT=$((REBUILD_COUNT + 1))
+  else
+    warn "better-sqlite3 rebuild failed in $parent"
+  fi
+done < <(find "$EXTENSIONS_DIR" "$MINICLAW_DIR/plugins" -path "*/node_modules/better-sqlite3/package.json" -print0 2>/dev/null)
+if [[ $REBUILD_COUNT -gt 0 ]]; then
+  ok "Rebuilt better-sqlite3 in $REBUILD_COUNT locations"
+else
+  warn "No better-sqlite3 found to rebuild"
 fi
 
 # Clean up pre-built staging
@@ -982,11 +1017,11 @@ cat > "$BOARD_PLIST" << PLIST
   <string>com.miniclaw.board-web</string>
   <key>ProgramArguments</key>
   <array>
-    <string>$(which node || echo /opt/homebrew/bin/node)</string>
-    <string>$STATE_DIR/web/server.js</string>
+    <string>$NODE_BIN</string>
+    <string>$BOARD_WEB_DIR/.next/standalone/server.js</string>
   </array>
   <key>WorkingDirectory</key>
-  <string>$STATE_DIR/web</string>
+  <string>$BOARD_WEB_DIR/.next/standalone</string>
   <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>
@@ -1006,7 +1041,7 @@ cat > "$BOARD_PLIST" << PLIST
     <key>HOSTNAME</key>
     <string>0.0.0.0</string>
     <key>PATH</key>
-    <string>$(dirname "$(which node)"):/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <string>$HOME/.local/bin:$NODE_DIR:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
     <key>OPENCLAW_STATE_DIR</key>
     <string>$STATE_DIR</string>
     <key>NODE_ENV</key>
@@ -1021,6 +1056,65 @@ if [[ "$BOARD_RUNNING" == true ]]; then
 else
   launchctl load "$BOARD_PLIST" 2>/dev/null && ok "Board web LaunchAgent loaded (port 4220)" \
     || warn "LaunchAgent created — run: launchctl load $BOARD_PLIST"
+fi
+
+# ── Step 14a2: Agent runner LaunchAgent ────────────────────────────────────────
+step "Step 14a2: Agent runner daemon"
+
+RUNNER_PLIST="$HOME/Library/LaunchAgents/com.miniclaw.board-agent-runner.plist"
+RUNNER_SCRIPT="$MINICLAW_DIR/plugins/mc-board/agent-runner/runner.mjs"
+
+if [[ -f "$RUNNER_SCRIPT" ]]; then
+  cat > "$RUNNER_PLIST" << RUNNERPLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.miniclaw.board-agent-runner</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>$NODE_BIN</string>
+    <string>$RUNNER_SCRIPT</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key>
+    <string>$HOME</string>
+    <key>PATH</key>
+    <string>$HOME/.local/bin:$NODE_DIR:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>OPENCLAW_STATE_DIR</key>
+    <string>$STATE_DIR</string>
+    <key>OPENCLAW_BIN</key>
+    <string>$(which openclaw || echo /opt/homebrew/bin/openclaw)</string>
+    <key>CLAUDE_BIN</key>
+    <string>$(which claude || echo $HOME/.local/bin/claude)</string>
+    <key>BOARD_DB_PATH</key>
+    <string>$STATE_DIR/USER/brain/board.db</string>
+    <key>AGENT_RUNNER_POLL_MS</key>
+    <string>5000</string>
+    <key>AGENT_RUNNER_MAX_CONCURRENT</key>
+    <string>3</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>$STATE_DIR/logs/agent-runner.stdout.log</string>
+  <key>StandardErrorPath</key>
+  <string>$STATE_DIR/logs/agent-runner.stderr.log</string>
+  <key>WorkingDirectory</key>
+  <string>$(dirname "$RUNNER_SCRIPT")</string>
+</dict>
+</plist>
+RUNNERPLIST
+
+  launchctl unload "$RUNNER_PLIST" 2>/dev/null || true
+  launchctl load "$RUNNER_PLIST" 2>/dev/null && ok "Agent runner LaunchAgent loaded" \
+    || warn "Agent runner plist created — run: launchctl load $RUNNER_PLIST"
+else
+  warn "Agent runner script not found at $RUNNER_SCRIPT — skipping"
 fi
 
 # ── Step 14b: Default board projects ──────────────────────────────────────────
@@ -1092,7 +1186,8 @@ else
 fi
 
 # ── Step 15c: OpenClaw Gateway LaunchAgent ───────────────────────────────────
-step "Step 15c: OpenClaw Gateway"
+GW_LABELS=("Configuring Telegram" "Connecting to gateway" "Hacking the matrix" "Coming online")
+step "Step 15c: ${GW_LABELS[$((RANDOM % ${#GW_LABELS[@]}))]}"
 
 # The gateway is the core process — it runs the telegram bot, cron workers,
 # and agent sessions.  `openclaw gateway install` creates a LaunchAgent plist
@@ -1240,20 +1335,21 @@ replacements = {
     "{{DATE}}": today,
 }
 
-for fname in os.listdir(workspace):
-    if not fname.endswith(".md"):
-        continue
-    fpath = os.path.join(workspace, fname)
-    with open(fpath) as f:
-        content = f.read()
-    changed = False
-    for placeholder, value in replacements.items():
-        if placeholder in content:
-            content = content.replace(placeholder, value)
-            changed = True
-    if changed:
-        with open(fpath, "w") as f:
-            f.write(content)
+for dirpath, _dirs, files in os.walk(workspace):
+    for fname in files:
+        if not fname.endswith(".md"):
+            continue
+        fpath = os.path.join(dirpath, fname)
+        with open(fpath) as f:
+            content = f.read()
+        changed = False
+        for placeholder, value in replacements.items():
+            if placeholder in content:
+                content = content.replace(placeholder, value)
+                changed = True
+        if changed:
+            with open(fpath, "w") as f:
+                f.write(content)
 
 # Update IDENTITY.md — fill in blanks from default template
 identity_path = os.path.join(workspace, "IDENTITY.md")

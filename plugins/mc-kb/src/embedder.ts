@@ -16,7 +16,23 @@ const DEFAULT_MODEL_PATH = path.join(
   ".cache/qmd/models/hf_ggml-org_embeddinggemma-300M-Q8_0.gguf",
 );
 
-const OPENCLAW_LLAMA_PATH = "/opt/homebrew/lib/node_modules/openclaw/node_modules/node-llama-cpp";
+// Resolve node-llama-cpp: own dep first, then openclaw's bundled copy
+function findLlamaPath(): string {
+  try { return path.dirname(require.resolve("node-llama-cpp/package.json")); } catch {}
+  try {
+    const { execSync } = require("node:child_process");
+    const ocBin = fs.realpathSync(execSync("which openclaw", { encoding: "utf-8" }).trim());
+    let dir = path.dirname(ocBin);
+    for (let i = 0; i < 5; i++) {
+      const candidate = path.join(dir, "node_modules", "node-llama-cpp");
+      if (fs.existsSync(candidate)) return candidate;
+      dir = path.dirname(dir);
+    }
+  } catch {}
+  return "node-llama-cpp";
+}
+
+const OPENCLAW_LLAMA_PATH = findLlamaPath();
 
 type LlamaEmbeddingContext = {
   getEmbeddingFor(text: string): Promise<{ vector: number[] }>;
