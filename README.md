@@ -143,7 +143,6 @@ MiniClaw is modular. Each plugin handles one job — and handles it well. You ca
 | Plugin | Description |
 |--------|-------------|
 | **[mc-email](./docs/mc-email.md)** | Gmail integration — IMAP polling, Haiku-based classification, auto-reply |
-| **[mc-voice](./docs/mc-voice.md)** | Style mirroring — learns your writing style from messages across all channels |
 | **[mc-rolodex](./docs/mc-rolodex.md)** | Contact management — search by name, email, domain, or tag with fuzzy matching |
 | **[mc-trust](./docs/mc-trust.md)** | Agent identity & security — cryptographic verification and signed messages |
 | **[mc-human](./docs/mc-human.md)** | Human intervention — delivers noVNC browser session for CAPTCHAs and UI the agent can't automate |

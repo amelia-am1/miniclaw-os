@@ -15,7 +15,7 @@
  *   mc-soul   — character voice and identity
  *   mc-kb     — long-term knowledge for grounded references
  *   mc-memo   — session scratchpad to avoid repeating work
- *   mc-voice  — human's writing style (for mirroring awareness, not copying)
+ *   voiceRulesPath — optional writing style rules file
  */
 
 import * as path from "node:path";

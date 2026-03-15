@@ -25,7 +25,6 @@ Everything your AI can do, plugin by plugin.
 
 ### Communication & Outreach
 - [mc-email](#mc-email--gmail-integration--triage) — Gmail Integration & Triage
-- [mc-voice](#mc-voice--style-mirroring--voice-learning) — Style Mirroring & Voice Learning
 - [mc-rolodex](#mc-rolodex--contact-management) — Contact Management
 - [mc-seo](#mc-seo--seo-automation--rank-tracking) — SEO Automation & Rank Tracking
 
@@ -125,7 +124,7 @@ mc designer batch --template linkedin-banner,youtube-profile --theme "tech-noir"
 ---
 
 ### mc-blog — Persona-Driven Blog Engine
-First-person journal entries and narrative posts written from the agent's own perspective. Post seeds with metadata, arcs, and tags. Auto-generated grounding documents and self-analysis. Integrates with mc-soul, mc-kb, mc-memo, and mc-voice.
+First-person journal entries and narrative posts written from the agent's own perspective. Post seeds with metadata, arcs, and tags. Auto-generated grounding documents and self-analysis. Integrates with mc-soul, mc-kb, and mc-memo.
 
 ```bash
 # Posts stored as:
@@ -172,17 +171,6 @@ Autonomous inbox polling with Haiku-based email classification across 6 categori
 
 ```bash
 mc mc-email auth
-```
-
----
-
-### mc-voice — Style Mirroring & Voice Learning
-Learns a human's writing style from captured messages across all channels. Gemini embeddings for semantic voice analysis. Transparency-first with disclosure on first capture and natural-language opt-out.
-
-```bash
-/voice-on
-/voice-off
-/voice-purge
 ```
 
 ---
@@ -318,4 +306,3 @@ mc docs versions <id>
 | board-worker-backlog | Every 5 min | Triage backlog, select best candidate, fill card details |
 | board-worker-in-progress | Every 5 min | Work on in-progress cards, check acceptance criteria |
 | board-worker-in-review | Every 5 min | Verify and deploy in-review cards |
-| nightly-voice-analyze | Daily 3:17 AM | Analyze voice samples, update style profiles |

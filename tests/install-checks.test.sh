@@ -26,13 +26,7 @@ else
   fail "#41 model missing provider prefix" "should be anthropic/claude-sonnet-4-6"
 fi
 
-# #37: install.sh creates USER/voice/ and USER/brain/
-if grep -q 'USER/voice' "$REPO_DIR/install.sh"; then
-  pass "#37 install.sh creates USER/voice/"
-else
-  fail "#37 USER/voice/ not created in install.sh" "add mkdir -p to step 10"
-fi
-
+# #37: install.sh creates USER/brain/
 if grep -q 'USER/brain' "$REPO_DIR/install.sh"; then
   pass "#37 install.sh creates USER/brain/"
 else
