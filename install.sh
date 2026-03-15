@@ -286,8 +286,22 @@ else
     || warn "Git Butler install failed — download from https://gitbutler.com"
 fi
 
-# ── Step 3: QMD (optional) ────────────────────────────────────────────────────
-step "Step 3: QMD"
+# ── Step 3: Claude Code ──────────────────────────────────────────────────────
+step "Step 3: Claude Code"
+
+if command -v claude &>/dev/null; then
+  ok "Claude Code already installed ($(claude --version 2>/dev/null | head -1))"
+elif [[ "$CHECK_ONLY" == true ]]; then
+  fail "Claude Code not found"
+else
+  info "Installing Claude Code..."
+  run_quiet npm install -g @anthropic-ai/claude-code \
+    && ok "Claude Code installed" \
+    || die "Claude Code install failed — run: npm install -g @anthropic-ai/claude-code"
+fi
+
+# ── Step 4: QMD (optional) ────────────────────────────────────────────────────
+step "Step 4: QMD"
 
 if command -v qmd &>/dev/null; then
   ok "QMD already installed"
@@ -298,8 +312,8 @@ else
     || warn "QMD install failed — run: npm install -g qmd"
 fi
 
-# ── Step 4: OpenClaw (from MiniClaw fork) ─────────────────────────────────────
-step "Step 4: OpenClaw"
+# ── Step 5: OpenClaw (from MiniClaw fork) ─────────────────────────────────────
+step "Step 5: OpenClaw"
 
 # Read pinned openclaw version from MANIFEST.json
 OPENCLAW_NPM_PKG=$(python3 -c "
@@ -386,8 +400,8 @@ fi
 
 [[ "$CHECK_ONLY" == true ]] && { echo -e "\n${GREEN}Check complete.${NC}\n"; exit 0; }
 
-# ── Step 5: Directories ───────────────────────────────────────────────────────
-step "Step 5: Directories"
+# ── Step 6: Directories ───────────────────────────────────────────────────────
+step "Step 6: Directories"
 
 mkdir -p "$MINICLAW_DIR/plugins" "$PROJECTS_DIR"
 ok "~/.openclaw/miniclaw/"
@@ -399,8 +413,8 @@ if [[ -f "$REPO_DIR/MANIFEST.json" ]]; then
   ok "MANIFEST.json (v$(python3 -c "import json; print(json.load(open('$MINICLAW_DIR/MANIFEST.json')).get('version','?'))"))"
 fi
 
-# ── Step 6: Install plugins ───────────────────────────────────────────────────
-step "Step 6: miniclaw plugins"
+# ── Step 7: Install plugins ───────────────────────────────────────────────────
+step "Step 7: miniclaw plugins"
 
 # Migrated plugins: install to $MINICLAW_DIR/<name>/ (standalone CLI)
 MIGRATED_PLUGINS=(vault designer)
@@ -428,8 +442,8 @@ for plugin_src in "$REPO_DIR/plugins"/*/; do
 done
 ok "$PLUGIN_COUNT plugins copied"
 
-# ── Step 7: Install plugins to extensions + patch openclaw.json ──────────────
-step "Step 7: Plugin registration"
+# ── Step 8: Install plugins to extensions + patch openclaw.json ──────────────
+step "Step 8: Plugin registration"
 
 # Clean unknown top-level keys that cause openclaw config validation to fail
 python3 - "$STATE_DIR/openclaw.json" <<'CLEANEOF'
@@ -560,8 +574,8 @@ REGEOF
 
 ok "Registered $REGISTERED plugins (direct install, no openclaw CLI)"
 
-# ── Step 8: CLI tools → SYSTEM/bin ────────────────────────────────────────────
-step "Step 8: CLI tools"
+# ── Step 9: CLI tools → SYSTEM/bin ────────────────────────────────────────────
+step "Step 9: CLI tools"
 
 SYSTEM_BIN="$MINICLAW_DIR/SYSTEM/bin"
 USER_BIN="$STATE_DIR/USER/bin"
@@ -602,8 +616,8 @@ done
 ok "Generated $GENERATED plugin CLI wrappers"
 ok "SYSTEM/bin total: $(ls "$SYSTEM_BIN" | wc -l | tr -d ' ') tools"
 
-# ── Step 9: Directories ───────────────────────────────────────────────────────
-step "Step 9: User directories"
+# ── Step 10: Directories ───────────────────────────────────────────────────────
+step "Step 10: User directories"
 
 USER_MEMORY_DIR="$STATE_DIR/USER/memory"
 SOUL_BACKUPS_DIR="$STATE_DIR/soul-backups"
@@ -614,8 +628,8 @@ ok "~/.openclaw/USER/memory/"
 mkdir -p "$SOUL_BACKUPS_DIR"
 ok "~/.openclaw/soul-backups/"
 
-# ── Step 10: QMD collections ──────────────────────────────────────────────────
-step "Step 10: QMD collections"
+# ── Step 11: QMD collections ──────────────────────────────────────────────────
+step "Step 11: QMD collections"
 
 if command -v qmd &>/dev/null; then
 
@@ -630,8 +644,8 @@ else
   warn "qmd not found — skipping collection setup"
 fi
 
-# ── Step 11: Vault ────────────────────────────────────────────────────────────
-step "Step 11: Vault"
+# ── Step 12: Vault ────────────────────────────────────────────────────────────
+step "Step 12: Vault"
 
 VAULT_ROOT="$MINICLAW_DIR/SYSTEM/vault"
 MC_VAULT="$MINICLAW_DIR/vault/cli"
@@ -647,9 +661,9 @@ fi
 # in the board web setup wizard (port 4220) — not in the terminal installer.
 
 
-# -- Step 15: Migrate data from archived OpenClaw install ------------------
+# -- Step 16: Migrate data from archived OpenClaw install ------------------
 if [[ "$NEEDS_MIGRATION" == true ]]; then
-  step "Step 15: Migrating your OpenClaw data"
+  step "Step 16: Migrating your OpenClaw data"
 
   # Import their openclaw.json settings (model prefs, auth, non-plugin config)
   if [[ -n "$OLD_CONFIG" && -f "$OLD_CONFIG" ]]; then
@@ -808,8 +822,8 @@ REG_PYEOF
 fi
 
 
-# ── Step 12: Cron workers (from MANIFEST.json) ───────────────────────────────
-step "Step 12: Cron workers"
+# ── Step 13: Cron workers (from MANIFEST.json) ───────────────────────────────
+step "Step 13: Cron workers"
 
 # Write cron jobs directly to jobs.json so OpenClaw picks them up on startup.
 # Reads expected crons from MANIFEST.json — no running gateway required.
@@ -928,8 +942,8 @@ if [[ -d "$REPO_DIR/cron/prompts" ]]; then
   ok "Cron prompts copied"
 fi
 
-# ── Step 13: Shell env ────────────────────────────────────────────────────────
-step "Step 13: Shell environment"
+# ── Step 14: Shell env ────────────────────────────────────────────────────────
+step "Step 14: Shell environment"
 
 # Env vars and PATH go in .zshenv so non-interactive shells (cron, agents,
 # IDE terminals) also pick them up.  Aliases stay in .zshrc (interactive only).
@@ -981,8 +995,8 @@ for rcfile in "$HOME/.zshrc"; do
   fi
 done
 
-# ── Step 14: Board web build + LaunchAgent ────────────────────────────────────
-step "Step 14: Board web server"
+# ── Step 15: Board web build + LaunchAgent ────────────────────────────────────
+step "Step 15: Board web server"
 
 BOARD_WEB_DIR="$MINICLAW_DIR/plugins/mc-board/web"
 BOARD_PLIST="$HOME/Library/LaunchAgents/com.miniclaw.board-web.plist"
@@ -1456,8 +1470,8 @@ else
   info "No setup state or workspace — agent will personalize on first conversation"
 fi
 
-# ── Step 16: Import shared KB ─────────────────────────────────────────────────
-step "Step 16: Shared knowledge base"
+# ── Step 17: Import shared KB ─────────────────────────────────────────────────
+step "Step 17: Shared knowledge base"
 
 KB_BUNDLE_URL="https://raw.githubusercontent.com/augmentedmike/miniclaw-os/main/shared/kb/knowledge.json"
 KB_TMP="/tmp/miniclaw-kb-import-$$.json"
