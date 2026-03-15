@@ -555,6 +555,26 @@ else
   fail "claude code not on PATH" "run: npm install -g @anthropic-ai/claude-code"
 fi
 
+# ── power management (macOS) ──────────────────────────────────────────────────
+if [[ "$(uname)" == "Darwin" ]]; then
+  section "power management"
+
+  DISK_SLEEP=$(pmset -g 2>/dev/null | grep disksleep | awk '{print $2}')
+  AUTO_RESTART=$(pmset -g 2>/dev/null | grep autorestart | awk '{print $2}')
+
+  if [[ "$DISK_SLEEP" == "0" ]]; then
+    pass "disksleep = 0 (disk sleep disabled)"
+  else
+    fail "disksleep = ${DISK_SLEEP:-unknown}" "run: sudo pmset -a disksleep 0"
+  fi
+
+  if [[ "$AUTO_RESTART" == "1" ]]; then
+    pass "autorestart = 1 (auto restart after power failure)"
+  else
+    fail "autorestart = ${AUTO_RESTART:-unknown}" "run: sudo pmset -a autorestart 1"
+  fi
+fi
+
 # ── summary ───────────────────────────────────────────────────────────────────
 echo ""
 echo "────────────────────────────────────────"
