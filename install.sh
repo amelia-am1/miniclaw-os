@@ -293,6 +293,21 @@ else
     || warn "Git Butler install failed — download from https://gitbutler.com"
 fi
 
+# ── Step 2b: Power management (macOS) ────────────────────────────────────────
+if [[ "$(uname)" == "Darwin" ]]; then
+  step "Step 2b: Power management (always-on)"
+
+  if [[ "$CHECK_ONLY" == true ]]; then
+    DISK_SLEEP=$(pmset -g 2>/dev/null | grep disksleep | awk '{print $2}')
+    AUTO_RESTART=$(pmset -g 2>/dev/null | grep autorestart | awk '{print $2}')
+    [[ "$DISK_SLEEP" == "0" ]] && ok "disksleep = 0" || warn "disksleep = ${DISK_SLEEP:-unknown}" "should be 0"
+    [[ "$AUTO_RESTART" == "1" ]] && ok "autorestart = 1" || warn "autorestart = ${AUTO_RESTART:-unknown}" "should be 1"
+  else
+    sudo pmset -a disksleep 0 && ok "disksleep set to 0 (disk sleep disabled)" || warn "failed to set disksleep"
+    sudo pmset -a autorestart 1 && ok "autorestart set to 1 (auto restart after power failure)" || warn "failed to set autorestart"
+  fi
+fi
+
 # ── Step 3: Claude Code ──────────────────────────────────────────────────────
 step "Step 3: Claude Code"
 
