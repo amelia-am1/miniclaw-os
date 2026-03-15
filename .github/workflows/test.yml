@@ -1,16 +1,16 @@
 name: Tests
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  release:
+    types: [published]
 
 jobs:
   test:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: stable
 
       - uses: actions/setup-node@v4
         with:
