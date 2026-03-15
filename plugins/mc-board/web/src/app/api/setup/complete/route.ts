@@ -252,6 +252,63 @@ print(f"Personalized: {name} ({pronouns})")
   }
 }
 
+/**
+ * Register cron jobs with the gateway from jobs.json.
+ * The gateway must be running for this to work.
+ */
+function registerCronJobs() {
+  const ocBin = findBin("openclaw");
+  if (!ocBin) return;
+
+  const cronFile = path.join(STATE_DIR, "cron", "jobs.json");
+  if (!fs.existsSync(cronFile)) return;
+
+  try {
+    const store = JSON.parse(fs.readFileSync(cronFile, "utf-8"));
+    const jobs = store.jobs || [];
+
+    // Check what's already registered
+    const listResult = spawnSync(ocBin, ["cron", "list", "--json"], {
+      encoding: "utf-8",
+      timeout: 10_000,
+    });
+    let existingNames = new Set<string>();
+    try {
+      const existing = JSON.parse(listResult.stdout || "[]");
+      existingNames = new Set(existing.map((j: { name?: string }) => j.name));
+    } catch { /* no existing jobs */ }
+
+    for (const job of jobs) {
+      if (existingNames.has(job.name)) continue;
+
+      const args = [
+        "cron", "add",
+        "--name", job.name,
+        "--schedule", job.schedule?.expr || "*/5 * * * *",
+      ];
+
+      if (job.payload?.messageFile) {
+        const promptPath = path.join(STATE_DIR, "cron", job.payload.messageFile);
+        if (fs.existsSync(promptPath)) {
+          args.push("--message-file", promptPath);
+        }
+      }
+
+      const result = spawnSync(ocBin, args, {
+        encoding: "utf-8",
+        timeout: 10_000,
+      });
+      if (result.status === 0) {
+        console.log(`Registered cron: ${job.name}`);
+      } else {
+        console.error(`Failed to register cron ${job.name}:`, result.stderr);
+      }
+    }
+  } catch (e) {
+    console.error("Cron registration failed:", e);
+  }
+}
+
 export async function POST() {
   const setupState = readSetupState();
   const botId = normalizeBotId(setupState.telegramBotUsername);
@@ -274,6 +331,9 @@ export async function POST() {
 
   // Install and start the openclaw gateway
   const gw = ensureGatewayRunning();
+
+  // Register cron jobs with the running gateway
+  registerCronJobs();
 
   // Run mc-smoke to verify everything is healthy
   const smoke = runSmoke();
