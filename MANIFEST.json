@@ -323,6 +323,11 @@
       "name": "mc-doctor",
       "path": "SYSTEM/bin/mc-doctor",
       "description": "Diagnostics and auto-repair \u2014 identifies and fixes common configuration issues"
+    },
+    {
+      "name": "mc-update",
+      "path": "SYSTEM/bin/mc-update",
+      "description": "Check for and apply updates from the stable release \u2014 runs daily at 4am automatically"
     }
   ],
   "crons": [

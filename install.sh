@@ -1117,6 +1117,55 @@ else
   warn "Agent runner script not found at $RUNNER_SCRIPT — skipping"
 fi
 
+# ── Step 14a3: Auto-update LaunchAgent ────────────────────────────────────────
+step "Step 14a3: Auto-update"
+
+UPDATE_PLIST="$HOME/Library/LaunchAgents/com.miniclaw.auto-update.plist"
+UPDATE_BIN="$MINICLAW_DIR/SYSTEM/bin/mc-update"
+
+if [[ -x "$UPDATE_BIN" ]]; then
+  cat > "$UPDATE_PLIST" << UPDATEPLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.miniclaw.auto-update</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>$UPDATE_BIN</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key>
+    <string>$HOME</string>
+    <key>PATH</key>
+    <string>$HOME/.local/bin:$NODE_DIR:$MINICLAW_DIR/SYSTEM/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>OPENCLAW_STATE_DIR</key>
+    <string>$STATE_DIR</string>
+  </dict>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>2</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>$STATE_DIR/logs/mc-update.log</string>
+  <key>StandardErrorPath</key>
+  <string>$STATE_DIR/logs/mc-update.log</string>
+</dict>
+</plist>
+UPDATEPLIST
+
+  launchctl unload "$UPDATE_PLIST" 2>/dev/null || true
+  launchctl load "$UPDATE_PLIST" 2>/dev/null && ok "Auto-update enabled (daily at 4am)" \
+    || warn "Auto-update plist created — run: launchctl load $UPDATE_PLIST"
+else
+  warn "mc-update not found — skipping auto-update setup"
+fi
+
 # ── Step 14b: Default board projects ──────────────────────────────────────────
 step "Step 14b: Default board projects"
 

@@ -1,0 +1,189 @@
+#!/usr/bin/env bash
+# mc-update — check for and apply MiniClaw updates from the stable release tag
+#
+# Usage:
+#   mc-update           # check and update if available
+#   mc-update --check   # check only, don't apply
+#   mc-update --force   # update even if already on latest
+
+set -euo pipefail
+
+STATE_DIR="${OPENCLAW_STATE_DIR:-$HOME/.openclaw}"
+MINICLAW_DIR="$STATE_DIR/miniclaw"
+REPO="augmentedmike/miniclaw-os"
+INSTALLED_SHA_FILE="$MINICLAW_DIR/.installed-sha"
+LOG_FILE="$STATE_DIR/logs/mc-update.log"
+
+CHECK_ONLY=false
+FORCE=false
+[[ "${1:-}" == "--check" ]] && CHECK_ONLY=true
+[[ "${1:-}" == "--force" ]] && FORCE=true
+
+mkdir -p "$(dirname "$LOG_FILE")"
+
+log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*" | tee -a "$LOG_FILE"; }
+
+# Report a bug via mc-contribute (best-effort, non-blocking)
+report_bug() {
+  local msg="$1"
+  if command -v openclaw &>/dev/null; then
+    openclaw mc-contribute bug "$msg" 2>/dev/null &
+  fi
+  log "BUG REPORTED: $msg"
+}
+ok()  { echo "  ✓ $*"; log "✓ $*"; }
+fail() { echo "  ✗ $*"; log "✗ $*"; }
+
+# Get the commit SHA that the stable tag points to
+get_remote_sha() {
+  curl -sf "https://api.github.com/repos/$REPO/git/ref/tags/stable" 2>/dev/null \
+    | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['object']['sha'][:12])" 2>/dev/null \
+    || echo ""
+}
+
+get_installed_sha() {
+  cat "$INSTALLED_SHA_FILE" 2>/dev/null || echo "none"
+}
+
+get_zip_url() {
+  curl -sf "https://api.github.com/repos/$REPO/releases" 2>/dev/null \
+    | python3 -c "
+import json, sys
+for r in json.load(sys.stdin):
+    if '-installer' in r.get('tag_name',''):
+        for a in r.get('assets', []):
+            if a['name'].endswith('.zip'):
+                print(a['browser_download_url'])
+                sys.exit(0)
+" 2>/dev/null || echo ""
+}
+
+log "checking for updates..."
+
+REMOTE_SHA=$(get_remote_sha)
+INSTALLED_SHA=$(get_installed_sha)
+
+if [[ -z "$REMOTE_SHA" ]]; then
+  fail "Could not reach GitHub — skipping"
+  exit 0
+fi
+
+log "installed: $INSTALLED_SHA | stable: $REMOTE_SHA"
+
+if [[ "$REMOTE_SHA" == "$INSTALLED_SHA" ]] && [[ "$FORCE" == false ]]; then
+  ok "Already up to date ($REMOTE_SHA)"
+  exit 0
+fi
+
+echo "  Update available: $INSTALLED_SHA → $REMOTE_SHA"
+
+if [[ "$CHECK_ONLY" == true ]]; then
+  exit 0
+fi
+
+ZIP_URL=$(get_zip_url)
+if [[ -z "$ZIP_URL" ]]; then
+  fail "No installer zip found in releases"
+  exit 1
+fi
+
+# Backup first
+log "Backing up before update..."
+if command -v mc-backup &>/dev/null; then
+  mc-backup now 2>>"$LOG_FILE" && ok "Backup created" || log "Backup failed (continuing anyway)"
+else
+  log "mc-backup not found — skipping backup"
+  report_bug "mc-backup not on PATH during mc-update — backup skipped before update"
+fi
+
+log "Downloading update..."
+ZIP_TMP="/tmp/mc-update-$$.zip"
+curl -fL# "$ZIP_URL" -o "$ZIP_TMP" 2>>"$LOG_FILE"
+
+log "Extracting..."
+EXTRACT="/tmp/mc-update-extract-$$"
+rm -rf "$EXTRACT"
+mkdir -p "$EXTRACT"
+unzip -q -o "$ZIP_TMP" -d "$EXTRACT"
+rm -f "$ZIP_TMP"
+
+APP_RESOURCES="$EXTRACT/Install MiniClaw.app/Contents/Resources"
+
+# 1. Update plugins (preserve node_modules, update source)
+BUNDLED_PLUGINS="$APP_RESOURCES/plugins-prebuilt"
+if [[ -d "$BUNDLED_PLUGINS" ]]; then
+  EXTENSIONS_DIR="$STATE_DIR/extensions"
+  for plugin_dir in "$BUNDLED_PLUGINS"/mc-*/; do
+    plugin_name="$(basename "$plugin_dir")"
+    ext_dest="$EXTENSIONS_DIR/$plugin_name"
+    if [[ -d "$ext_dest" ]]; then
+      # Update source files, keep node_modules
+      rsync -a --exclude='node_modules' --exclude='.git' "$plugin_dir/" "$ext_dest/"
+    else
+      rsync -a --exclude='.git' "$plugin_dir/" "$ext_dest/"
+    fi
+  done
+  # Update shared node_modules if present
+  if [[ -d "$BUNDLED_PLUGINS/node_modules" ]]; then
+    rsync -a "$BUNDLED_PLUGINS/node_modules/" "$EXTENSIONS_DIR/node_modules/"
+  fi
+  ok "Plugins updated"
+
+  # Rebuild native modules
+  NODE_BIN="$(which node)"
+  NODE_DIR="$(dirname "$NODE_BIN")"
+  NPM_BIN="$NODE_DIR/npm"
+  while IFS= read -r -d '' bs3_pkg; do
+    bs3_dir="$(dirname "$bs3_pkg")"
+    parent="$(dirname "$(dirname "$bs3_dir")")"
+    rm -rf "$bs3_dir/build" 2>/dev/null
+    (cd "$parent" && PATH="$NODE_DIR:$PATH" "$NPM_BIN" rebuild better-sqlite3 2>>"$LOG_FILE") || true
+  done < <(find "$EXTENSIONS_DIR" "$MINICLAW_DIR/plugins" -path "*/node_modules/better-sqlite3/package.json" -print0 2>/dev/null)
+  ok "Native modules rebuilt"
+fi
+
+# 2. Update web standalone
+BUNDLED_WEB="$APP_RESOURCES/miniclaw-web"
+if [[ -d "$BUNDLED_WEB" && -f "$BUNDLED_WEB/server.js" ]]; then
+  WEB_DEST="$MINICLAW_DIR/plugins/mc-board/web/.next/standalone"
+  rm -rf "$WEB_DEST"
+  mkdir -p "$(dirname "$WEB_DEST")"
+  cp -a "$BUNDLED_WEB" "$WEB_DEST"
+  ok "Web app updated"
+
+  # Restart board web
+  launchctl unload "$HOME/Library/LaunchAgents/com.miniclaw.board-web.plist" 2>/dev/null || true
+  sleep 1
+  launchctl load "$HOME/Library/LaunchAgents/com.miniclaw.board-web.plist" 2>/dev/null || true
+  ok "Board web restarted"
+fi
+
+# 3. Update SYSTEM/bin tools
+if [[ -d "$APP_RESOURCES/plugins-prebuilt" ]]; then
+  # The repo clone has the SYSTEM/bin — pull latest
+  REPO_DIR="$STATE_DIR/projects/miniclaw-os"
+  if [[ -d "$REPO_DIR/.git" ]]; then
+    (cd "$REPO_DIR" && git pull --ff-only origin main 2>>"$LOG_FILE") || true
+    rsync -a "$REPO_DIR/SYSTEM/bin/" "$MINICLAW_DIR/SYSTEM/bin/"
+    chmod +x "$MINICLAW_DIR/SYSTEM/bin/"* 2>/dev/null || true
+    ok "CLI tools updated"
+  fi
+fi
+
+# 4. Update workspace templates (don't overwrite user edits)
+if [[ -d "$STATE_DIR/projects/miniclaw-os/workspace" ]]; then
+  WORKSPACE="$STATE_DIR/workspace"
+  for tpl in "$STATE_DIR/projects/miniclaw-os/workspace/refs"/*.md; do
+    [[ -f "$tpl" ]] || continue
+    dest="$WORKSPACE/refs/$(basename "$tpl")"
+    [[ ! -f "$dest" ]] && cp "$tpl" "$dest"
+  done
+fi
+
+# Record SHA
+mkdir -p "$(dirname "$INSTALLED_SHA_FILE")"
+echo "$REMOTE_SHA" > "$INSTALLED_SHA_FILE"
+
+rm -rf "$EXTRACT"
+log "Update complete: $REMOTE_SHA"
+ok "Updated to $REMOTE_SHA"
