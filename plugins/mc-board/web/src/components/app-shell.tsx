@@ -36,9 +36,7 @@ function DailyStats() {
       <span className="stat-pill" title={`${data.total_tokens.toLocaleString()} tokens today`}>
         tokens<b>{fmtK(data.total_tokens)}</b>
       </span>
-      <span className="stat-pill" title={`${data.plan} — API: $${data.total_cost_usd.toFixed(2)}`} style={{ color: "#4ade80" }}>
-        cost<b>${data.subscription_cost_usd.toFixed(2)}</b>
-      </span>
+      {/* cost pill hidden for now */}
     </>
   );
 }

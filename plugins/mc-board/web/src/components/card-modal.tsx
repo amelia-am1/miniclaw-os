@@ -307,11 +307,7 @@ function AgentRunsSection({ cardId }: { cardId: string }) {
             {totalRuns}
           </span>
         )}
-        {!isLoading && totalCost > 0 && (
-          <span style={{ fontSize: 10, color: "#4ade80", background: "#052e16", borderRadius: 10, padding: "0 6px", lineHeight: "18px" }}>
-            {subCost(totalCost)}
-          </span>
-        )}
+        {/* cost badge hidden for now */}
         <span style={{ fontSize: 10, color: "#52525b", marginLeft: 2 }}>{open ? "▲" : "▼"}</span>
       </button>
 
@@ -361,9 +357,7 @@ function AgentRunsSection({ cardId }: { cardId: string }) {
                         <span>cache-r: {fmtTokens(run.cacheReadTokens)}</span>
                         <span>cache-w: {fmtTokens(run.cacheWriteTokens)}</span>
                         <span style={{ color: "#a1a1aa" }}>total: {fmtTokens(run.totalTokens)}</span>
-                        {run.costUsd > 0 && (
-                          <span style={{ color: "#4ade80" }}>{subCost(run.costUsd)}{mult > 1 ? <span style={{ color: "#3f3f46" }}> (api {fmtCost(run.costUsd)})</span> : null}</span>
-                        )}
+                        {/* cost per run hidden for now */}
                       </div>
                     )}
                   </div>
@@ -378,7 +372,7 @@ function AgentRunsSection({ cardId }: { cardId: string }) {
                 }}>
                   <span>{totalRuns} runs</span>
                   {totalTokens > 0 && <span>{fmtTokens(totalTokens)} tokens</span>}
-                  {totalCost > 0 && <span style={{ color: "#4ade80" }}>{subCost(totalCost)} total{mult > 1 ? <span style={{ color: "#3f3f46" }}> (api {fmtCost(totalCost)})</span> : null}</span>}
+                  {/* total cost hidden for now */}
                 </div>
               )}
             </>
