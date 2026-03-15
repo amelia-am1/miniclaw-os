@@ -131,6 +131,17 @@ else
 fi
 
 echo ""
+echo "── path consistency checks"
+
+# #52: rolodex web uses USER/rolodex/ not legacy path
+if grep -q 'USER.*rolodex.*contacts' "$REPO_DIR/plugins/mc-board/web/src/lib/rolodex.ts" && \
+   ! grep -q 'homedir.*"rolodex"' "$REPO_DIR/plugins/mc-board/web/src/lib/rolodex.ts"; then
+  pass "#52 rolodex web uses USER/rolodex/ path (no legacy fallback)"
+else
+  fail "#52 rolodex web still has legacy path fallback" "remove fallback to ~/.openclaw/rolodex/"
+fi
+
+echo ""
 echo "── vault env check"
 
 if grep -q 'OPENCLAW_VAULT_ROOT' "$REPO_DIR/plugins/mc-board/web/src/lib/vault.ts"; then
