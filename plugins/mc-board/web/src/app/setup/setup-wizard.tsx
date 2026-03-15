@@ -69,6 +69,20 @@ export default function SetupWizard() {
   const stepNum = NUMBERED_STEPS.indexOf(step as (typeof NUMBERED_STEPS)[number]) + 1;
 
   // Splash screen — only on very first load
+  // Allow scrolling on setup pages (globals.css sets overflow:hidden for the board)
+  useEffect(() => {
+    document.documentElement.style.overflow = "auto";
+    document.documentElement.style.height = "auto";
+    document.body.style.overflow = "auto";
+    document.body.style.height = "auto";
+    return () => {
+      document.documentElement.style.overflow = "";
+      document.documentElement.style.height = "";
+      document.body.style.overflow = "";
+      document.body.style.height = "";
+    };
+  }, []);
+
   const [splash, setSplash] = useState(() => {
     if (typeof window === "undefined") return false;
     return !sessionStorage.getItem("mc-splash-shown");
