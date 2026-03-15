@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import crypto from "node:crypto";
 import { listCards, getCard, listProjects } from "@/lib/data";
 import { getOrCreateSession, destroySession } from "@/lib/chat-session";
 
@@ -78,7 +79,7 @@ export async function POST(req: NextRequest) {
       return new Response(JSON.stringify({ cleared: true }), { headers: { "Content-Type": "application/json" } });
     }
 
-    const sid = sessionId || `chat-${Date.now()}`;
+    const sid = sessionId || crypto.randomUUID();
     const persona = getSystemPrompt();
     const board = buildBoardContext(projectId, activeCardId);
     const systemPrompt = board ? `${persona}\n\n---\n\n## Board State\n\n${board}` : persona;

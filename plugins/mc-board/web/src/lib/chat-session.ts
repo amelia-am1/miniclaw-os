@@ -1,13 +1,13 @@
 /**
- * chat-session.ts — Interactive Claude Code session via PTY.
+ * chat-session.ts — Claude Code session manager.
  *
- * Spawns `claude` in a pseudo-terminal so it runs in full interactive mode
- * with tools, file access, and conversation history. Communicates with the
- * web server via EventEmitter. The PTY keeps claude alive across messages.
+ * Each message spawns `claude -p` with `--continue --session-id` to maintain
+ * conversation context across turns. Claude Code handles history internally.
  */
 
-import * as pty from "node-pty";
+import { spawn } from "node:child_process";
 import * as os from "node:os";
+import * as crypto from "node:crypto";
 import { EventEmitter } from "node:events";
 
 const CLAUDE_BIN = process.env.CLAUDE_BIN ?? "claude";
@@ -19,148 +19,119 @@ interface ChatEvent {
   detail?: string;
 }
 
-// Strip ANSI escape sequences from terminal output
-function stripAnsi(s: string): string {
-  return s.replace(/\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07|\x1b[()][0-9A-B]|\x1b\[[\?]?[0-9;]*[a-zA-Z]|\x1b[>=<]|\x1b\[[0-9]*[a-zA-Z]/g, "");
-}
-
 export class ChatSession extends EventEmitter {
-  private term: pty.IPty | null = null;
-  private ready = false;
-  private buf = "";
-  private turnActive = false;
-  private turnResolve: (() => void) | null = null;
-  private idleTimer: ReturnType<typeof setTimeout> | null = null;
-  private outputLines: string[] = [];
+  readonly sessionId: string;
+  private firstMessage = true;
 
   constructor(
     private systemPrompt: string,
     private cwd: string = os.homedir(),
+    sessionId?: string,
   ) {
     super();
-  }
-
-  private ensureTerm() {
-    if (this.term) return;
-
-    const env = { ...process.env };
-    delete env.CLAUDECODE;
-    // Force plain output
-    env.TERM = "dumb";
-    env.NO_COLOR = "1";
-    env.FORCE_COLOR = "0";
-    env.COLUMNS = "120";
-    env.LINES = "50";
-
-    this.term = pty.spawn(CLAUDE_BIN, [
-      "--dangerously-skip-permissions",
-      "--model", "claude-haiku-4-5-20251001",
-      "--system-prompt", this.systemPrompt,
-    ], {
-      name: "dumb",
-      cols: 120,
-      rows: 50,
-      cwd: this.cwd,
-      env,
-    });
-
-    this.term.onData((data: string) => {
-      const clean = stripAnsi(data);
-      if (!clean.trim()) return;
-
-      // Accumulate output
-      this.buf += clean;
-
-      // Reset idle timer — when output stops for 500ms, consider turn done
-      if (this.turnActive) {
-        if (this.idleTimer) clearTimeout(this.idleTimer);
-        this.idleTimer = setTimeout(() => this.flushTurn(), 500);
-      }
-    });
-
-    this.term.onExit(({ exitCode }) => {
-      this.emit("event", { type: "system", text: `Session ended (code ${exitCode})` } as ChatEvent);
-      this.emit("event", { type: "done" } as ChatEvent);
-      this.term = null;
-      if (this.turnResolve) {
-        this.turnResolve();
-        this.turnResolve = null;
-      }
-    });
-
-    // Wait for claude to be ready (prompt appears)
-    this.ready = true;
-  }
-
-  private flushTurn() {
-    if (!this.turnActive) return;
-
-    const text = this.buf.trim();
-    this.buf = "";
-
-    if (text) {
-      // Parse out tool calls and text
-      const lines = text.split("\n");
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-        // Skip prompt lines
-        if (trimmed.startsWith(">") && trimmed.length < 5) continue;
-        if (trimmed.startsWith("╭") || trimmed.startsWith("╰") || trimmed.startsWith("│")) continue;
-
-        // Tool use indicators
-        if (trimmed.startsWith("⏺") || trimmed.match(/^[A-Z][a-z]+\(/)) {
-          this.emit("event", { type: "tool", name: trimmed.slice(0, 60) } as ChatEvent);
-        } else {
-          this.emit("event", { type: "delta", text: trimmed + "\n" } as ChatEvent);
-        }
-      }
-    }
-
-    this.turnActive = false;
-    this.emit("event", { type: "done" } as ChatEvent);
-    if (this.turnResolve) {
-      this.turnResolve();
-      this.turnResolve = null;
-    }
+    this.sessionId = sessionId || crypto.randomUUID();
   }
 
   async send(message: string): Promise<void> {
-    this.ensureTerm();
-    if (!this.term) {
-      this.emit("event", { type: "error", text: "Failed to start Claude Code" } as ChatEvent);
-      this.emit("event", { type: "done" } as ChatEvent);
-      return;
+    const { CLAUDECODE: _cc, ...env } = process.env;
+
+    const args = [
+      "-p", message,
+      "--output-format", "stream-json",
+      "--model", "claude-haiku-4-5-20251001",
+      "--dangerously-skip-permissions",
+      "--verbose",
+      "--session-id", this.sessionId,
+    ];
+
+    if (this.firstMessage) {
+      args.push("--system-prompt", this.systemPrompt);
+      this.firstMessage = false;
+    } else {
+      args.push("--continue");
     }
 
-    this.buf = "";
-    this.turnActive = true;
+    const proc = spawn(CLAUDE_BIN, args, {
+      env,
+      cwd: this.cwd,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
 
-    // Write message + enter
-    this.term.write(message + "\r");
+    let buf = "";
+    let lastText = "";
+
+    const processLine = (line: string) => {
+      if (!line.trim()) return;
+      try {
+        const msg = JSON.parse(line);
+
+        // Text from assistant messages (full content, diff to get delta)
+        if (msg.type === "assistant" && msg.message?.content) {
+          for (const block of msg.message.content) {
+            if (block.type === "text" && block.text && block.text.length > lastText.length) {
+              const delta = block.text.slice(lastText.length);
+              lastText = block.text;
+              this.emit("event", { type: "delta", text: delta } as ChatEvent);
+            }
+            if (block.type === "tool_use") {
+              const name = block.name ?? "tool";
+              let detail = "";
+              try {
+                const input = block.input ?? {};
+                detail = String(input.command ?? input.path ?? input.file_path ?? input.query ?? input.pattern ?? "")
+                  .split("\n")[0].slice(0, 100);
+              } catch {}
+              this.emit("event", { type: "tool", name, detail } as ChatEvent);
+            }
+          }
+        }
+
+        // Result — end of turn
+        if (msg.type === "result") {
+          this.emit("event", { type: "done" } as ChatEvent);
+        }
+
+        // System (skip init)
+        if (msg.type === "system" && msg.subtype !== "init") {
+          const text = msg.message ?? msg.text ?? "";
+          if (text) this.emit("event", { type: "system", text } as ChatEvent);
+        }
+      } catch {}
+    };
+
+    proc.stdout.on("data", (chunk: Buffer) => {
+      buf += chunk.toString();
+      const lines = buf.split("\n");
+      buf = lines.pop() ?? "";
+      for (const line of lines) processLine(line);
+    });
+
+    proc.stderr.on("data", (chunk: Buffer) => {
+      const text = chunk.toString().trim();
+      if (text && /login|auth|compact|warning|limit|quota/i.test(text)) {
+        this.emit("event", { type: "system", text } as ChatEvent);
+      }
+    });
 
     return new Promise<void>((resolve) => {
-      this.turnResolve = resolve;
-      // Safety timeout — 5 minutes
-      setTimeout(() => {
-        if (this.turnActive) {
-          this.flushTurn();
-          resolve();
+      proc.on("close", (code) => {
+        if (buf.trim()) processLine(buf);
+        if (code && code !== 0) {
+          this.emit("event", { type: "system", text: `Session ended (code ${code})` } as ChatEvent);
         }
-      }, 300_000);
+        this.emit("event", { type: "done" } as ChatEvent);
+        resolve();
+      });
+
+      proc.on("error", (err) => {
+        this.emit("event", { type: "error", text: err.message } as ChatEvent);
+        resolve();
+      });
     });
   }
 
-  kill() {
-    if (this.term) {
-      this.term.kill();
-      this.term = null;
-    }
-  }
-
-  get alive(): boolean {
-    return this.term !== null;
-  }
+  get alive(): boolean { return true; }
+  kill() {}
 }
 
 // Session store
@@ -171,8 +142,6 @@ const SESSION_TTL_MS = 30 * 60 * 1000;
 function touchSession(id: string) {
   if (sessionTimers.has(id)) clearTimeout(sessionTimers.get(id)!);
   sessionTimers.set(id, setTimeout(() => {
-    const s = sessions.get(id);
-    if (s) s.kill();
     sessions.delete(id);
     sessionTimers.delete(id);
   }, SESSION_TTL_MS));
@@ -180,19 +149,17 @@ function touchSession(id: string) {
 
 export function getOrCreateSession(id: string, systemPrompt: string, cwd?: string): ChatSession {
   let session = sessions.get(id);
-  if (session && session.alive) {
+  if (session) {
     touchSession(id);
     return session;
   }
-  session = new ChatSession(systemPrompt, cwd);
+  session = new ChatSession(systemPrompt, cwd, id);
   sessions.set(id, session);
   touchSession(id);
   return session;
 }
 
 export function destroySession(id: string) {
-  const s = sessions.get(id);
-  if (s) s.kill();
   sessions.delete(id);
   if (sessionTimers.has(id)) {
     clearTimeout(sessionTimers.get(id)!);
