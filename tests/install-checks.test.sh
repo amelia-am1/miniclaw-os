@@ -216,6 +216,33 @@ else
 fi
 
 echo ""
+echo "── gateway stability checks (#94)"
+
+# #94: mc-guardian plugin exists
+if [[ -f "$REPO_DIR/plugins/mc-guardian/openclaw.plugin.json" ]] && \
+   [[ -f "$REPO_DIR/plugins/mc-guardian/index.ts" ]]; then
+  pass "#94 mc-guardian plugin exists with manifest and entry point"
+else
+  fail "#94 mc-guardian plugin missing" "create plugins/mc-guardian/"
+fi
+
+# #94: mc-kb kb_add has null-safe defaults for type/title/content
+if grep -q 'input.type || "fact"' "$REPO_DIR/plugins/mc-kb/tools/definitions.ts" && \
+   grep -q 'input.title || "Untitled"' "$REPO_DIR/plugins/mc-kb/tools/definitions.ts" && \
+   grep -q 'input.content || ""' "$REPO_DIR/plugins/mc-kb/tools/definitions.ts"; then
+  pass "#94 mc-kb kb_add has null-safe defaults for type/title/content"
+else
+  fail "#94 mc-kb kb_add missing null-safe defaults" "add fallback defaults before use"
+fi
+
+# #94: mc-guardian handles uncaughtException
+if grep -q 'uncaughtException' "$REPO_DIR/plugins/mc-guardian/index.ts"; then
+  pass "#94 mc-guardian replaces uncaughtException handler"
+else
+  fail "#94 mc-guardian missing uncaughtException handler" "add process.on uncaughtException"
+fi
+
+echo ""
 echo "── vault env check"
 
 if grep -q 'OPENCLAW_VAULT_ROOT' "$REPO_DIR/plugins/mc-board/web/src/lib/vault.ts"; then
