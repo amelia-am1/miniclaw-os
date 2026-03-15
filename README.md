@@ -47,7 +47,7 @@ curl -fsSL https://raw.githubusercontent.com/augmentedmike/miniclaw-os/main/boot
 
 That's it. The bootstrap script installs everything — Homebrew, Node.js, the web app, plugins, and a LaunchAgent to keep it running. Your browser opens automatically when it's ready.
 
-<video src="https://github.com/augmentedmike/miniclaw-os/releases/download/v0.1.5-installer/miniclaw-0.1.5-install-demo.mp4" controls width="100%"></video>
+https://github.com/user-attachments/assets/937327da-40a8-423c-ab34-d3fe088099c9
 
 ---
 
