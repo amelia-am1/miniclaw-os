@@ -22,6 +22,20 @@ All git and GitHub operations use `gh` CLI and standard git commands under the h
 
 ---
 
+## Runtime: Node.js Only — No Bun
+
+MiniClaw is a **Node.js-only** project. Do not use Bun, `bun:*` imports, `Bun.serve()`, `Bun.file()`, `bun:sqlite`, `bun:test`, or any Bun-specific APIs. All contributions must use:
+
+- `better-sqlite3` for SQLite (not `bun:sqlite`)
+- `vitest` for tests (not `bun:test`)
+- `node:fs`, `node:path`, `node:child_process` for system APIs
+- `npm install -g` for global packages (not `bun install -g`)
+- `npx tsx` for running TypeScript (not `bun`)
+
+PRs containing Bun references will be rejected. The ESLint config enforces `no-restricted-imports` for `bun:*` in TypeScript files. Shell scripts are manually reviewed.
+
+---
+
 ## Security Hardening
 
 mc-contribute is hardened against prompt injection and shell injection:

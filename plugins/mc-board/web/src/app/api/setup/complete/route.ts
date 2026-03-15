@@ -281,16 +281,23 @@ function registerCronJobs() {
     for (const job of jobs) {
       if (existingNames.has(job.name)) continue;
 
+      const cronExpr = job.schedule?.expr || "*/5 * * * *";
       const args = [
         "cron", "add",
         "--name", job.name,
-        "--schedule", job.schedule?.expr || "*/5 * * * *",
+        "--cron", cronExpr,
+        "--session", job.sessionTarget || "isolated",
       ];
+
+      if (job.payload?.timeoutSeconds) {
+        args.push("--timeout-seconds", String(job.payload.timeoutSeconds));
+      }
 
       if (job.payload?.messageFile) {
         const promptPath = path.join(STATE_DIR, "cron", job.payload.messageFile);
         if (fs.existsSync(promptPath)) {
-          args.push("--message-file", promptPath);
+          const prompt = fs.readFileSync(promptPath, "utf-8").trim();
+          args.push("--message", prompt);
         }
       }
 
