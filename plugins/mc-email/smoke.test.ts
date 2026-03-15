@@ -1,9 +1,13 @@
 import { test, expect } from "vitest";
 import { existsSync } from "node:fs";
-import { resolveConfig } from "./src/config.js";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { resolveConfig } from "./src/config.ts";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 test("index.ts exists", () => {
-  expect(existsSync(import.meta.dir + "/index.ts")).toBe(true);
+  expect(existsSync(__dirname + "/index.ts")).toBe(true);
 });
 
 test("resolveConfig returns defaults", () => {

@@ -98,7 +98,7 @@ describe('DocumentStore', () => {
     it('should update the updated timestamp', async () => {
       const created = store.create('Test', 'author', 'Content');
       const originalUpdated = created.metadata.updated;
-      await Bun.sleep(5);
+      await new Promise((resolve) => setTimeout(resolve, 5));
       const updated = store.update(created.metadata.id, 'New content', 'author2');
       expect(updated.metadata.updated).not.toBe(originalUpdated);
     });

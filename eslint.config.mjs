@@ -40,6 +40,20 @@ export default [
     },
     rules: {
       // ── Unreachable / dead code (hallucination red flags) ──────────
+      // ── No Bun — this project is Node.js only ─────────────────────
+      "no-restricted-imports": ["error", {
+        patterns: [
+          { group: ["bun", "bun:*"], message: "No Bun imports — this project uses Node.js only" },
+        ],
+      }],
+      "no-restricted-globals": ["error",
+        { name: "Bun", message: "No Bun globals — this project uses Node.js only" },
+      ],
+      "no-restricted-syntax": ["error",
+        { selector: "MemberExpression[object.type='MetaProperty'][property.name='dir']", message: "import.meta.dir is Bun-only — use dirname(fileURLToPath(import.meta.url))" },
+      ],
+
+      // ── Unreachable / dead code (hallucination red flags) ──────────
       "no-unreachable": "error",
       "no-unreachable-loop": "error",
       "no-constant-condition": "error",
