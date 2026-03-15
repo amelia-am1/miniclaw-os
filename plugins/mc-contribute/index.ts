@@ -11,7 +11,7 @@ export default function register(api: OpenClawPluginApi): void {
 
   // Inject contribution guidelines into every prompt when working
   // in the miniclaw-os repo — so the agent always knows the rules.
-  api.hook("before_prompt_build", (_ctx) => {
+  if (typeof api.hook === "function") api.hook("before_prompt_build", (_ctx) => {
     return {
       prepend:
         `## MiniClaw Contribution Context\n` +

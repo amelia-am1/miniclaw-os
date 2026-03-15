@@ -102,6 +102,17 @@ else
   warn "soul-backups dir missing" "run: mkdir -p $SNAPSHOTS_DIR"
 fi
 
+# ── required directories ──────────────────────────────────────────────────────
+section "required directories"
+
+for reqdir in "$STATE_DIR/USER/memory" "$STATE_DIR/USER/voice" "$STATE_DIR/USER/brain" "$STATE_DIR/soul-backups"; do
+  if [[ -d "$reqdir" ]]; then
+    pass "$(basename "$reqdir")/ exists"
+  else
+    fail "$(basename "$reqdir")/ missing" "run: mkdir -p $reqdir"
+  fi
+done
+
 # ── inbox ─────────────────────────────────────────────────────────────────────
 section "inbox"
 

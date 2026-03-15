@@ -274,7 +274,9 @@ function registerCronJobs() {
     });
     let existingNames = new Set<string>();
     try {
-      const existing = JSON.parse(listResult.stdout || "[]");
+      const parsed = JSON.parse(listResult.stdout || "[]");
+      // Handle both array and {jobs: []} formats
+      const existing = Array.isArray(parsed) ? parsed : (parsed.jobs || []);
       existingNames = new Set(existing.map((j: { name?: string }) => j.name));
     } catch { /* no existing jobs */ }
 

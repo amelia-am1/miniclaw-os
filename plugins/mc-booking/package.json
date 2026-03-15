@@ -6,6 +6,7 @@
   "description": "Appointment scheduling with cloud DB, payment integration, and embeddable widget",
   "dependencies": {
     "@libsql/client": "^0.14.0",
+    "@hono/node-server": "^1.13.0",
     "hono": "^4.7.0"
   },
   "devDependencies": {

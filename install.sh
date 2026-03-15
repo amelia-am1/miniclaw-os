@@ -392,7 +392,7 @@ if [[ ! -f "$STATE_DIR/openclaw.json" ]]; then
 import json, sys
 cfg = {
   "meta": {},
-  "agents": { "defaults": { "model": { "primary": "claude-sonnet-4-6" }, "compaction": { "mode": "safeguard" } } },
+  "agents": { "defaults": { "model": { "primary": "anthropic/claude-sonnet-4-6" }, "compaction": { "mode": "safeguard" } } },
   "plugins": {},
   "gateway": { "mode": "local" }
 }
@@ -631,6 +631,12 @@ SOUL_BACKUPS_DIR="$STATE_DIR/soul-backups"
 
 mkdir -p "$USER_MEMORY_DIR"
 ok "~/.openclaw/USER/memory/"
+
+mkdir -p "$STATE_DIR/USER/voice"
+ok "~/.openclaw/USER/voice/"
+
+mkdir -p "$STATE_DIR/USER/brain"
+ok "~/.openclaw/USER/brain/"
 
 mkdir -p "$SOUL_BACKUPS_DIR"
 ok "~/.openclaw/soul-backups/"

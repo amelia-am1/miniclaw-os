@@ -30,7 +30,7 @@ export default function register(api: OpenClawPluginApi): void {
 
   // Inject GitHub workflow context into every prompt.
   // This is the general-purpose workflow — not project-specific like mc-contribute.
-  api.hook("before_prompt_build", (_ctx) => {
+  if (typeof api.hook === "function") api.hook("before_prompt_build", (_ctx) => {
     const axioms = loadCodingAxioms();
     const axiomsSection = axioms
       ? `\n## Coding Axioms (from repo)\n${axioms}\n`
