@@ -939,16 +939,59 @@ for w in workers:
     if w["name"] not in existing_names:
         w["id"] = str(uuid.uuid4())
         store.setdefault("jobs", []).append(w)
+        existing_names.add(w["name"])
         added += 1
+
+# ── Email check cron (every 5 min) — only if email was configured ──
+setup_state_path = os.path.join("$STATE_DIR", "USER", "setup-state.json")
+try:
+    with open(setup_state_path) as f:
+        setup = json.load(f)
+    email_configured = setup.get("emailConfigured", False)
+    agent_email = setup.get("emailAddress", "")
+    smtp_host = setup.get("emailSmtpHost", "")
+    smtp_port = setup.get("emailSmtpPort", 465)
+    email_password = setup.get("emailAppPassword", "")
+except Exception:
+    email_configured = False
+    agent_email = ""
+
+if email_configured and agent_email and "email-check" not in existing_names:
+    # Derive IMAP host from SMTP host (mail.* or smtp.* → mail.*)
+    imap_host = smtp_host.replace("smtp.", "mail.", 1) if smtp_host.startswith("smtp.") else smtp_host
+    email_job = {
+        "id": str(uuid.uuid4()),
+        "name": "email-check",
+        "schedule": {"kind": "cron", "expr": "*/5 * * * *"},
+        "sessionTarget": "isolated",
+        "payload": {
+            "kind": "agentTurn",
+            "timeoutSeconds": 60,
+            "message": (
+                f"Check email inbox at {agent_email} via IMAP ({imap_host}:993). "
+                f"Use python3 imaplib with SSL. Login: {agent_email} / password from vault key 'email-app-password'. "
+                "Search UNSEEN messages. For each: read subject, sender, and body snippet; mark as SEEN. "
+                "If the message is from a known contact or requires action (reply requests, feedback, questions), "
+                "send a Telegram notification to the human summarizing it. "
+                "If inbox is empty or only automated/newsletter mail, stay silent (NO_REPLY). "
+                "Never reply to emails autonomously — only notify and log."
+            )
+        },
+        "delivery": {"mode": "none"},
+        "enabled": True
+    }
+    store.setdefault("jobs", []).append(email_job)
+    added += 1
+    print(f"  Added email-check cron for {agent_email}")
 
 os.makedirs(os.path.dirname(cron_file), exist_ok=True)
 with open(cron_file, "w") as f:
     json.dump(store, f, indent=2)
 
 if added:
-    print(f"  Added {added} board worker(s) to jobs.json")
+    print(f"  Added {added} cron job(s) to jobs.json")
 else:
-    print("  Board workers already in jobs.json")
+    print("  All cron jobs already in jobs.json")
 PYEOF
 ok "Cron workers written to $CRON_FILE"
 
