@@ -72,6 +72,85 @@ mc kb search "common mistakes"
 
 ---
 
+## Issue-Driven Development
+
+Every change follows this cycle. No exceptions.
+
+```
+Issue → Branch → Work → Commit → PR → CI → Merge → Close
+```
+
+### The issue is the contract
+
+The issue defines what gets done. Not more, not less. This is how agents and humans stay aligned — the issue constrains the scope, prevents hallucination, and creates an auditable trail.
+
+- **No work without an issue.** If there's no issue, create one first.
+- **The issue is the single source of truth.** If scope changes, update the issue. If you hit a blocker, comment on the issue. If you discover something, add it to the issue.
+- **Close with a resolution.** Document what was done, which commits/files changed, and how to verify.
+
+### Branch naming
+
+```bash
+git checkout -b fix/32-credentials-save-failing
+git checkout -b feat/34-mc-github-plugin
+git checkout -b chore/35-branch-workflow
+```
+
+Convention: `fix/`, `feat/`, `chore/`, `docs/` prefix + issue number + short slug.
+
+### Commits reference issues
+
+```bash
+git commit -m "fix: vault init before credential persist
+
+Resolves #32"
+```
+
+### PRs link to issues
+
+Use `Fixes #N` in the PR body so issues auto-close on merge.
+
+### CI must pass
+
+The test suite runs on the `stable` tag. All tests must pass before tagging stable.
+
+### Reference example: #33 (favicon)
+
+[Issue #33](https://github.com/augmentedmike/miniclaw-os/issues/33) is the template:
+
+1. Issue created with clear description
+2. Work done, committed (`f264f93`)
+3. Issue closed with resolution comment listing files changed and verification status
+
+Every issue should look like this when it's done.
+
+### Agent workflow (mc-board ↔ GitHub)
+
+An agent's mc-board card maps 1:1 to a GitHub issue:
+
+| mc-board state | GitHub state |
+|---|---|
+| backlog | issue open, no branch |
+| in-progress | branch created, commits flowing |
+| in-review | PR open, CI running |
+| shipped | PR merged, issue closed |
+
+mc-contribute handles the GitHub side. mc-github (planned, [#34](https://github.com/augmentedmike/miniclaw-os/issues/34)) will add full project management.
+
+---
+
+## Coding Standards
+
+Follow [CODING_AXIOMS.md](./CODING_AXIOMS.md) — language-independent principles rooted in functional programming, composition, and clarity.
+
+Key axioms: fail loudly, three lines > one abstraction, declarative over imperative, side effects at the edges, delete don't deprecate, tests prove behavior not coverage.
+
+**Runtime: Node.js only.** No Bun. No `bun:*` imports, no `Bun.serve()`, no `bun:sqlite`, no `bun:test`. Use `better-sqlite3`, `vitest`, `node:fs`, `npm install -g`, `npx tsx`. PRs with Bun references will be rejected.
+
+**File naming:** kebab-case only. `setup-wizard.tsx`, not `SetupWizard.tsx`.
+
+---
+
 ## Development setup (manual)
 
 If you're not using MiniClaw, the traditional setup works too:
