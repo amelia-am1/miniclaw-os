@@ -1,0 +1,14 @@
+{
+  "assistantName": "Amelia",
+  "shortName": "am",
+  "pronouns": "she/her",
+  "accentColor": "#00E5CC",
+  "telegramBotToken": "YOUR_BOT_TOKEN",
+  "telegramBotUsername": "your_bot_name",
+  "telegramChatId": "",
+  "ghToken": "ghp_YOUR_GITHUB_TOKEN",
+  "ghUsername": "your-github-username",
+  "emailAddress": "your-agent@gmail.com",
+  "appPassword": "xxxx xxxx xxxx xxxx",
+  "geminiApiKey": "AIza_YOUR_KEY"
+}
