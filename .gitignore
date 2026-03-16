@@ -36,3 +36,5 @@ secrets/
 .DS_Store
 Thumbs.db
 test-results/
+.next/
+TODO-*.md
