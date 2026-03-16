@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+# mc — MiniClaw CLI
+#
+# Routes subcommands to miniclaw plugin CLIs.
+# Each plugin lives at $MINICLAW_HOME/<name>/ with its own CLI entry point.
+#
+# Call paths (per plugin):
+#   ~/.openclaw/miniclaw/<name>/cli[.ts]   Direct
+#   mc <name> <cmd>                 Via this wrapper
+#   oc mc-<name> <cmd>              Via openclaw plugin
+#
+# Migrated plugins (standalone CLI):
+#   mc vault <cmd>     → miniclaw/vault/cli
+#   mc designer <cmd>  → miniclaw/designer/cli.ts (node/tsx)
+#
+# Legacy plugins (still routed through openclaw):
+#   mc board <cmd>     → openclaw mc-board <cmd>
+#   mc trust <cmd>     → openclaw mc-trust <cmd>
+
+set -euo pipefail
+
+# ── Resolve MINICLAW_HOME ──────────────────────────────────────────────────────
+# Priority: env var > derive from real script location (follows symlinks)
+if [[ -z "${MINICLAW_HOME:-}" ]]; then
+  SOURCE="${BASH_SOURCE[0]}"
+  while [[ -L "$SOURCE" ]]; do
+    DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
+    SOURCE="$(readlink "$SOURCE")"
+    [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
+  done
+  SCRIPT_DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
+  MINICLAW_HOME="$(dirname "$(dirname "$SCRIPT_DIR")")"
+fi
+export MINICLAW_HOME
+
+SUBCOMMAND="${1:-}"
+
+case "$SUBCOMMAND" in
+  # ── Migrated: standalone CLI ──
+  vault)
+    shift
+    exec "$MINICLAW_HOME/vault/cli" "$@"
+    ;;
+  designer)
+    shift
+    exec npx tsx "$MINICLAW_HOME/designer/cli.ts" "$@"
+    ;;
+
+  # ── Legacy: still via openclaw ──
+  board)
+    shift
+    exec openclaw mc-board "$@"
+    ;;
+  trust)
+    shift
+    exec openclaw mc-trust "$@"
+    ;;
+
+  # ── System utilities ──
+  smoke)
+    shift
+    exec mc-smoke "$@"
+    ;;
+
+  ""|help|--help|-h)
+    cat <<'EOF'
+mc — MiniClaw CLI
+
+Usage: mc <name> [args...]
+
+Plugins:
+  vault      Secrets manager — age-encrypted credential store
+  designer   Visual creation studio — image generation (occipital lobe)
+  board      Kanban board — task management (prefrontal cortex)
+  trust      Cross-agent trust and identity (cryptographic handshakes)
+  smoke      System health check
+
+Examples:
+  mc vault get gh-token
+  mc vault list
+  mc designer gen "a serene mountain landscape"
+  mc designer canvas list
+  mc designer stats
+  mc board list
+  mc board create --title "Fix bug" --priority high
+  mc trust sign "hello world"
+  mc smoke
+EOF
+    ;;
+  *)
+    # Passthrough: mc <anything> → openclaw <anything>
+    exec openclaw "$@"
+    ;;
+esac

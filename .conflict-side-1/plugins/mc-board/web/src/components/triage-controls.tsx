@@ -1,0 +1,120 @@
+"use client";
+
+import type { TriageColumnState } from "@/hooks/useTriageColumn";
+
+interface Props extends TriageColumnState {
+  column?: string;
+  onOpenTriage: () => void;
+  onOpenWork?: () => void;
+  hasWorkCards?: boolean;
+  hasTriageCards?: boolean;
+  launching?: boolean;
+  maxConcurrent: number;
+  onMaxConcurrentChange: (n: number) => void;
+  showTriageButton?: boolean;
+}
+
+export function TriageControls({
+  column,
+  cronEnabled, cronMinutes, cronLoaded,
+  handleToggleCron, handleMinutesChange,
+  onOpenTriage, onOpenWork, hasWorkCards, hasTriageCards, launching,
+  maxConcurrent, onMaxConcurrentChange,
+  showTriageButton = true,
+}: Props) {
+  const t = (id: string) => column ? `${column}-${id}` : undefined;
+  if (!cronLoaded) return null;
+
+  return (
+    <>
+      <button
+        data-tour={t("toggle")}
+        onClick={handleToggleCron}
+        title={cronEnabled ? "Disable scheduler" : "Enable scheduler"}
+        style={{
+          display: "flex", alignItems: "center", gap: 5,
+          fontSize: 10, padding: "3px 8px", borderRadius: 4,
+          background: cronEnabled ? "#14532d" : "#27272a",
+          border: `1px solid ${cronEnabled ? "#16a34a" : "#52525b"}`,
+          color: cronEnabled ? "#86efac" : "#71717a",
+          cursor: "pointer", lineHeight: 1.6,
+        }}
+      >
+        <span style={{
+          width: 5, height: 5, borderRadius: "50%",
+          background: cronEnabled ? "#22c55e" : "#52525b",
+          display: "inline-block",
+        }} />
+        {cronEnabled ? "on" : "off"}
+      </button>
+
+      <select
+        data-tour={t("interval")}
+        onClick={e => e.stopPropagation()}
+        value={cronMinutes}
+        onChange={handleMinutesChange}
+        style={{
+          fontSize: 10, padding: "3px 6px", borderRadius: 4,
+          background: "#27272a", border: "1px solid #52525b",
+          color: "#a1a1aa", cursor: "pointer", lineHeight: 1.6,
+          appearance: "none", WebkitAppearance: "none",
+        }}
+      >
+        {[1, 5, 10, 15, 30, 60].map(m => (
+          <option key={m} value={m}>{m}m</option>
+        ))}
+      </select>
+
+      <select
+        data-tour={t("max")}
+        onClick={e => e.stopPropagation()}
+        value={maxConcurrent}
+        onChange={e => onMaxConcurrentChange(parseInt(e.target.value, 10))}
+        title="Max cards worked concurrently"
+        style={{
+          fontSize: 10, padding: "3px 6px", borderRadius: 4,
+          background: "#27272a", border: "1px solid #52525b",
+          color: "#a1a1aa", cursor: "pointer", lineHeight: 1.6,
+          appearance: "none", WebkitAppearance: "none",
+        }}
+      >
+        {[1, 3, 5, 10].map(n => (
+          <option key={n} value={n}>{n}×</option>
+        ))}
+      </select>
+
+      {showTriageButton && (
+        <button
+          data-tour={t("triage")}
+          onClick={e => { e.stopPropagation(); if (hasTriageCards) onOpenTriage(); }}
+          disabled={!hasTriageCards}
+          title={hasTriageCards ? "Triage backlog cards" : "No cards to triage"}
+          className="btn-action"
+          style={{ fontSize: 10, padding: "3px 9px", borderRadius: 4 }}
+        >
+          ⚙ Triage
+        </button>
+      )}
+
+      {onOpenWork && (
+        <button
+          data-tour={t("work")}
+          onClick={e => { e.stopPropagation(); if (hasWorkCards) onOpenWork(); }}
+          disabled={launching || !hasWorkCards}
+          title={hasWorkCards ? `Work top ${maxConcurrent} card${maxConcurrent === 1 ? "" : "s"}` : "No cards to work"}
+          className="btn-action"
+          style={{
+            fontSize: 10, padding: "3px 9px", borderRadius: 4,
+            ...(launching ? {
+              background: "#292524",
+              border: "1px solid #92400e",
+              color: "#92400e",
+            } : {}),
+          }}
+        >
+          {launching ? "…" : "▶ Work"}
+        </button>
+      )}
+    </>
+  );
+}

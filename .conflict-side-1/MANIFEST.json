@@ -1,0 +1,435 @@
+{
+  "name": "miniclaw-os",
+  "version": "0.1.5",
+  "openclaw": {
+    "npm": "@miniclaw_official/openclaw",
+    "repo": "augmentedmike/openclaw",
+    "tag": "v0.1.5"
+  },
+  "description": "AugmentedMike's AI operating system \u2014 plugins, tools, and infrastructure for OpenClaw",
+  "plugins": [
+    {
+      "id": "mc-board",
+      "label": "Brain Board",
+      "description": "State-machine kanban board \u2014 the agent's prefrontal cortex. Task planning, project tracking, cron dispatch queue.",
+      "path": "plugins/mc-board",
+      "entry": "index.ts",
+      "cli": true,
+      "tools": [
+        "brain_board",
+        "brain_create_card",
+        "brain_update_card",
+        "brain_move_card",
+        "brain_show_card",
+        "brain_next_task",
+        "brain_column_context",
+        "brain_pickup",
+        "brain_release",
+        "brain_active",
+        "brain_pickup_log",
+        "brain_project_create",
+        "brain_project_list",
+        "brain_project_show"
+      ],
+      "web": {
+        "port": 4220,
+        "standalone": "web/standalone.mjs"
+      },
+      "config": {
+        "cardsDir": "~/.openclaw/USER/brain/cards",
+        "qmdBin": "~/.bun/bin/qmd",
+        "qmdCollection": "mc-board",
+        "webPort": 4220
+      }
+    },
+    {
+      "id": "mc-context",
+      "label": "Smart Context",
+      "description": "Memory window management \u2014 hippocampus. Controls history pruning, image limits, tool result truncation.",
+      "path": "plugins/mc-context",
+      "entry": "index.ts",
+      "cli": false,
+      "tools": [],
+      "config": {
+        "windowMinutes": 60,
+        "windowMinMessages": 10,
+        "maxImagesInHistory": 2,
+        "maxToolResultChars": 4000,
+        "applyToChannels": true,
+        "applyToDMs": true,
+        "replaceMessages": true
+      }
+    },
+    {
+      "id": "mc-designer",
+      "label": "Designer",
+      "description": "Image generation via Gemini \u2014 occipital lobe. Canvas-based image creation with layer support.",
+      "path": "plugins/mc-designer",
+      "entry": "index.ts",
+      "cli": true,
+      "tools": [],
+      "optional": true,
+      "requires": [
+        "gemini-api-key"
+      ],
+      "config": {
+        "apiKey": "",
+        "model": "gemini-3.1-flash-image-preview",
+        "mediaDir": "~/.openclaw/media/designer",
+        "defaultWidth": 1024,
+        "defaultHeight": 1024,
+        "vaultBin": "~/.local/bin/mc-vault"
+      }
+    },
+    {
+      "id": "mc-kb",
+      "label": "Knowledge Base",
+      "description": "Vector-backed long-term memory \u2014 semantic search over facts, errors, workflows, decisions.",
+      "path": "plugins/mc-kb",
+      "entry": "index.ts",
+      "cli": true,
+      "tools": [
+        "kb_search",
+        "kb_add",
+        "kb_update",
+        "kb_get"
+      ],
+      "config": {
+        "dbDir": "~/.openclaw/USER/brain/kb",
+        "modelPath": "~/.cache/qmd/models/hf_ggml-org_embeddinggemma-300M-Q8_0.gguf",
+        "qmdBin": "~/.bun/bin/qmd",
+        "qmdCollection": "kb",
+        "contextN": 3,
+        "contextThreshold": 0.75
+      }
+    },
+    {
+      "id": "mc-rolodex",
+      "label": "Rolodex",
+      "description": "Contact browser \u2014 fast, searchable access to trusted contacts. Search by name, email, phone, domain, or tag.",
+      "path": "plugins/mc-rolodex",
+      "entry": "index.ts",
+      "cli": true,
+      "tools": [],
+      "config": {
+        "storagePath": "~/.openclaw/USER/rolodex/contacts.json"
+      }
+    },
+    {
+      "id": "mc-queue",
+      "label": "Message Queue",
+      "description": "Haiku triage for all messaging sessions \u2014 IMMEDIATE/QUICK/TASK classification, soul context injection, tool call limit.",
+      "path": "plugins/mc-queue",
+      "entry": "index.ts",
+      "cli": false,
+      "tools": [],
+      "config": {
+        "enabled": true,
+        "haikuModel": "claude-haiku-4-5-20251001",
+        "maxToolCallsPerTurn": 3,
+        "applyToChannels": true,
+        "applyToDMs": true
+      }
+    },
+    {
+      "id": "mc-soul",
+      "label": "Soul",
+      "description": "Workspace file management and identity backup \u2014 SOUL.md, IDENTITY.md, AGENTS.md snapshots.",
+      "path": "plugins/mc-soul",
+      "entry": "index.ts",
+      "cli": true,
+      "tools": [],
+      "config": {}
+    },
+    {
+      "id": "mc-trust",
+      "label": "Trust",
+      "description": "Ed25519 agent identity and mutual authentication \u2014 cryptographic handshakes between agents.",
+      "path": "plugins/mc-trust",
+      "entry": "index.ts",
+      "cli": true,
+      "tools": [
+        "trust_challenge",
+        "trust_respond",
+        "trust_complete",
+        "trust_verify",
+        "trust_sessions"
+      ],
+      "config": {
+        "agentId": "am",
+        "trustDir": "~/.openclaw/trust",
+        "vaultBin": "~/.openclaw/miniclaw/SYSTEM/bin/mc-vault",
+        "sessionTtlMs": 3600000
+      }
+    },
+    {
+      "id": "mc-email",
+      "label": "Email",
+      "description": "Autonomous Gmail triage — IMAP inbox polling, Haiku classification (6 categories), reply-as-AM, archive, and escalation to owner@example.com.",
+      "path": "plugins/mc-email",
+      "entry": "index.ts",
+      "cli": true,
+      "tools": [],
+      "requires": ["gmail-app-password"],
+      "config": {
+        "vaultBin": "~/.local/bin/mc-vault",
+        "emailAddress": "owner@example.com"
+      }
+    },
+    {
+      "id": "mc-jobs",
+      "label": "Jobs",
+      "description": "Role-specific job templates with workflows, procedures, and review gates for agents.",
+      "path": "plugins/mc-jobs",
+      "entry": "index.ts",
+      "cli": true,
+      "tools": [],
+      "config": {
+        "jobsDir": "~/.openclaw/jobs",
+        "defaultJob": "software-developer"
+      }
+    },
+    {
+      "id": "mc-substack",
+      "label": "Substack",
+      "description": "Substack publishing — drafts, images, scheduling, EN/ES post workflow.",
+      "path": "plugins/mc-substack",
+      "entry": "index.ts",
+      "cli": true,
+      "tools": [],
+      "optional": true,
+      "config": {
+        "subdomain": "",
+        "vaultBin": "~/.local/bin/mc-vault"
+      }
+    },
+    {
+      "id": "mc-backup",
+      "label": "Backup",
+      "description": "Daily tgz backups of the MiniClaw state directory with tiered retention (recent dailies \u2192 monthly \u2192 yearly).",
+      "path": "plugins/mc-backup",
+      "entry": "index.ts",
+      "cli": true,
+      "tools": [],
+      "config": {}
+    },
+    {
+      "id": "mc-stripe",
+      "label": "Stripe",
+      "description": "Shared Stripe payment service \u2014 charge, refund, customer management. Other plugins consume via CLI or direct import.",
+      "path": "plugins/mc-stripe",
+      "entry": "index.ts",
+      "cli": true,
+      "tools": [
+        "stripe_charge",
+        "stripe_refund",
+        "stripe_status",
+        "stripe_customer_create",
+        "stripe_customer_find"
+      ],
+      "optional": true,
+      "requires": ["stripe-secret-key"],
+      "config": {
+        "vaultBin": "~/.local/bin/mc-vault",
+        "testMode": false
+      }
+    },
+    {
+      "id": "mc-square",
+      "label": "Square",
+      "description": "Square payment service \u2014 charge, refund, payment links. Zero deps, raw fetch to Square REST API v2.",
+      "path": "plugins/mc-square",
+      "entry": "index.ts",
+      "cli": true,
+      "tools": [
+        "square_charge",
+        "square_refund",
+        "square_status",
+        "square_list_payments",
+        "square_payment_link"
+      ],
+      "optional": true,
+      "requires": ["square-access-token"],
+      "config": {
+        "vaultBin": "~/.local/bin/mc-vault",
+        "environment": "sandbox",
+        "locationId": "",
+        "currency": "USD"
+      }
+    },
+    {
+      "id": "mc-authenticator",
+      "label": "Authenticator",
+      "description": "TOTP 2FA code generation — Google Authenticator compatible. Gives the agent autonomous 2FA capability.",
+      "path": "plugins/mc-authenticator",
+      "entry": "index.ts",
+      "cli": true,
+      "tools": ["auth_code", "auth_list", "auth_time_remaining"],
+      "optional": true,
+      "config": {
+        "vaultBin": "~/.local/bin/mc-vault"
+      }
+    },
+    {
+      "id": "mc-booking",
+      "label": "Booking",
+      "description": "Appointment scheduling with Turso cloud DB, payment provider integration, and embeddable booking widget.",
+      "path": "plugins/mc-booking",
+      "entry": "index.ts",
+      "cli": true,
+      "tools": [
+        "booking_slots",
+        "booking_list",
+        "booking_show",
+        "booking_cancel",
+        "booking_reschedule"
+      ],
+      "optional": true,
+      "requires": ["turso-booking-url"],
+      "web": {
+        "port": 4221
+      },
+      "config": {
+        "vaultBin": "~/.local/bin/mc-vault",
+        "paymentProvider": "stripe",
+        "port": 4221,
+        "origins": ["https://miniclaw.bot", "https://augmentedmike.com"],
+        "availableDays": [1, 2, 3],
+        "timeSlots": [17, 18, 19],
+        "durationMinutes": 90,
+        "priceCents": 19900,
+        "maxPerDay": 1,
+        "windowWeeks": 4
+      }
+    }
+  ],
+  "cli": [
+    {
+      "name": "mc",
+      "path": "SYSTEM/bin/mc",
+      "description": "Main miniclaw CLI wrapper"
+    },
+    {
+      "name": "mc-vault",
+      "path": "SYSTEM/bin/mc-vault",
+      "description": "age-encrypted secret store \u2014 get/set/export/list/rm"
+    },
+    {
+      "name": "mc-smoke",
+      "path": "SYSTEM/bin/mc-smoke",
+      "description": "Health check \u2014 verifies all miniclaw components are installed and running"
+    },
+    {
+      "name": "mc-doctor",
+      "path": "SYSTEM/bin/mc-doctor",
+      "description": "Diagnostics and auto-repair \u2014 identifies and fixes common configuration issues"
+    },
+    {
+      "name": "mc-update",
+      "path": "SYSTEM/bin/mc-update",
+      "description": "Check for and apply updates from the stable release \u2014 runs daily at 4am automatically"
+    }
+  ],
+  "crons": [
+    {
+      "name": "board-worker-backlog",
+      "description": "Triage: surveys backlog, selects best candidate per project (max 3), fills details, moves to in-progress",
+      "schedule": {
+        "kind": "cron",
+        "expr": "*/5 * * * *"
+      },
+      "timeoutSeconds": 600,
+      "sessionTarget": "isolated"
+    },
+    {
+      "name": "board-worker-in-progress",
+      "description": "Triage: surveys in-progress, selects best per project (max 3), does one unit of work, checks criteria",
+      "schedule": {
+        "kind": "cron",
+        "expr": "1-59/5 * * * *"
+      },
+      "timeoutSeconds": 600,
+      "sessionTarget": "isolated"
+    },
+    {
+      "name": "board-worker-in-review",
+      "description": "Triage: surveys in-review, selects best per project (max 3), verifies + deploys, ships or fails back",
+      "schedule": {
+        "kind": "cron",
+        "expr": "2-59/5 * * * *"
+      },
+      "timeoutSeconds": 600,
+      "sessionTarget": "isolated"
+    },
+    {
+      "name": "nightly-voice-analyze",
+      "description": "Nightly voice style analysis — run voice-analyze for michael, update style-profile.json and michael-voice-profile.md",
+      "schedule": { "kind": "cron", "expr": "17 3 * * *", "tz": "America/Chicago" },
+      "model": "claude-haiku-4-5-20251001",
+      "timeoutSeconds": 300,
+      "sessionTarget": "isolated"
+    }
+  ],
+  "launchAgents": [
+    {
+      "name": "com.augmentedmike.miniclaw-brain-web",
+      "description": "Brain board web UI \u2014 standalone.mjs server on port 4220",
+      "script": "plugins/mc-board/web/standalone.mjs",
+      "plist": "system/launchagents/com.augmentedmike.miniclaw-brain-web.plist"
+    }
+  ],
+  "vaultSecrets": [
+    {
+      "key": "gh-token",
+      "description": "GitHub personal access token",
+      "required": true
+    },
+    {
+      "key": "gmail-app-password",
+      "description": "Gmail app password for email integration",
+      "required": false
+    },
+    {
+      "key": "gemini-api-key",
+      "description": "Gemini API key for mc-designer (image generation)",
+      "required": false
+    },
+    {
+      "key": "stripe-secret-key",
+      "description": "Stripe secret API key (sk_test_... or sk_live_...)",
+      "required": false
+    },
+    {
+      "key": "stripe-publishable-key",
+      "description": "Stripe publishable API key (pk_test_... or pk_live_...)",
+      "required": false
+    },
+    {
+      "key": "square-access-token",
+      "description": "Square personal access token for payment processing",
+      "required": false
+    },
+    {
+      "key": "turso-booking-url",
+      "description": "Turso database URL for mc-booking (libsql://...)",
+      "required": false
+    },
+    {
+      "key": "turso-booking-token",
+      "description": "Turso auth token for mc-booking database",
+      "required": false
+    }
+  ],
+  "apps": [
+    {
+      "id": "am-setup",
+      "label": "AM Setup Wizard",
+      "description": "Consumer onboarding wizard and personal dashboard for first-time AM installation. No terminal required.",
+      "path": "apps/am-setup",
+      "port": 4210,
+      "pm2": "am-setup",
+      "entryUrl": "http://localhost:4210",
+      "setupState": "~/.openclaw/USER/setup-state.json"
+    }
+  ]
+}

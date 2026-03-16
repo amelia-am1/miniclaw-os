@@ -1,0 +1,3 @@
+ancestorEntries = ["plugins/mc-board/web/src/app/api/setup/complete/route.ts"]
+ourEntries = ["plugins/mc-board/web/src/app/api/setup/complete/route.ts"]
+theirEntries = ["plugins/mc-board/web/src/app/api/setup/complete/route.ts"]

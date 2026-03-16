@@ -1,0 +1,18 @@
+{
+  "name": "mc-designer",
+  "version": "0.2.0",
+  "type": "module",
+  "main": "index.ts",
+  "description": "Visual creation studio — the agent's occipital lobe",
+  "bin": {
+    "mc-designer": "./cli.ts"
+  },
+  "dependencies": {
+    "@google/genai": "^0.7.0",
+    "commander": "^13.0.0",
+    "sharp": "^0.33.0"
+  },
+  "devDependencies": {
+    "openclaw": "npm:@miniclaw_official/openclaw@^2026.3.8"
+  }
+}

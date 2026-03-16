@@ -1,0 +1,260 @@
+#!/usr/bin/env bash
+# mc vault — age-encrypted secret store
+#
+# Call paths:
+#   ~/.openclaw/miniclaw/vault/cli <cmd>     Direct
+#   mc vault <cmd>                    Via miniclaw wrapper
+#   oc mc-vault <cmd>                 Via openclaw plugin
+#
+# Usage:
+#   mc vault init                   First-time setup: generate key, create dirs
+#   mc vault set <key> <value>      Store a secret (encrypted at rest)
+#   mc vault set <key> -            Read value from stdin
+#   mc vault get <key>              Retrieve and decrypt a secret
+#   mc vault export <key>           Raw decrypted output (for eval/piping)
+#   mc vault list                   List stored keys with notes
+#   mc vault rm <key>               Remove a secret and its note
+#   mc vault note <key> [text]      Attach/view plaintext description
+#
+#   mc vault memo set <name> <text> Store encrypted private note
+#   mc vault memo set <name> -      Read memo from stdin
+#   mc vault memo get <name>        Decrypt and read memo
+#   mc vault memo list              List memo names
+#   mc vault memo rm <name>         Delete memo
+set -euo pipefail
+
+# ── Resolve MINICLAW_HOME ──────────────────────────────────────────────────────
+# Priority: env var > derive from real script location (follows symlinks)
+if [[ -z "${MINICLAW_HOME:-}" ]]; then
+  SOURCE="${BASH_SOURCE[0]}"
+  while [[ -L "$SOURCE" ]]; do
+    DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
+    SOURCE="$(readlink "$SOURCE")"
+    [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
+  done
+  SCRIPT_DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
+  MINICLAW_HOME="$(dirname "$SCRIPT_DIR")"
+fi
+
+AGE_BIN="${OPENCLAW_AGE_BIN:-/opt/homebrew/bin/age}"
+AGE_KEYGEN_BIN="${OPENCLAW_AGE_KEYGEN_BIN:-/opt/homebrew/bin/age-keygen}"
+VAULT_ROOT="${OPENCLAW_VAULT_ROOT:-${MINICLAW_HOME}/SYSTEM/vault}"
+KEY_FILE="${VAULT_ROOT}/key.txt"
+STORE_DIR="${VAULT_ROOT}/secrets"
+NOTES_DIR="${VAULT_ROOT}/notes"
+MEMOS_DIR="${VAULT_ROOT}/memos"
+
+usage() {
+  echo "mc vault — age-encrypted secret store"
+  echo ""
+  echo "Usage:"
+  echo "  mc vault init                   First-time setup (generate key, create dirs)"
+  echo "  mc vault set <key> <value>      Store a secret (encrypted at rest)"
+  echo "  mc vault set <key> -            Read value from stdin"
+  echo "  mc vault get <key>              Retrieve and decrypt a secret"
+  echo "  mc vault export <key>           Raw decrypted output (no label, for piping)"
+  echo "  mc vault list                   List all secrets with notes"
+  echo "  mc vault rm <key>               Remove a secret and its note"
+  echo "  mc vault note <key> [text]      Attach or view plaintext description"
+  echo ""
+  echo "  mc vault memo set <name> <text> Store encrypted private note"
+  echo "  mc vault memo set <name> -      Read memo text from stdin"
+  echo "  mc vault memo get <name>        Decrypt and display memo"
+  echo "  mc vault memo list              List memo names"
+  echo "  mc vault memo rm <name>         Delete a memo"
+  echo ""
+  echo "Vault dir: ${VAULT_ROOT}"
+}
+
+require_key() {
+  if [[ ! -f "$KEY_FILE" ]]; then
+    echo "Error: No age key found at ${KEY_FILE}" >&2
+    echo "Run: mc vault init" >&2
+    exit 1
+  fi
+}
+
+get_pubkey() {
+  grep 'age1' "$KEY_FILE" | sed 's/.*\(age1[a-z0-9]*\)/\1/'
+}
+
+cmd="${1:-help}"
+shift || true
+
+case "$cmd" in
+  init)
+    if [[ -f "$KEY_FILE" ]]; then
+      echo "Error: Key already exists at ${KEY_FILE}" >&2
+      echo "Refusing to overwrite. Delete it manually if you really mean it." >&2
+      exit 1
+    fi
+    if [[ -d "${VAULT_ROOT}/secrets" ]] && ls "${VAULT_ROOT}/secrets"/*.age &>/dev/null 2>&1; then
+      echo "Error: Existing secrets found in ${VAULT_ROOT}/secrets/" >&2
+      echo "Cannot init a new key — it would orphan existing encrypted data." >&2
+      echo "Restore the original key.txt or move secrets out first." >&2
+      exit 1
+    fi
+    mkdir -p "${VAULT_ROOT}/secrets" "${VAULT_ROOT}/notes" "${VAULT_ROOT}/memos"
+    chmod 700 "$VAULT_ROOT"
+    "${AGE_KEYGEN_BIN}" -o "$KEY_FILE"
+    chmod 600 "$KEY_FILE"
+    echo "Vault initialized at ${VAULT_ROOT}"
+    echo "Key: ${KEY_FILE}"
+    ;;
+
+  set)
+    require_key
+    key="${1:?Usage: mc vault set <key> <value>}"
+    shift
+    if [[ "${1:-}" == "-" ]]; then
+      value=$(cat)
+    else
+      value="${*:?Usage: mc vault set <key> <value>}"
+    fi
+    PUB_KEY=$(get_pubkey)
+    echo -n "$value" | "${AGE_BIN}" -r "$PUB_KEY" -o "${STORE_DIR}/${key}.age"
+    chmod 600 "${STORE_DIR}/${key}.age"
+    echo "Stored: $key"
+    ;;
+
+  get)
+    require_key
+    key="${1:?Usage: mc vault get <key>}"
+    file="${STORE_DIR}/${key}.age"
+    if [[ ! -f "$file" ]]; then
+      echo "Error: No secret found for '${key}'" >&2
+      exit 1
+    fi
+    echo -n "${key} = "
+    "${AGE_BIN}" -d -i "$KEY_FILE" "$file"
+    echo ""
+    ;;
+
+  export)
+    require_key
+    key="${1:?Usage: mc vault export <key>}"
+    file="${STORE_DIR}/${key}.age"
+    if [[ ! -f "$file" ]]; then
+      echo "Error: No secret found for '${key}'" >&2
+      exit 1
+    fi
+    "${AGE_BIN}" -d -i "$KEY_FILE" "$file"
+    ;;
+
+  note)
+    require_key
+    key="${1:?Usage: mc vault note <key> [text]}"
+    shift || true
+    note_file="${NOTES_DIR}/${key}.txt"
+    if [[ $# -gt 0 ]]; then
+      echo "$*" > "$note_file"
+      echo "Note set: $key"
+    else
+      if [[ -f "$note_file" ]]; then
+        cat "$note_file"
+      else
+        echo "(no note)"
+      fi
+    fi
+    ;;
+
+  list|ls)
+    require_key
+    if ls "${STORE_DIR}"/*.age &>/dev/null 2>&1; then
+      for f in "${STORE_DIR}"/*.age; do
+        k=$(basename "$f" .age)
+        note_file="${NOTES_DIR}/${k}.txt"
+        if [[ -f "$note_file" ]]; then
+          printf "%-28s  # %s\n" "$k" "$(cat "$note_file")"
+        else
+          echo "$k"
+        fi
+      done
+    else
+      echo "(no secrets stored)"
+    fi
+    ;;
+
+  rm|delete)
+    require_key
+    key="${1:?Usage: mc vault rm <key>}"
+    file="${STORE_DIR}/${key}.age"
+    if [[ ! -f "$file" ]]; then
+      echo "Error: No secret found for '${key}'" >&2
+      exit 1
+    fi
+    rm "$file"
+    [[ -f "${NOTES_DIR}/${key}.txt" ]] && rm "${NOTES_DIR}/${key}.txt"
+    echo "Removed: $key"
+    ;;
+
+  memo)
+    require_key
+    subcmd="${1:-list}"
+    shift || true
+    case "$subcmd" in
+      set)
+        name="${1:?Usage: mc vault memo set <name> <text>}"
+        shift
+        if [[ "${1:-}" == "-" ]]; then
+          text=$(cat)
+        else
+          text="${*:?Usage: mc vault memo set <name> <text>}"
+        fi
+        PUB_KEY=$(get_pubkey)
+        echo -n "$text" | "${AGE_BIN}" -r "$PUB_KEY" -o "${MEMOS_DIR}/${name}.age"
+        chmod 600 "${MEMOS_DIR}/${name}.age"
+        echo "Memo stored: $name"
+        ;;
+
+      get)
+        name="${1:?Usage: mc vault memo get <name>}"
+        file="${MEMOS_DIR}/${name}.age"
+        if [[ ! -f "$file" ]]; then
+          echo "Error: No memo found for '${name}'" >&2
+          exit 1
+        fi
+        echo "=== ${name} ==="
+        "${AGE_BIN}" -d -i "$KEY_FILE" "$file"
+        echo ""
+        ;;
+
+      list|ls)
+        if ls "${MEMOS_DIR}"/*.age &>/dev/null 2>&1; then
+          for f in "${MEMOS_DIR}"/*.age; do
+            echo "$(basename "$f" .age)"
+          done
+        else
+          echo "(no memos stored)"
+        fi
+        ;;
+
+      rm|delete)
+        name="${1:?Usage: mc vault memo rm <name>}"
+        file="${MEMOS_DIR}/${name}.age"
+        if [[ ! -f "$file" ]]; then
+          echo "Error: No memo found for '${name}'" >&2
+          exit 1
+        fi
+        rm "$file"
+        echo "Memo removed: $name"
+        ;;
+
+      *)
+        echo "Unknown memo subcommand: $subcmd" >&2
+        usage >&2
+        exit 1
+        ;;
+    esac
+    ;;
+
+  help|--help|-h)
+    usage
+    ;;
+
+  *)
+    echo "Unknown command: $cmd" >&2
+    usage >&2
+    exit 1
+    ;;
+esac
