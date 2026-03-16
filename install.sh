@@ -1834,13 +1834,13 @@ import json, sys, uuid
 from datetime import datetime
 cfg = json.load(open(sys.argv[1]))
 contacts = [
-    {"id": str(uuid.uuid4()), "name": cfg.get("ghUsername", "My Human"), "emails": [], "phones": [], "domains": [],
+    {"id": str(uuid.uuid4()), "name": "My Human", "emails": [], "phones": [], "domains": [],
      "tags": ["owner", "human"], "trustStatus": "verified", "lastVerified": datetime.utcnow().isoformat(),
-     "notes": f"GitHub: {cfg.get('ghUsername', '')}. Added during setup." if cfg.get('ghUsername') else "Human owner."},
+     "notes": "Human owner — added during setup."},
     {"id": str(uuid.uuid4()), "name": cfg.get("assistantName", "MiniClaw"),
      "emails": [cfg["emailAddress"]] if cfg.get("emailAddress") else [], "phones": [], "domains": [],
      "tags": ["agent", "self"], "trustStatus": "verified", "lastVerified": datetime.utcnow().isoformat(),
-     "notes": f"AI agent ({cfg.get('shortName', cfg.get('assistantName', 'mc'))})."}
+     "notes": f"AI agent ({cfg.get('shortName', 'mc')}). GitHub: {cfg.get('ghUsername')}." if cfg.get("ghUsername") else f"AI agent ({cfg.get('shortName', 'mc')})."}
 ]
 with open(sys.argv[2], "w") as f: json.dump(contacts, f, indent=2); f.write("\n")
 print(f"  Seeded {len(contacts)} contacts")
