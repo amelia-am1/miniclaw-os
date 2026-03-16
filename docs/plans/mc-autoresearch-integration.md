@@ -1,151 +1,206 @@
-# Plan: mc-autoresearch — Autonomous ML Research Plugin
+# Plan: mc-research — Autonomous Research Agent
 
 ## Source
 
-[karpathy/autoresearch](https://github.com/karpathy/autoresearch) — AI agents running research on single-GPU nanochat training automatically.
+[karpathy/autoresearch](https://github.com/karpathy/autoresearch) — The pattern, not the ML specifics. Andrej's insight: give an agent a hypothesis, a fixed-time experiment, a metric, and let it iterate autonomously. Works for any research, not just ML.
 
-## What it does
+## The Pattern
 
-An agent modifies a training script (train.py), runs 5-minute experiments, evaluates val_bpb (validation bits per byte), keeps improvements, reverts failures, and repeats. ~12 experiments/hour, ~100 overnight. No human needed.
+```
+propose hypothesis → design experiment → execute (fixed time) → measure → learn → repeat
+```
 
-## Why it fits MiniClaw
-
-MiniClaw agents already:
-- Run autonomous work loops (agent-runner, cron workers)
-- Track work on a kanban board (mc-board)
-- Store knowledge and lessons (mc-kb)
-- File issues and PRs (mc-github, mc-contribute)
-- Self-repair and iterate
-
-Autoresearch is the same pattern applied to ML: propose → execute → evaluate → learn → repeat. MiniClaw is the orchestration layer that autoresearch is missing.
+This is the scientific method on autopilot. The agent runs 100 experiments overnight. You wake up to findings.
 
 ---
 
-## Integration Plan
+## What MiniClaw already has
 
-### Phase 1: mc-autoresearch plugin (wrapper)
+| Capability | Plugin |
+|---|---|
+| Task tracking | mc-board (cards as experiments) |
+| Long-term memory | mc-kb (store findings, avoid repeats) |
+| Web research | mc-seo, browser automation |
+| Email outreach | mc-email |
+| Contact management | mc-rolodex |
+| Content creation | mc-blog, mc-designer, mc-substack |
+| Scheduling | mc-booking |
+| Payments | mc-stripe, mc-square |
+| Code execution | agent-runner (spawns claude) |
+| Cron scheduling | mc-jobs (run experiments on schedule) |
 
-**What:** An OpenClaw plugin that wraps autoresearch's experiment loop and connects it to MiniClaw's brain.
+MiniClaw is already a research platform. It just doesn't think of itself as one.
 
-**Plugin structure:**
+---
+
+## mc-research plugin
+
+### Core concept
+
+A research project is:
+1. **A question** — "What email subject lines get the best open rates?"
+2. **A method** — "Send 10 variations to segments of 50, measure opens after 24h"
+3. **A metric** — open rate (%)
+4. **A time budget** — 24h per experiment batch
+5. **A knowledge base** — all past experiments and their results
+
+The agent proposes experiments, executes them using existing mc-* plugins, measures results, stores findings in mc-kb, and proposes the next experiment.
+
+### Plugin structure
+
 ```
-plugins/mc-autoresearch/
+plugins/mc-research/
 ├── openclaw.plugin.json
 ├── package.json
 ├── index.ts
 ├── tools/definitions.ts
 ├── cli/commands.ts
 └── src/
-    ├── config.ts        # experiment config (GPU, time budget, model)
-    ├── runner.ts        # spawns uv run train.py, captures metrics
-    ├── tracker.ts       # SQLite experiment log (run_id, val_bpb, changes, duration)
-    └── strategy.ts      # reads program.md, decides next experiment
+    ├── config.ts         # research project config
+    ├── project.ts        # project CRUD (SQLite)
+    ├── experiment.ts     # experiment lifecycle
+    └── analysis.ts       # compare results, find patterns
 ```
 
-**Agent tools:**
-- `research_start` — begin an experiment run (or series)
-- `research_status` — current experiment progress, metrics
-- `research_history` — past experiments with val_bpb trends
-- `research_propose` — agent proposes a change to train.py
-- `research_evaluate` — compare two runs
-- `research_best` — show the best-performing configuration
+### Agent tools
 
-**CLI commands:**
-- `mc autoresearch run` — single 5-min experiment
-- `mc autoresearch loop --hours 8` — overnight loop
-- `mc autoresearch history` — experiment table
-- `mc autoresearch best` — best val_bpb and its train.py
+- `research_create_project` — define a research question, method, metric
+- `research_propose` — agent proposes next experiment based on findings
+- `research_execute` — run the experiment (delegates to mc-email, mc-seo, etc.)
+- `research_record` — log results with metric value
+- `research_analyze` — compare experiments, find what works
+- `research_report` — generate a findings report
+- `research_history` — all experiments for a project
 
-### Phase 2: Board integration
+### Research types and how they map to mc-* plugins
 
-**Each experiment = a card on mc-board.**
+**Market research**
+- Method: web scraping, competitor monitoring
+- Tools: browser automation, mc-seo crawl
+- Metric: market share %, pricing delta, feature gap count
 
-The agent creates cards like:
-- "Experiment #47: increase n_layer from 6 to 8"
-- Acceptance criteria: val_bpb < current best
-- Auto-moves to shipped/failed based on result
-- Work log contains the diff, metrics, duration
+**Email optimization**
+- Method: A/B test subject lines, send times, content
+- Tools: mc-email (send variants), measure open/reply rates
+- Metric: open rate %, reply rate %, conversion rate %
 
-This gives you a visual dashboard of ML research progress.
+**SEO experiments**
+- Method: change page titles, meta descriptions, content structure
+- Tools: mc-seo (crawl, rank check), mc-blog (publish variants)
+- Metric: search rank position, click-through rate
 
-### Phase 3: Knowledge base integration
+**Content strategy**
+- Method: publish different formats, topics, styles
+- Tools: mc-blog, mc-substack, mc-social (X, Reddit)
+- Metric: views, engagement, shares, subscriber growth
 
-**Every experiment result goes to mc-kb.**
+**Customer discovery**
+- Method: outreach to potential customers, track responses
+- Tools: mc-email, mc-rolodex, mc-booking
+- Metric: response rate %, meeting book rate %, deal close rate
 
-```
-Type: fact
-Title: "n_layer=8 improves val_bpb by 0.3%"
-Content: "Experiment #47: changed n_layer from 6 to 8..."
-Tags: autoresearch, architecture, nanochat
-```
+**Pricing research**
+- Method: test different price points, offers, bundles
+- Tools: mc-stripe, mc-square, mc-booking
+- Metric: conversion rate %, revenue per visitor
 
-The agent searches mc-kb before proposing changes — "what did we learn about layer count?" — avoiding repeated failures.
+**Academic/literature research**
+- Method: search papers, extract findings, synthesize
+- Tools: browser automation, mc-kb (store citations)
+- Metric: papers reviewed, key findings extracted, gaps identified
 
-### Phase 4: Apple Silicon adaptation
+**Prompt engineering**
+- Method: vary system prompts, measure task completion
+- Tools: agent-runner, mc-board (track card success rate)
+- Metric: task success rate %, tokens used, time to completion
 
-Autoresearch requires NVIDIA. Community forks exist for Apple Silicon:
-- [miolini/autoresearch-macos](https://github.com/miolini/autoresearch-macos)
-- [trevin-creator/autoresearch-mlx](https://github.com/trevin-creator/autoresearch-mlx)
-
-MiniClaw runs on Macs. The plugin should:
-1. Detect hardware (Apple Silicon vs NVIDIA)
-2. Use the MLX fork on Apple Silicon
-3. Adjust time budget for the hardware (M1 Mini ≠ H100)
-4. Scale model size to fit available memory
-
-### Phase 5: Multi-agent research
-
-Multiple MiniClaw agents (clone swarm) running different experiment strategies:
-- Agent A: architecture changes (layers, heads, dimensions)
-- Agent B: optimizer experiments (learning rate, warmup, schedule)
-- Agent C: data experiments (tokenizer, dataset mix)
-
-Results shared via mc-kb. Best findings from any agent become the baseline for all.
+**Self-optimization**
+- Method: tune plugin configs, cron schedules, context windows
+- Tools: all mc-* plugins
+- Metric: agent efficiency (tokens/task, success rate, human escalations)
 
 ---
 
-## What MiniClaw adds that raw autoresearch doesn't
+## How it works end-to-end
 
-| Autoresearch | MiniClaw + mc-autoresearch |
-|---|---|
-| Single loop, no memory | Persistent KB of all experiments |
-| No visualization | Board cards, timeline, agent runs |
-| Manual program.md editing | Agent refines its own strategy based on results |
-| Single machine | Clone swarm parallel research |
-| Results in git log | Structured experiment DB with search |
-| No notifications | Telegram alerts when breakthrough found |
-| Stops when you close the terminal | LaunchAgent runs indefinitely |
+### Example: Email subject line optimization
+
+1. Human creates project: "Optimize cold outreach email subject lines"
+2. Agent reads mc-kb for past email experiments
+3. Agent proposes 5 subject line variants
+4. Agent sends each variant to 20 contacts via mc-email (tracked in mc-rolodex)
+5. Agent waits 24h (cron job)
+6. Agent checks open rates via mc-email inbox analysis
+7. Agent records results: "Variant C: 45% open rate, Variant A: 12%"
+8. Agent stores finding in mc-kb: "Subject lines with numbers outperform generic ones by 3x"
+9. Agent proposes next batch based on winning variant
+10. Repeat
+
+All visible on mc-board. Each batch = a card. Timeline shows progress. Human reviews findings via Telegram.
+
+### Example: Competitive intelligence
+
+1. Human: "Track what our top 3 competitors are doing"
+2. Agent crawls competitor websites weekly (mc-seo)
+3. Agent compares pricing, features, content changes
+4. Agent stores diffs in mc-kb
+5. Agent generates weekly report via mc-docs
+6. Agent sends summary via Telegram
+7. When significant change detected: alert immediately
+
+---
+
+## Board integration
+
+Each research project = a mc-board project.
+Each experiment = a card.
+
+Card lifecycle:
+- **backlog** — proposed experiment
+- **in-progress** — experiment running
+- **in-review** — results measured, awaiting analysis
+- **shipped** — findings recorded in mc-kb
+
+The board becomes a research dashboard.
+
+---
 
 ## Config
 
 ```json
 {
-  "autoresearch": {
-    "repoPath": "~/.openclaw/miniclaw/USER/projects/autoresearch",
-    "timeBudgetMinutes": 5,
-    "maxExperimentsPerSession": 100,
-    "hardware": "auto",
-    "notifyOnImprovement": true,
-    "strategy": "explore-then-exploit"
+  "mc-research": {
+    "maxConcurrentProjects": 3,
+    "defaultTimeBudget": "24h",
+    "autoPropose": true,
+    "notifyOnFinding": true,
+    "minExperimentsBeforeReport": 5
   }
 }
 ```
 
-## Dependencies
+---
 
-- Python 3.10+ (already installed by install.sh)
-- uv package manager (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
-- PyTorch (installed by autoresearch's uv sync)
-- GPU: Apple Silicon (MLX) or NVIDIA (CUDA)
+## What autoresearch taught us
+
+1. **Fixed time budget** — every experiment runs for the same duration. Apples to apples.
+2. **Single metric** — one number to optimize. No ambiguity.
+3. **Agent freedom within constraints** — the agent chooses what to try, but the experiment framework is fixed.
+4. **program.md** — human writes the research strategy, agent executes it. Human refines strategy based on results.
+5. **Persistence** — every experiment is logged. The agent never forgets what it tried.
+
+MiniClaw already has all of this. mc-research just formalizes the pattern.
+
+---
 
 ## Estimated effort
 
-- Phase 1 (wrapper plugin): 1 session
-- Phase 2 (board integration): 1 session
-- Phase 3 (KB integration): half session
-- Phase 4 (Apple Silicon): 1 session (fork adaptation)
-- Phase 5 (multi-agent): future
+- Phase 1: Core plugin (project CRUD, experiment lifecycle, tools) — 1 session
+- Phase 2: Board integration (cards as experiments) — 1 session
+- Phase 3: KB integration (findings storage and search) — half session
+- Phase 4: Example research templates (email, SEO, pricing) — 1 session
+- Phase 5: Cron-driven autonomous loop — already built (agent-runner)
 
 ## First step
 
-Clone the Apple Silicon fork, get it running on a Mac Mini, then wrap it in mc-autoresearch.
+Build the plugin with one research type (email subject line optimization) as the proof of concept. The rest are just different tools called from the same experiment loop.
