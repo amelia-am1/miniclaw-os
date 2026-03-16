@@ -203,10 +203,10 @@ else
 fi
 
 # #112: example config file exists
-if [[ -f "$REPO_DIR/examples/headless-config.json" ]]; then
+if [[ -f "$REPO_DIR/examples/headless-config.example.json" ]]; then
   pass "#112 example headless config exists"
 else
-  fail "#112 example headless config missing" "add examples/headless-config.json"
+  fail "#112 example headless config missing" "add examples/headless-config.example.json"
 fi
 
 echo ""
