@@ -427,28 +427,28 @@ function seedRolodexContacts() {
 
   const contacts = [];
 
-  // Human owner contact
-  const humanName = (setupState as Record<string, string>).ghUsername || "Human Owner";
-  const humanEmail = setupState.emailAddress || "";
+  // Human owner contact — ghUsername is their GitHub handle, email step is the AGENT's email
+  const humanGh = (setupState as Record<string, string>).ghUsername || "";
   contacts.push({
     id: crypto.randomUUID(),
-    name: humanName,
-    emails: humanEmail ? [humanEmail] : [],
+    name: "My Human",
+    emails: [],
     phones: [],
     domains: [],
     tags: ["owner", "human"],
     trustStatus: "verified",
     lastVerified: new Date().toISOString(),
-    notes: "Human owner — added during setup.",
+    notes: humanGh ? `GitHub: ${humanGh}. Added during setup.` : "Human owner — added during setup.",
   });
 
-  // Agent contact
+  // Agent contact — emailAddress from the wizard is the AGENT's email
   const agentName = setupState.assistantName || "MiniClaw";
   const agentShort = setupState.shortName || agentName;
+  const agentEmail = setupState.emailAddress || "";
   contacts.push({
     id: crypto.randomUUID(),
     name: agentName,
-    emails: [],
+    emails: agentEmail ? [agentEmail] : [],
     phones: [],
     domains: [],
     tags: ["agent", "self"],
