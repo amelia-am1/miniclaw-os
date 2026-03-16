@@ -292,9 +292,18 @@ elif [[ "$CHECK_ONLY" == true ]]; then
   warn "Tailscale not found — remote access and mc-human will not work"
 else
   info "Installing Tailscale..."
-  run_quiet brew install --cask tailscale \
-    && ok "Tailscale installed" \
-    || warn "Tailscale install failed — download from https://tailscale.com/download/mac"
+  TS_ZIP="/tmp/tailscale-$$.zip"
+  TS_TMP="/tmp/tailscale-extract-$$"
+  if curl -fsSL "https://pkgs.tailscale.com/stable/Tailscale-1.94.2-macos.zip" -o "$TS_ZIP" 2>>"$LOG_FILE"; then
+    rm -rf "$TS_TMP" && mkdir -p "$TS_TMP"
+    unzip -q -o "$TS_ZIP" -d "$TS_TMP"
+    cp -a "$TS_TMP/Tailscale.app" "/Applications/Tailscale.app"
+    rm -rf "$TS_ZIP" "$TS_TMP"
+    open -a Tailscale 2>/dev/null || true
+    ok "Tailscale installed and launched"
+  else
+    warn "Tailscale download failed — install from https://pkgs.tailscale.com/stable/#macos"
+  fi
 fi
 
 # Google Chrome (required for browser automation via remote debugging)
