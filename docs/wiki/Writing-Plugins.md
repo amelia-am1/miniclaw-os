@@ -101,7 +101,7 @@ Both directory names are **CAPS** — they mark the system/user boundary.
 $OPENCLAW_STATE_DIR/
 ├── miniclaw/
 │   ├── SYSTEM/          # Shipped by MiniClaw — never overwritten by the user
-│   │   ├── bin/         # mc-vault, mc, mc-smoke, voice-analyze, etc.
+│   │   ├── bin/         # mc-vault, mc, mc-smoke, etc.
 │   │   └── vault/       # Age-encrypted secret store
 │   └── plugins/         # Installed plugins
 ├── USER/                # Owned by the user's agent
@@ -110,7 +110,6 @@ $OPENCLAW_STATE_DIR/
 │       ├── kb/          # Knowledge base (SQLite)
 │       ├── media/       # Generated images, screenshots (per-plugin subdirs)
 │       ├── memos/       # Per-card scratchpads
-│       ├── voice/       # Voice analysis DB
 │       ├── rolodex/     # Contact data
 │       ├── docs/        # Authored documents
 │       ├── seo/         # SEO tracking data

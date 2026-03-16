@@ -717,9 +717,6 @@ SOUL_BACKUPS_DIR="$STATE_DIR/soul-backups"
 mkdir -p "$USER_MEMORY_DIR"
 ok "~/.openclaw/USER/memory/"
 
-mkdir -p "$STATE_DIR/USER/voice"
-ok "~/.openclaw/USER/voice/"
-
 mkdir -p "$STATE_DIR/USER/brain"
 ok "~/.openclaw/USER/brain/"
 

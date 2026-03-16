@@ -360,14 +360,6 @@
       },
       "timeoutSeconds": 600,
       "sessionTarget": "isolated"
-    },
-    {
-      "name": "nightly-voice-analyze",
-      "description": "Nightly voice style analysis — run voice-analyze for michael, update style-profile.json and michael-voice-profile.md",
-      "schedule": { "kind": "cron", "expr": "17 3 * * *", "tz": "America/Chicago" },
-      "model": "claude-haiku-4-5-20251001",
-      "timeoutSeconds": 300,
-      "sessionTarget": "isolated"
     }
   ],
   "launchAgents": [
