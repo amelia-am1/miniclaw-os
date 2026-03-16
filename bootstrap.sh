@@ -103,7 +103,7 @@ fi
 rm -rf "$EXTRACT_TMP"
 
 # ── Prep state dir ───────────────────────────────────────────────────────────
-mkdir -p "$STATE_DIR/USER" "$STATE_DIR/logs" "$STATE_DIR/miniclaw/USER/projects"
+mkdir -p "$STATE_DIR/USER" "$STATE_DIR/logs" "$STATE_DIR/miniclaw/USER/projects" "$STATE_DIR/.tailscale"
 rm -f "$STATE_DIR/USER/setup-state.json"
 ln -sfn "$STATE_DIR/miniclaw/USER/projects" "$HOME/mc-projects"
 
