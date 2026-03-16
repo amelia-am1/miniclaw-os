@@ -1,11 +1,30 @@
 import { execSync } from "node:child_process";
 import * as fs from "node:fs";
+import * as path from "node:path";
+import * as os from "node:os";
 import * as net from "node:net";
 import type { BrowserConfig } from "../index.js";
 
 interface CommandContext {
   program: any;
   logger: { info: (m: string) => void; warn: (m: string) => void };
+}
+
+const CHROME_APP = "/Applications/Google Chrome.app";
+const POLICY_DIR = "/Library/Google/Chrome/Managed Preferences";
+const POLICY_FILE = `${POLICY_DIR}/com.google.Chrome.plist`;
+const LAUNCH_AGENT_LABEL = "com.miniclaw.mc-chrome";
+
+function relayExtensionDir(cfg: BrowserConfig): string {
+  return path.join(cfg.stateDir, "miniclaw/plugins/mc-browser/assets/extension");
+}
+
+function launchAgentPlistPath(): string {
+  return path.join(os.homedir(), "Library/LaunchAgents", `${LAUNCH_AGENT_LABEL}.plist`);
+}
+
+function mcChromeBin(cfg: BrowserConfig): string {
+  return path.join(cfg.stateDir, "miniclaw/SYSTEM/bin/mc-chrome");
 }
 
 export function registerBrowserCommands(ctx: CommandContext, cfg: BrowserConfig): void {
@@ -20,9 +39,8 @@ export function registerBrowserCommands(ctx: CommandContext, cfg: BrowserConfig)
       let ok = true;
 
       // 1. Chrome installed?
-      const chromeApp = "/Applications/Google Chrome.app";
-      if (fs.existsSync(chromeApp)) {
-        console.log(`  ✓  Chrome installed at ${chromeApp}`);
+      if (fs.existsSync(CHROME_APP)) {
+        console.log(`  ✓  Chrome installed at ${CHROME_APP}`);
       } else {
         console.log(`  ✗  Chrome not found — run: brew install --cask google-chrome`);
         ok = false;
@@ -37,10 +55,9 @@ export function registerBrowserCommands(ctx: CommandContext, cfg: BrowserConfig)
       }
 
       // 3. Extension policy configured?
-      const policyFile = "/Library/Google/Chrome/Managed Preferences/com.google.Chrome.plist";
-      if (fs.existsSync(policyFile)) {
+      if (fs.existsSync(POLICY_FILE)) {
         try {
-          const plistContent = execSync(`defaults read "${policyFile}" ExtensionInstallForcelist 2>/dev/null`, {
+          const plistContent = execSync(`defaults read "${POLICY_FILE}" ExtensionInstallForcelist 2>/dev/null`, {
             encoding: "utf-8",
           });
           const missingExts = cfg.extensionIds.filter((id) => !plistContent.includes(id));
@@ -56,25 +73,41 @@ export function registerBrowserCommands(ctx: CommandContext, cfg: BrowserConfig)
         console.log(`  ⚠  Chrome managed policy not found — run: mc-browser setup`);
       }
 
-      // 4. Remote debugging policy?
+      // 4. Remote debugging policy (RemoteDebuggingAllowed)?
       try {
-        const cmdLineArgs = execSync(
-          `defaults read "/Library/Google/Chrome/Managed Preferences/com.google.Chrome.plist" CommandLineFlagSecurityWarningsEnabled 2>/dev/null`,
+        const val = execSync(
+          `defaults read "${POLICY_FILE}" RemoteDebuggingAllowed 2>/dev/null`,
           { encoding: "utf-8" },
         ).trim();
-        console.log(`  ✓  Chrome command-line flag warnings suppressed`);
+        if (val === "1") {
+          console.log(`  ✓  Remote debugging allowed via Chrome policy`);
+        } else {
+          console.log(`  ⚠  RemoteDebuggingAllowed policy is not enabled`);
+        }
       } catch {
-        // not critical
+        console.log(`  ⚠  RemoteDebuggingAllowed policy not set — run: mc-browser setup`);
       }
 
-      // 5. mc-chrome launcher?
-      const mcChromePaths = [
-        `${cfg.stateDir}/miniclaw/SYSTEM/bin/mc-chrome`,
-        "/usr/local/bin/mc-chrome",
-      ];
-      const mcChrome = mcChromePaths.find((p) => fs.existsSync(p));
-      if (mcChrome) {
-        console.log(`  ✓  mc-chrome launcher at ${mcChrome}`);
+      // 5. LaunchAgent for persistent remote debugging?
+      const plistPath = launchAgentPlistPath();
+      if (fs.existsSync(plistPath)) {
+        console.log(`  ✓  LaunchAgent installed at ${plistPath}`);
+      } else {
+        console.log(`  ⚠  LaunchAgent not installed — run: mc-browser setup`);
+      }
+
+      // 6. Browser Relay extension present?
+      const extDir = relayExtensionDir(cfg);
+      if (fs.existsSync(path.join(extDir, "manifest.json"))) {
+        console.log(`  ✓  Browser Relay extension at ${extDir}`);
+      } else {
+        console.log(`  ⚠  Browser Relay extension not found — run: mc-browser setup`);
+      }
+
+      // 7. mc-chrome launcher?
+      const mcChromeFile = mcChromeBin(cfg);
+      if (fs.existsSync(mcChromeFile)) {
+        console.log(`  ✓  mc-chrome launcher at ${mcChromeFile}`);
       } else {
         console.log(`  ⚠  mc-chrome launcher not found`);
       }
@@ -87,8 +120,7 @@ export function registerBrowserCommands(ctx: CommandContext, cfg: BrowserConfig)
     .description("Install Chrome, configure remote debugging, and set up extension policies")
     .action(async () => {
       // 1. Install Chrome if missing
-      const chromeApp = "/Applications/Google Chrome.app";
-      if (!fs.existsSync(chromeApp)) {
+      if (!fs.existsSync(CHROME_APP)) {
         console.log("Installing Google Chrome...");
         try {
           execSync("brew install --cask google-chrome", { stdio: "inherit" });
@@ -101,18 +133,14 @@ export function registerBrowserCommands(ctx: CommandContext, cfg: BrowserConfig)
         console.log("  ✓  Chrome already installed");
       }
 
-      // 2. Set up extension force-install policy
+      // 2. Set up extension force-install policy (CWS extensions)
       console.log("Configuring Chrome extension policies...");
-      const policyDir = "/Library/Google/Chrome/Managed Preferences";
-      const policyFile = `${policyDir}/com.google.Chrome.plist`;
-
       try {
-        execSync(`sudo mkdir -p "${policyDir}"`, { stdio: "inherit" });
+        execSync(`sudo mkdir -p "${POLICY_DIR}"`, { stdio: "inherit" });
 
-        // Read existing forcelist
         let existing: string[] = [];
         try {
-          const raw = execSync(`defaults read "${policyFile}" ExtensionInstallForcelist 2>/dev/null`, {
+          const raw = execSync(`defaults read "${POLICY_FILE}" ExtensionInstallForcelist 2>/dev/null`, {
             encoding: "utf-8",
           });
           const matches = raw.match(/"([^"]+)"/g);
@@ -123,7 +151,6 @@ export function registerBrowserCommands(ctx: CommandContext, cfg: BrowserConfig)
           // no existing policy
         }
 
-        // Add missing extensions
         for (const extId of cfg.extensionIds) {
           const entry = `${extId};https://clients2.google.com/service/update2/crx`;
           if (!existing.some((e) => e.includes(extId))) {
@@ -131,31 +158,132 @@ export function registerBrowserCommands(ctx: CommandContext, cfg: BrowserConfig)
           }
         }
 
-        // Write policy
         const args = existing.map((e) => `"${e}"`).join(" ");
-        execSync(`sudo defaults write "${policyFile}" ExtensionInstallForcelist -array ${args}`, {
+        execSync(`sudo defaults write "${POLICY_FILE}" ExtensionInstallForcelist -array ${args}`, {
           stdio: "inherit",
         });
         console.log(`  ✓  Extension policy updated (${existing.length} extensions)`);
-      } catch (err) {
+      } catch {
         console.error(`  ✗  Failed to write extension policy (sudo required)`);
       }
 
-      // 3. Set persistent remote debugging args via Chrome policy
+      // 3. Enable persistent remote debugging via Chrome enterprise policy
       console.log("Configuring persistent remote debugging...");
       try {
-        // Use Bookmarks as a proxy to detect if Chrome has ever been launched
-        // Set the remote debugging port as a managed preference
+        // RemoteDebuggingAllowed — Chrome enterprise policy that permits --remote-debugging-port
         execSync(
-          `sudo defaults write "/Library/Google/Chrome/Managed Preferences/com.google.Chrome.plist" CommandLineFlagSecurityWarningsEnabled -bool false`,
+          `sudo defaults write "${POLICY_FILE}" RemoteDebuggingAllowed -bool true`,
           { stdio: "inherit" },
         );
-        console.log(`  ✓  Chrome policy configured`);
+        // Suppress the "you are using an unsupported command-line flag" warning bar
+        execSync(
+          `sudo defaults write "${POLICY_FILE}" CommandLineFlagSecurityWarningsEnabled -bool false`,
+          { stdio: "inherit" },
+        );
+        console.log(`  ✓  Remote debugging policy enabled (RemoteDebuggingAllowed + no warnings)`);
       } catch {
         console.error(`  ⚠  Could not set Chrome policy (sudo required)`);
       }
 
-      console.log("\nBrowser setup complete. Use 'mc-chrome' to launch Chrome with remote debugging.");
+      // 4. Copy Browser Relay extension to plugin assets in state dir
+      console.log("Installing Browser Relay extension...");
+      const extDst = relayExtensionDir(cfg);
+      const extSrc = path.join(__dirname, "..", "assets", "extension");
+      try {
+        if (fs.existsSync(extSrc) && !fs.existsSync(path.join(extDst, "manifest.json"))) {
+          fs.mkdirSync(extDst, { recursive: true });
+          for (const file of fs.readdirSync(extSrc)) {
+            fs.copyFileSync(path.join(extSrc, file), path.join(extDst, file));
+          }
+          console.log(`  ✓  Browser Relay extension copied to ${extDst}`);
+        } else if (fs.existsSync(path.join(extDst, "manifest.json"))) {
+          console.log(`  ✓  Browser Relay extension already installed at ${extDst}`);
+        } else {
+          console.log(`  ⚠  Extension source not found at ${extSrc}`);
+        }
+      } catch (err) {
+        console.error(`  ✗  Failed to copy extension: ${err}`);
+      }
+
+      // 5. Update mc-chrome launcher to load Browser Relay extension
+      console.log("Updating mc-chrome launcher...");
+      const mcChromeFile = mcChromeBin(cfg);
+      try {
+        const launcherScript = `#!/usr/bin/env bash
+# mc-chrome — launch Google Chrome with remote debugging + Browser Relay extension
+set -euo pipefail
+
+CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+PORT="\${MC_CHROME_DEBUG_PORT:-${cfg.cdpPort}}"
+EXT_DIR="${extDst}"
+
+if [[ ! -x "$CHROME" ]]; then
+  echo "error: Google Chrome not found at $CHROME — install via: brew install --cask google-chrome" >&2
+  exit 1
+fi
+
+EXTRA_ARGS=("--remote-debugging-port=$PORT")
+if [[ -d "$EXT_DIR" ]]; then
+  EXTRA_ARGS+=("--load-extension=$EXT_DIR")
+fi
+
+exec "$CHROME" "\${EXTRA_ARGS[@]}" "$@"
+`;
+        fs.mkdirSync(path.dirname(mcChromeFile), { recursive: true });
+        fs.writeFileSync(mcChromeFile, launcherScript, { mode: 0o755 });
+        console.log(`  ✓  mc-chrome updated with --load-extension at ${mcChromeFile}`);
+      } catch (err) {
+        console.error(`  ✗  Failed to update mc-chrome: ${err}`);
+      }
+
+      // 6. Install LaunchAgent so Chrome starts with remote debugging on login
+      console.log("Installing LaunchAgent for persistent remote debugging...");
+      const plistPath = launchAgentPlistPath();
+      try {
+        const plistContent = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${LAUNCH_AGENT_LABEL}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>${mcChromeFile}</string>
+    <string>--no-first-run</string>
+    <string>--no-default-browser-check</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <false/>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>MC_CHROME_DEBUG_PORT</key>
+    <string>${cfg.cdpPort}</string>
+  </dict>
+</dict>
+</plist>
+`;
+        fs.mkdirSync(path.dirname(plistPath), { recursive: true });
+        fs.writeFileSync(plistPath, plistContent);
+        console.log(`  ✓  LaunchAgent installed at ${plistPath}`);
+
+        // Load the agent (don't fail if already loaded)
+        try {
+          execSync(`launchctl unload "${plistPath}" 2>/dev/null || true`, { stdio: "pipe" });
+          execSync(`launchctl load "${plistPath}"`, { stdio: "pipe" });
+          console.log(`  ✓  LaunchAgent loaded`);
+        } catch {
+          console.log(`  ⚠  LaunchAgent written but could not be loaded — will activate on next login`);
+        }
+      } catch (err) {
+        console.error(`  ✗  Failed to install LaunchAgent: ${err}`);
+      }
+
+      console.log("\nBrowser setup complete.");
+      console.log("  Chrome will launch with remote debugging on port " + cfg.cdpPort + " at login.");
+      console.log("  Browser Relay extension will be loaded automatically.");
+      console.log("  Launch now with: mc-chrome");
     });
 }
 

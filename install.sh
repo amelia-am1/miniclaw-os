@@ -481,14 +481,81 @@ if [[ -d "/Applications/Google Chrome.app" ]]; then
       && ok "Chrome remote debugging policy set" \
       || warn "Could not set Chrome debugging policy (sudo required)"
   fi
+
+  # Enable persistent remote debugging via Chrome enterprise policy
+  if [[ "$CHECK_ONLY" != true ]]; then
+    sudo defaults write "$CHROME_POLICY_FILE" RemoteDebuggingAllowed -bool true 2>/dev/null \
+      && ok "RemoteDebuggingAllowed policy enabled" \
+      || warn "Could not set RemoteDebuggingAllowed policy (sudo required)"
+  elif defaults read "$CHROME_POLICY_FILE" RemoteDebuggingAllowed 2>/dev/null | grep -q 1; then
+    ok "RemoteDebuggingAllowed policy enabled"
+  else
+    warn "RemoteDebuggingAllowed policy not set"
+  fi
 fi
 
-# mc-chrome launcher (starts Chrome with remote debugging on port 9222)
+# mc-chrome launcher (starts Chrome with remote debugging on port 9222 + Browser Relay extension)
 MC_CHROME="$REPO_DIR/SYSTEM/bin/mc-chrome"
 if [[ -x "$MC_CHROME" ]]; then
   ok "mc-chrome launcher present"
 else
   fail "mc-chrome launcher missing — expected at $MC_CHROME"
+fi
+
+# Copy Browser Relay extension to plugin assets in state dir
+RELAY_EXT_SRC="$REPO_DIR/plugins/mc-browser/assets/extension"
+RELAY_EXT_DST="$STATE_DIR/miniclaw/plugins/mc-browser/assets/extension"
+if [[ -d "$RELAY_EXT_SRC" ]]; then
+  if [[ "$CHECK_ONLY" != true ]]; then
+    mkdir -p "$RELAY_EXT_DST"
+    cp -R "$RELAY_EXT_SRC/"* "$RELAY_EXT_DST/" 2>/dev/null \
+      && ok "Browser Relay extension installed to $RELAY_EXT_DST" \
+      || warn "Failed to copy Browser Relay extension"
+  elif [[ -f "$RELAY_EXT_DST/manifest.json" ]]; then
+    ok "Browser Relay extension installed"
+  else
+    warn "Browser Relay extension not installed — run installer"
+  fi
+else
+  warn "Browser Relay extension source not found at $RELAY_EXT_SRC"
+fi
+
+# Install LaunchAgent for persistent remote debugging on login
+MC_CHROME_AGENT_PLIST="$HOME/Library/LaunchAgents/com.miniclaw.mc-chrome.plist"
+if [[ "$CHECK_ONLY" != true ]]; then
+  mkdir -p "$HOME/Library/LaunchAgents"
+  cat > "$MC_CHROME_AGENT_PLIST" << PLISTEOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.miniclaw.mc-chrome</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>$MC_CHROME</string>
+    <string>--no-first-run</string>
+    <string>--no-default-browser-check</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <false/>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>MC_CHROME_DEBUG_PORT</key>
+    <string>9222</string>
+    <key>OPENCLAW_STATE_DIR</key>
+    <string>$STATE_DIR</string>
+  </dict>
+</dict>
+</plist>
+PLISTEOF
+  ok "LaunchAgent installed (Chrome starts with remote debugging on login)"
+elif [[ -f "$MC_CHROME_AGENT_PLIST" ]]; then
+  ok "LaunchAgent for mc-chrome installed"
+else
+  warn "LaunchAgent for mc-chrome not installed"
 fi
 
 # ── Step 3: Claude Code ──────────────────────────────────────────────────────

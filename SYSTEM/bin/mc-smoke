@@ -206,6 +206,21 @@ else
   warn "Browser Relay extension not found" "run install.sh to copy plugin assets"
 fi
 
+# RemoteDebuggingAllowed Chrome policy
+if defaults read "$CHROME_POLICY" RemoteDebuggingAllowed 2>/dev/null | grep -q 1; then
+  pass "RemoteDebuggingAllowed Chrome policy enabled"
+else
+  warn "RemoteDebuggingAllowed policy not set" "run: mc-browser setup"
+fi
+
+# LaunchAgent for persistent remote debugging
+MC_CHROME_AGENT="$HOME/Library/LaunchAgents/com.miniclaw.mc-chrome.plist"
+if [[ -f "$MC_CHROME_AGENT" ]]; then
+  pass "mc-chrome LaunchAgent installed (Chrome starts with debugging on login)"
+else
+  warn "mc-chrome LaunchAgent not installed" "run: mc-browser setup"
+fi
+
 # ── board DB ──────────────────────────────────────────────────────────────────
 section "board DB"
 

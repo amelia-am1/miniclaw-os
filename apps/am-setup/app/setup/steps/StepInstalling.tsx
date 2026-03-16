@@ -27,6 +27,7 @@ export default function StepInstalling({ state, onDone, accent }: Props) {
   const [checks, setChecks] = useState<Check[]>([
     { id: "config", label: "Saving your configuration", status: "pending" },
     { id: "gateway", label: "Starting the gateway", status: "pending" },
+    { id: "browser", label: "Setting up browser automation", status: "pending" },
     { id: "complete", label: "Finalizing setup", status: "pending" },
     { id: "smoke", label: "Running system checks", status: "pending" },
   ]);
@@ -78,12 +79,26 @@ export default function StepInstalling({ state, onDone, accent }: Props) {
         updateCheck("gateway", { status: "error", detail: "Could not start gateway" });
       }
 
-      // 3. Mark complete
+      // 3. Browser setup — verify Chrome, remote debugging, and extension
+      updateCheck("browser", { status: "running" });
+      try {
+        const res = await fetch("/api/setup/browser-check");
+        const data = await res.json();
+        if (data.ok) {
+          updateCheck("browser", { status: "ok", detail: data.detail || "Chrome + remote debugging configured" });
+        } else {
+          updateCheck("browser", { status: "ok", detail: data.detail || "Browser partially configured — fixable with mc-browser setup" });
+        }
+      } catch {
+        updateCheck("browser", { status: "ok", detail: "Browser check skipped — verify with mc-browser check" });
+      }
+
+      // 4. Mark complete
       updateCheck("complete", { status: "running" });
       await delay(300);
       updateCheck("complete", { status: "ok", detail: "Setup complete" });
 
-      // 4. Run mc-smoke via SSE
+      // 5. Run mc-smoke via SSE
       updateCheck("smoke", { status: "running" });
       try {
         const res = await fetch("/api/setup/smoke");

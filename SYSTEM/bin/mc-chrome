@@ -1,13 +1,20 @@
 #!/usr/bin/env bash
-# mc-chrome — launch Google Chrome with remote debugging enabled
+# mc-chrome — launch Google Chrome with remote debugging + Browser Relay extension
 set -euo pipefail
 
 CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 PORT="${MC_CHROME_DEBUG_PORT:-9222}"
+STATE_DIR="${OPENCLAW_STATE_DIR:-${HOME}/.openclaw}"
+EXT_DIR="$STATE_DIR/miniclaw/plugins/mc-browser/assets/extension"
 
 if [[ ! -x "$CHROME" ]]; then
   echo "error: Google Chrome not found at $CHROME — install via: brew install --cask google-chrome" >&2
   exit 1
 fi
 
-exec "$CHROME" --remote-debugging-port="$PORT" "$@"
+EXTRA_ARGS=("--remote-debugging-port=$PORT")
+if [[ -d "$EXT_DIR" ]]; then
+  EXTRA_ARGS+=("--load-extension=$EXT_DIR")
+fi
+
+exec "$CHROME" "${EXTRA_ARGS[@]}" "$@"
