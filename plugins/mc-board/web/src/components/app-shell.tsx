@@ -157,13 +157,25 @@ export function AppShell({ initialTab, initialCardId, initialProjectId }: { init
           <div className="tab-bar">
             {(["board", "memory", "rolodex", "settings"] as Tab[]).map(t => {
               const activeCount = t === "board" && counts ? counts.inProgress : 0;
-              const memoryCount = t === "memory" && memoryStats ? memoryStats.total : 0;
-              const badgeCount = t === "rolodex" && rolodexCount ? rolodexCount.count : t === "memory" ? memoryCount : activeCount;
+              const badgeCount = t === "rolodex" && rolodexCount ? rolodexCount.count : t === "board" ? activeCount : 0;
+              const memoryBadge = t === "memory" && memoryStats && memoryStats.total > 0
+                ? `${memoryStats.memoryFiles}\u2009/\u2009${memoryStats.kbEntries}` : "";
               return (
                 <button key={t} onClick={() => switchTab(t)}
                   className={`tab-btn${tab === t ? " active" : ""}`}
                   style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   {t === "board" ? "Board" : t === "memory" ? "Memory" : t === "rolodex" ? "Contacts" : "Settings"}
+                  {memoryBadge && (
+                    <span style={{
+                      fontSize: 10,
+                      fontWeight: 600,
+                      background: "#52525b",
+                      color: "#fafafa",
+                      borderRadius: 10,
+                      padding: "1px 6px",
+                      lineHeight: "14px",
+                    }}>{memoryBadge}</span>
+                  )}
                   {badgeCount > 0 && (
                     <span style={{
                       fontSize: 10,
@@ -263,11 +275,6 @@ export function AppShell({ initialTab, initialCardId, initialProjectId }: { init
             <span className="stat-pill">in&nbsp;review<b>{counts.inReview}</b></span>
             <span className="stat-pill">shipped<b>{counts.shipped}</b></span>
             <DailyStats />
-            {memoryStats && (
-              <span className="stat-pill" title={`${memoryStats.memoryFiles} memory files, ${memoryStats.kbEntries} KB entries`}>
-                memory<b>{memoryStats.memoryFiles}&thinsp;/&thinsp;{memoryStats.kbEntries}</b>
-              </span>
-            )}
           </div>
         )}
 
