@@ -176,6 +176,3 @@ These axioms didn't come from nowhere. If you want to understand the thinking be
 - **Structure and Interpretation of Computer Programs** — Abelson & Sussman. The book that teaches you to think about computation, not just syntax. Composition, abstraction boundaries, side effects at the edges — it's all here.
 - **A Philosophy of Software Design** — John Ousterhout. The best modern argument against complexity creep. Deep modules, strategic vs tactical programming, why most abstractions make things worse.
 - **Designing Data-Intensive Applications** — Martin Kleppmann. How to think about data flow, system boundaries, and failure modes. The "validate at boundaries" and "deterministic beats probabilistic" axioms live here.
-- **The Mythical Man-Month** — Fred Brooks. "No silver bullet." Why adding complexity doesn't solve problems and why the simplest thing that works is usually the right thing.
-- **Out of the Tar Pit** — Ben Moseley & Peter Marks. The paper that makes the case against accidental complexity and for separating state, logic, and control. Free online.
-- **Worse Is Better** — Richard P. Gabriel. The essay that explains why Unix beat Lisp — simplicity of implementation over correctness of interface. Controversial and correct.
