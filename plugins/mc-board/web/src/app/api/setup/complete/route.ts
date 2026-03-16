@@ -465,25 +465,24 @@ function seedRolodexContacts() {
 
   const contacts = [];
 
-  // Human owner contact — ghUsername is their GitHub handle, email step is the AGENT's email
-  const humanGh = (setupState as Record<string, string>).ghUsername || "";
-  const humanName = humanGh || "My Human";
+  // Human owner contact — we don't collect the human's name during setup
   contacts.push({
     id: crypto.randomUUID(),
-    name: humanName,
+    name: "My Human",
     emails: [],
     phones: [],
     domains: [],
     tags: ["owner", "human"],
     trustStatus: "verified",
     lastVerified: new Date().toISOString(),
-    notes: humanGh ? `GitHub: ${humanGh}. Added during setup.` : "Human owner — added during setup.",
+    notes: "Human owner — added during setup.",
   });
 
-  // Agent contact — emailAddress from the wizard is the AGENT's email
+  // Agent contact — all wizard fields are the AGENT's info
   const agentName = setupState.assistantName || "MiniClaw";
   const agentShort = setupState.shortName || agentName;
   const agentEmail = setupState.emailAddress || "";
+  const agentGh = (setupState as Record<string, string>).ghUsername || "";
   contacts.push({
     id: crypto.randomUUID(),
     name: agentName,
@@ -493,7 +492,7 @@ function seedRolodexContacts() {
     tags: ["agent", "self"],
     trustStatus: "verified",
     lastVerified: new Date().toISOString(),
-    notes: `AI agent (${agentShort}) — added during setup.`,
+    notes: agentGh ? `AI agent (${agentShort}). GitHub: ${agentGh}.` : `AI agent (${agentShort}) — added during setup.`,
   });
 
   fs.writeFileSync(contactsPath, JSON.stringify(contacts, null, 2) + "\n", "utf-8");
