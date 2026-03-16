@@ -1,5 +1,78 @@
 {
   "version": 1,
-  "exported_at": "2026-03-11T00:00:00.000Z",
-  "entries": []
+  "exported_at": "2026-03-16T00:00:00.000Z",
+  "entries": [
+    {
+      "type": "principle",
+      "title": "Unix Philosophy — do one thing well",
+      "content": "From Eric Raymond's 'The Art of Unix Programming': Write programs that do one thing and do it well. Write programs to work together. Write programs to handle text streams, because that is a universal interface. This is why MiniClaw plugins each have a single responsibility (mc-email does email, mc-kb does knowledge, mc-voice does transcription). Composition of small tools beats monolithic frameworks. When designing a new tool or plugin, ask: does this do ONE thing? Can its output be consumed by another tool? If the answer to either is no, split it.",
+      "tags": ["philosophy", "unix", "architecture", "reflection-source"]
+    },
+    {
+      "type": "principle",
+      "title": "Unix Philosophy — silence is golden",
+      "content": "From Raymond: When a program has nothing surprising to report, it should say nothing. No 'Successfully completed!' when success is the normal case. No verbose output when quiet would do. Error output is for errors. This applies to agent behavior too — don't narrate success, don't announce routine operations, don't add filler to responses. Say something when something needs saying.",
+      "tags": ["philosophy", "unix", "communication", "reflection-source"]
+    },
+    {
+      "type": "principle",
+      "title": "Unix Philosophy — make data complicated, not the program",
+      "content": "From Raymond: Fold knowledge into data so program logic can be stupid and robust. Smart data and dumb code works better than the other way around. This is why card files are plain markdown with YAML frontmatter — the complexity is in the data format, not in the code that processes it. When tempted to add conditionals, ask: can this be expressed as data instead?",
+      "tags": ["philosophy", "unix", "architecture", "reflection-source"]
+    },
+    {
+      "type": "principle",
+      "title": "SICP — abstraction barriers",
+      "content": "From Abelson & Sussman's 'Structure and Interpretation of Computer Programs': Abstraction barriers separate usage from implementation. The user of an abstraction should not need to know how it works — only what it does. In MiniClaw, the plugin API is an abstraction barrier: plugins call api.registerTool() without knowing how the gateway dispatches tools. The card file format is a barrier: code reads/writes markdown without knowing how the board UI renders it. Respect these barriers. Don't reach through them.",
+      "tags": ["philosophy", "sicp", "architecture", "reflection-source"]
+    },
+    {
+      "type": "principle",
+      "title": "SICP — the power of composition",
+      "content": "From SICP: The most powerful design principle is composition — building complex behavior from simple, well-understood parts. A function that takes a function and returns a function is more powerful than a class hierarchy. A pipeline of small transforms is more reliable than a single big transform. When building agent tools, prefer composable primitives (search, create, update, delete) over monolithic 'do everything' operations.",
+      "tags": ["philosophy", "sicp", "architecture", "reflection-source"]
+    },
+    {
+      "type": "principle",
+      "title": "SICP — side effects are where bugs live",
+      "content": "From SICP: Pure functions (same input → same output, no side effects) are trivially testable and composable. Side effects (I/O, state mutation, network calls) are where bugs hide. Push side effects to the edges. The function that decides what to do should not be the function that does it. In practice: compute the plan, then execute the plan. Don't interleave thinking and acting.",
+      "tags": ["philosophy", "sicp", "code-quality", "reflection-source"]
+    },
+    {
+      "type": "principle",
+      "title": "Ousterhout — deep modules, shallow interfaces",
+      "content": "From John Ousterhout's 'A Philosophy of Software Design': The best modules are deep — they do a lot of work behind a simple interface. The worst are shallow — they have a complex interface that does little. A good plugin tool has 2-3 parameters and handles all the complexity internally. A bad one exposes every knob and requires the caller to understand the internals. When designing tools: make the interface as simple as possible, hide the complexity inside.",
+      "tags": ["philosophy", "ousterhout", "architecture", "reflection-source"]
+    },
+    {
+      "type": "principle",
+      "title": "Ousterhout — complexity is the enemy",
+      "content": "From Ousterhout: The primary cause of software complexity is dependencies and obscurity. Every dependency is a liability. Every piece of obscure behavior is a future bug. Fight complexity relentlessly. When you add a feature, ask: does this make the system simpler or more complex? If more complex, is the value worth it? Most of the time, the answer is no.",
+      "tags": ["philosophy", "ousterhout", "code-quality", "reflection-source"]
+    },
+    {
+      "type": "principle",
+      "title": "Kleppmann — validate at system boundaries",
+      "content": "From Martin Kleppmann's 'Designing Data-Intensive Applications': The boundary between your system and the outside world is where trust ends. Validate everything that crosses a boundary: user input, API responses, file contents, database results. Inside the boundary, trust your own types and invariants. Don't re-validate what you already guaranteed. This prevents defensive programming bloat while keeping the system safe.",
+      "tags": ["philosophy", "kleppmann", "architecture", "reflection-source"]
+    },
+    {
+      "type": "principle",
+      "title": "Kleppmann — deterministic processing beats probabilistic",
+      "content": "From Kleppmann: When you can make a process deterministic (same input → same output), do it. Deterministic processes are testable, reproducible, and debuggable. Probabilistic processes (retry with backoff, eventual consistency, best-effort matching) are hard to test and impossible to debug reliably. Use deterministic logic for everything you can. Reserve probabilistic approaches for genuinely uncertain domains.",
+      "tags": ["philosophy", "kleppmann", "code-quality", "reflection-source"]
+    },
+    {
+      "type": "principle",
+      "title": "Out of the Tar Pit — accidental vs essential complexity",
+      "content": "From Moseley & Marks: All complexity in software is either essential (inherent to the problem) or accidental (introduced by our tools, choices, and habits). Most complexity is accidental. State is the primary source of accidental complexity — mutable state that flows through the system in unpredictable ways. The cure: minimize mutable state, separate logic from state, make data flow explicit. Every time you add a global variable, a cache, or a shared mutable object, ask: is this essential or accidental?",
+      "tags": ["philosophy", "tar-pit", "architecture", "reflection-source"]
+    },
+    {
+      "type": "lesson",
+      "title": "Nightly reflection — how to apply coding philosophy",
+      "content": "During nightly reflection, review the day's code through the lens of these principles. Ask: Did I add accidental complexity today? Did I build for hypothetical futures? Did I respect abstraction barriers? Did I push side effects to the edges? Did I make deep modules with simple interfaces? If any answer is no, create a card to fix it. The goal is not perfection — it's continuous improvement through honest self-assessment.",
+      "tags": ["reflection", "self-improvement", "meta", "reflection-source"]
+    }
+  ]
 }
