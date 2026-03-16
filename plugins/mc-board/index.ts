@@ -26,10 +26,11 @@ interface BrainConfig {
   stateDir: string;
   qmdBin: string;
   qmdCollection: string;
+  boardWebUrl?: string;
 }
 
 function resolveConfig(api: OpenClawPluginApi): BrainConfig {
-  const raw = (api.pluginConfig ?? {}) as Partial<{ cardsDir: string; qmdBin: string; qmdCollection: string }>;
+  const raw = (api.pluginConfig ?? {}) as Partial<{ cardsDir: string; qmdBin: string; qmdCollection: string; boardWebUrl: string }>;
 
   // stateDir = parent of cardsDir (the brain/ directory)
   const cardsDir = resolvePath(raw.cardsDir ?? `~/.openclaw/USER/brain/cards`);
@@ -37,8 +38,9 @@ function resolveConfig(api: OpenClawPluginApi): BrainConfig {
 
   const qmdBin = resolvePath(raw.qmdBin ?? "~/.bun/bin/qmd");
   const qmdCollection = raw.qmdCollection ?? "mc-board";
+  const boardWebUrl = raw.boardWebUrl;
 
-  return { stateDir, qmdBin, qmdCollection };
+  return { stateDir, qmdBin, qmdCollection, boardWebUrl };
 }
 
 function resolvePath(p: string): string {
@@ -78,8 +80,8 @@ export default function register(api: OpenClawPluginApi): void {
 
       const projects = projectStore.list();
       const boardText = projects.length > 0
-        ? renderCompactBoardWithProjects(cards, projects)
-        : renderCompactBoard(cards);
+        ? renderCompactBoardWithProjects(cards, projects, config.boardWebUrl)
+        : renderCompactBoard(cards, config.boardWebUrl);
       return { prependContext: boardText };
     } catch (err) {
       api.logger.warn(`mc-board: before_prompt_build error: ${err}`);

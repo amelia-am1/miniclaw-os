@@ -72,7 +72,15 @@ export function filterCardsByTags(cards: Card[], filterTags: string[]): Card[] {
   return cards.filter(card => filterTags.some(tag => card.tags.includes(tag)));
 }
 
-export function renderCompactBoard(cards: Card[]): string {
+function cardRef(card: Card, boardWebUrl?: string): string {
+  if (boardWebUrl) {
+    const url = `${boardWebUrl.replace(/\/$/, "")}/board/c/${card.id}`;
+    return `[${card.id}](${url})`;
+  }
+  return card.id;
+}
+
+export function renderCompactBoard(cards: Card[], boardWebUrl?: string): string {
   if (cards.length === 0) return "(no cards on board)";
 
   const lines: string[] = ["## Brain Board", ""];
@@ -84,7 +92,7 @@ export function renderCompactBoard(cards: Card[]): string {
     lines.push(`**${col}** (${colCards.length})`);
     for (const card of colCards) {
       const priorityStr = card.priority !== "medium" ? ` [${card.priority}]` : "";
-      lines.push(`- ${card.id}: ${card.title}${priorityStr}`);
+      lines.push(`- ${cardRef(card, boardWebUrl)}: ${card.title}${priorityStr}`);
     }
     lines.push("");
   }
@@ -201,7 +209,7 @@ export function renderProjectBoard(project: Project, cards: Card[]): string {
   return lines.join("\n").trimEnd();
 }
 
-export function renderCompactBoardWithProjects(cards: Card[], projects: Project[]): string {
+export function renderCompactBoardWithProjects(cards: Card[], projects: Project[], boardWebUrl?: string): string {
   if (cards.length === 0) return "(no cards on board)";
 
   const projectMap = new Map(projects.map(p => [p.id, p.name]));
@@ -230,7 +238,7 @@ export function renderCompactBoardWithProjects(cards: Card[], projects: Project[
       lines.push(`**${col}** (${colCards.length})`);
       for (const card of colCards) {
         const priorityStr = card.priority !== "medium" ? ` [${card.priority}]` : "";
-        lines.push(`- ${card.id}: ${card.title}${priorityStr}`);
+        lines.push(`- ${cardRef(card, boardWebUrl)}: ${card.title}${priorityStr}`);
       }
     }
     lines.push("");
@@ -244,7 +252,7 @@ export function renderCompactBoardWithProjects(cards: Card[], projects: Project[
       lines.push(`**${col}** (${colCards.length})`);
       for (const card of colCards) {
         const priorityStr = card.priority !== "medium" ? ` [${card.priority}]` : "";
-        lines.push(`- ${card.id}: ${card.title}${priorityStr}`);
+        lines.push(`- ${cardRef(card, boardWebUrl)}: ${card.title}${priorityStr}`);
       }
     }
     lines.push("");

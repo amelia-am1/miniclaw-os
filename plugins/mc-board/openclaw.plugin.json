@@ -9,7 +9,8 @@
       "cardsDir":       { "type": "string" },
       "qmdBin":         { "type": "string" },
       "qmdCollection":  { "type": "string" },
-      "webPort":        { "type": "number" }
+      "webPort":        { "type": "number" },
+      "boardWebUrl":    { "type": "string", "description": "Base URL of the board web UI (e.g. Tailscale funnel URL). When set, card IDs in the board context are rendered as clickable links." }
     }
   }
 }
