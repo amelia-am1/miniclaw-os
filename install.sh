@@ -1576,15 +1576,15 @@ if [[ -d "$TAILSCALE_APP" ]]; then
     TS_IP=$("$TAILSCALE_BIN" ip -4 2>/dev/null || echo "")
     if [[ -n "$TS_IP" ]]; then
       ok "Tailscale connected ($TS_IP)"
-      # Save the Tailscale IP for gateway externalUrl
+      # Save the Tailscale IP — store under 'miniclaw' key (not 'gateway' which has strict schema)
       python3 -c "
 import json
 p = '$STATE_DIR/openclaw.json'
 with open(p) as f: cfg = json.load(f)
-gw = cfg.setdefault('gateway', {})
-gw['externalUrl'] = 'http://$TS_IP:4220'
+mc = cfg.setdefault('miniclaw', {})
+mc['externalUrl'] = 'http://$TS_IP:4220'
 with open(p, 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
-" 2>/dev/null && ok "gateway.externalUrl set to http://$TS_IP:4220"
+" 2>/dev/null && ok "miniclaw.externalUrl set to http://$TS_IP:4220"
     else
       warn "Tailscale not yet connected — run 'sudo tailscale up' after install"
     fi

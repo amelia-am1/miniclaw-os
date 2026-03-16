@@ -240,13 +240,15 @@ function setGithubDefaultRepo() {
   } catch { /* start fresh */ }
 
   const plugins = (cfg.plugins ?? {}) as Record<string, unknown>;
-  const entries = (plugins.entries ?? {}) as Record<string, Record<string, unknown>>;
-  const mcGithub = entries["mc-github"] ?? {};
-  if (!mcGithub.defaultRepo) {
-    mcGithub.defaultRepo = `${username}/miniclaw-os`;
+  const installs = (plugins.installs ?? {}) as Record<string, Record<string, unknown>>;
+  const mcGithub = installs["mc-github"] ?? {};
+  const mcGithubConfig = (mcGithub.config ?? {}) as Record<string, unknown>;
+  if (!mcGithubConfig.defaultRepo) {
+    mcGithubConfig.defaultRepo = `${username}/miniclaw-os`;
   }
-  entries["mc-github"] = mcGithub;
-  plugins.entries = entries;
+  mcGithub.config = mcGithubConfig;
+  installs["mc-github"] = mcGithub;
+  plugins.installs = installs;
   cfg.plugins = plugins;
 
   fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2) + "\n", "utf-8");
