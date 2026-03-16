@@ -107,7 +107,7 @@ mkdir -p "$EXTRACT"
 unzip -q -o "$ZIP_TMP" -d "$EXTRACT"
 rm -f "$ZIP_TMP"
 
-APP_RESOURCES="$EXTRACT/Install MiniClaw.app/Contents/Resources"
+APP_RESOURCES="$EXTRACT/miniclaw-installer.app/Contents/Resources"
 
 # 1. Update plugins (preserve node_modules, update source)
 BUNDLED_PLUGINS="$APP_RESOURCES/plugins-prebuilt"

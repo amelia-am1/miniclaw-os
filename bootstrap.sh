@@ -81,8 +81,8 @@ mkdir -p "$EXTRACT_TMP"
 unzip -q -o "$ZIP_TMP" -d "$EXTRACT_TMP"
 rm -f "$ZIP_TMP"
 
-BUNDLED_WEB="$EXTRACT_TMP/Install MiniClaw.app/Contents/Resources/miniclaw-web"
-BUNDLED_PLUGINS="$EXTRACT_TMP/Install MiniClaw.app/Contents/Resources/plugins-prebuilt"
+BUNDLED_WEB="$EXTRACT_TMP/miniclaw-installer.app/Contents/Resources/miniclaw-web"
+BUNDLED_PLUGINS="$EXTRACT_TMP/miniclaw-installer.app/Contents/Resources/plugins-prebuilt"
 if [[ -d "$BUNDLED_WEB" && -f "$BUNDLED_WEB/server.js" ]]; then
   rm -rf "$WEB_DIR"
   mkdir -p "$STATE_DIR"

@@ -99,9 +99,9 @@ cp -a "$BOARD_WEB/.next/standalone/." "$DIST/miniclaw-web/"
 cp -r "$BOARD_WEB/.next/static" "$DIST/miniclaw-web/.next/static"
 cp -r "$BOARD_WEB/public" "$DIST/miniclaw-web/public"
 
-APP="$DIST/Install MiniClaw.app"
+APP="$DIST/miniclaw-installer.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp "$REPO_DIR/dist/Install MiniClaw.app/Contents/Info.plist" "$APP/Contents/Info.plist"
+cp "$REPO_DIR/dist/miniclaw-installer.app/Contents/Info.plist" "$APP/Contents/Info.plist"
 printf '#!/bin/bash\nexec bash "$(dirname "$0")/../../Resources/bootstrap.sh"\n' > "$APP/Contents/MacOS/install"
 chmod +x "$APP/Contents/MacOS/install"
 cp "$REPO_DIR/bootstrap.sh" "$APP/Contents/Resources/bootstrap.sh"
@@ -110,7 +110,7 @@ cp -a "$DIST/miniclaw-web" "$APP/Contents/Resources/miniclaw-web"
 cp -a "$PLUGINS_PREBUILT" "$APP/Contents/Resources/plugins-prebuilt"
 
 ZIP="$DIST/MiniClaw-Installer-$TAG.zip"
-(cd "$DIST" && zip -r -q "$ZIP" "Install MiniClaw.app")
+(cd "$DIST" && zip -r -q "$ZIP" "miniclaw-installer.app")
 echo "  ✓ Packaged: $(du -h "$ZIP" | awk '{print $1}')"
 
 # Clean up prebuilt staging
