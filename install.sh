@@ -1642,6 +1642,8 @@ name = state.get("assistantName", "")
 short = state.get("shortName", name)
 pronouns = state.get("pronouns", "they/them")
 blurb = state.get("personaBlurb", "")
+email = state.get("emailAddress", "")
+gh_user = state.get("ghUsername", "")
 
 if not name:
     print("  No assistant name in setup state — skipping")
@@ -1675,6 +1677,8 @@ replacements = {
     "{{PRONOUNS_POSSESSIVE}}": poss,
     "{{VERSION}}": version,
     "{{DATE}}": today,
+    "{{EMAIL}}": email,
+    "{{GITHUB}}": gh_user,
 }
 
 for dirpath, _dirs, files in os.walk(workspace):

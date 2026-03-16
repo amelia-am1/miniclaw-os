@@ -304,9 +304,8 @@ function personalizeWorkspace() {
   const name = setupState.assistantName;
   if (!name) return;
 
-  const miniclaw = path.join(STATE_DIR, "miniclaw");
-  const workspace = path.join(miniclaw, "workspace");
-  const manifestPath = path.join(miniclaw, "MANIFEST.json");
+  const workspace = path.join(STATE_DIR, "workspace");
+  const manifestPath = path.join(STATE_DIR, "miniclaw", "MANIFEST.json");
 
   if (!fs.existsSync(workspace)) return;
 
@@ -322,6 +321,8 @@ name = state.get("assistantName", "")
 short = state.get("shortName", name)
 pronouns = state.get("pronouns", "they/them")
 blurb = state.get("personaBlurb", "")
+email = state.get("emailAddress", "")
+gh_user = state.get("ghUsername", "")
 
 if not name:
     sys.exit(0)
@@ -342,6 +343,7 @@ replacements = {
     "{{HUMAN_NAME}}": "my human", "{{PRONOUNS}}": pronouns,
     "{{PRONOUNS_SUBJECT}}": subj, "{{PRONOUNS_POSSESSIVE}}": poss,
     "{{VERSION}}": version, "{{DATE}}": today,
+    "{{EMAIL}}": email, "{{GITHUB}}": gh_user,
 }
 
 for dirpath, _dirs, files in os.walk(workspace):
