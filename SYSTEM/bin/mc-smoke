@@ -169,23 +169,20 @@ section "board DB"
 BOARD_DB="$STATE_DIR/USER/brain/board.db"
 if [[ -f "$BOARD_DB" ]]; then
   pass "board.db exists"
-  if command -v node &>/dev/null; then
-    db_check=$(npx tsx -e "
-      import Database from 'better-sqlite3';
-      const db = new Database('$BOARD_DB', { readonly: true });
-      const tables = db.prepare(\"SELECT name FROM sqlite_master WHERE type='table'\").all();
-      const names = tables.map(t => t.name);
-      const hasCards = names.includes('cards');
-      const cardCount = hasCards ? db.prepare('SELECT COUNT(*) as n FROM cards').get().n : 0;
-      const hasProjects = names.includes('projects');
-      const projectCount = hasProjects ? db.prepare('SELECT COUNT(*) as n FROM projects').get().n : 0;
-      // Check required project
-      const mcProject = hasProjects ? db.prepare(\"SELECT id FROM projects WHERE id = 'prj_miniclaw_enh'\").get() : null;
-      console.log('tables:' + names.join(','));
-      console.log('cards:' + cardCount);
-      console.log('projects:' + projectCount);
-      console.log('miniclaw_project:' + (mcProject ? 'yes' : 'no'));
-    " 2>&1 || true)
+  if command -v python3 &>/dev/null; then
+    db_check=$(python3 -c "
+import sqlite3
+db = sqlite3.connect('$BOARD_DB')
+tables = [r[0] for r in db.execute(\"SELECT name FROM sqlite_master WHERE type='table'\").fetchall()]
+cards = db.execute('SELECT COUNT(*) FROM cards').fetchone()[0] if 'cards' in tables else 0
+projects = db.execute('SELECT COUNT(*) FROM projects').fetchone()[0] if 'projects' in tables else 0
+mc_prj = db.execute(\"SELECT id FROM projects WHERE id='prj_miniclaw_enh'\").fetchone() if 'projects' in tables else None
+print('tables:' + ','.join(tables))
+print('cards:' + str(cards))
+print('projects:' + str(projects))
+print('miniclaw_project:' + ('yes' if mc_prj else 'no'))
+db.close()
+" 2>&1 || true)
     if echo "$db_check" | grep -q "^tables:"; then
       tables=$(echo "$db_check" | grep "^tables:" | cut -d: -f2)
       cards=$(echo "$db_check" | grep "^cards:" | cut -d: -f2)
