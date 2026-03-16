@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execSync, execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
@@ -57,8 +57,9 @@ export function registerBrowserCommands(ctx: CommandContext, cfg: BrowserConfig)
       // 3. Extension policy configured?
       if (fs.existsSync(POLICY_FILE)) {
         try {
-          const plistContent = execSync(`defaults read "${POLICY_FILE}" ExtensionInstallForcelist 2>/dev/null`, {
+          const plistContent = execFileSync("defaults", ["read", POLICY_FILE, "ExtensionInstallForcelist"], {
             encoding: "utf-8",
+            stdio: ["pipe", "pipe", "pipe"],
           });
           const missingExts = cfg.extensionIds.filter((id) => !plistContent.includes(id));
           if (missingExts.length === 0) {
@@ -75,10 +76,10 @@ export function registerBrowserCommands(ctx: CommandContext, cfg: BrowserConfig)
 
       // 4. Remote debugging policy (RemoteDebuggingAllowed)?
       try {
-        const val = execSync(
-          `defaults read "${POLICY_FILE}" RemoteDebuggingAllowed 2>/dev/null`,
-          { encoding: "utf-8" },
-        ).trim();
+        const val = execFileSync("defaults", ["read", POLICY_FILE, "RemoteDebuggingAllowed"], {
+          encoding: "utf-8",
+          stdio: ["pipe", "pipe", "pipe"],
+        }).trim();
         if (val === "1") {
           console.log(`  ✓  Remote debugging allowed via Chrome policy`);
         } else {
@@ -136,12 +137,13 @@ export function registerBrowserCommands(ctx: CommandContext, cfg: BrowserConfig)
       // 2. Set up extension force-install policy (CWS extensions)
       console.log("Configuring Chrome extension policies...");
       try {
-        execSync(`sudo mkdir -p "${POLICY_DIR}"`, { stdio: "inherit" });
+        execFileSync("sudo", ["mkdir", "-p", POLICY_DIR], { stdio: "inherit" });
 
         let existing: string[] = [];
         try {
-          const raw = execSync(`defaults read "${POLICY_FILE}" ExtensionInstallForcelist 2>/dev/null`, {
+          const raw = execFileSync("defaults", ["read", POLICY_FILE, "ExtensionInstallForcelist"], {
             encoding: "utf-8",
+            stdio: ["pipe", "pipe", "pipe"],
           });
           const matches = raw.match(/"([^"]+)"/g);
           if (matches) {
@@ -158,8 +160,7 @@ export function registerBrowserCommands(ctx: CommandContext, cfg: BrowserConfig)
           }
         }
 
-        const args = existing.map((e) => `"${e}"`).join(" ");
-        execSync(`sudo defaults write "${POLICY_FILE}" ExtensionInstallForcelist -array ${args}`, {
+        execFileSync("sudo", ["defaults", "write", POLICY_FILE, "ExtensionInstallForcelist", "-array", ...existing], {
           stdio: "inherit",
         });
         console.log(`  ✓  Extension policy updated (${existing.length} extensions)`);
@@ -171,15 +172,13 @@ export function registerBrowserCommands(ctx: CommandContext, cfg: BrowserConfig)
       console.log("Configuring persistent remote debugging...");
       try {
         // RemoteDebuggingAllowed — Chrome enterprise policy that permits --remote-debugging-port
-        execSync(
-          `sudo defaults write "${POLICY_FILE}" RemoteDebuggingAllowed -bool true`,
-          { stdio: "inherit" },
-        );
+        execFileSync("sudo", ["defaults", "write", POLICY_FILE, "RemoteDebuggingAllowed", "-bool", "true"], {
+          stdio: "inherit",
+        });
         // Suppress the "you are using an unsupported command-line flag" warning bar
-        execSync(
-          `sudo defaults write "${POLICY_FILE}" CommandLineFlagSecurityWarningsEnabled -bool false`,
-          { stdio: "inherit" },
-        );
+        execFileSync("sudo", ["defaults", "write", POLICY_FILE, "CommandLineFlagSecurityWarningsEnabled", "-bool", "false"], {
+          stdio: "inherit",
+        });
         console.log(`  ✓  Remote debugging policy enabled (RemoteDebuggingAllowed + no warnings)`);
       } catch {
         console.error(`  ⚠  Could not set Chrome policy (sudo required)`);
@@ -270,8 +269,8 @@ exec "$CHROME" "\${EXTRA_ARGS[@]}" "$@"
 
         // Load the agent (don't fail if already loaded)
         try {
-          execSync(`launchctl unload "${plistPath}" 2>/dev/null || true`, { stdio: "pipe" });
-          execSync(`launchctl load "${plistPath}"`, { stdio: "pipe" });
+          try { execFileSync("launchctl", ["unload", plistPath], { stdio: "pipe" }); } catch { /* not loaded */ }
+          execFileSync("launchctl", ["load", plistPath], { stdio: "pipe" });
           console.log(`  ✓  LaunchAgent loaded`);
         } catch {
           console.log(`  ⚠  LaunchAgent written but could not be loaded — will activate on next login`);

@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { existsSync } from "node:fs";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -22,8 +22,9 @@ export async function GET() {
   if (existsSync(policyFile)) {
     // Check RemoteDebuggingAllowed
     try {
-      const val = execSync(`defaults read "${policyFile}" RemoteDebuggingAllowed 2>/dev/null`, {
+      const val = execFileSync("defaults", ["read", policyFile, "RemoteDebuggingAllowed"], {
         encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
       }).trim();
       if (val === "1") {
         passed.push("Remote debugging allowed");
