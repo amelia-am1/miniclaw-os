@@ -1490,16 +1490,30 @@ if [[ -d "$TAILSCALE_APP" ]]; then
   if "$TAILSCALE_BIN" status 2>/dev/null | grep -q "Logged in"; then
     ok "Tailscale is connected"
   else
-    if [[ -n "$CONFIG_FILE" ]]; then
-      warn "Tailscale not logged in — run 'tailscale up' after install"
-    else
-      info "Tailscale installed — please log in via the Tailscale menu bar icon, then press Enter"
-      read -r -p "    Press Enter after logging into Tailscale... " || true
+    info "Starting Tailscale..."
+    # Start the daemon
+    if [[ -d "/Applications/Tailscale.app" ]]; then
+      open -a Tailscale 2>/dev/null || true
+      sleep 2
     fi
-    if "$TAILSCALE_BIN" status 2>/dev/null | grep -q "Logged in\|[0-9]\{1,3\}\.[0-9]"; then
-      ok "Tailscale connected"
+    # Bring the interface up (may prompt for browser login)
+    sudo tailscale up 2>>"$LOG_FILE" || true
+    sleep 3
+    # Check connection and get IP
+    TS_IP=$("$TAILSCALE_BIN" ip -4 2>/dev/null || echo "")
+    if [[ -n "$TS_IP" ]]; then
+      ok "Tailscale connected ($TS_IP)"
+      # Save the Tailscale IP for gateway externalUrl
+      python3 -c "
+import json
+p = '$STATE_DIR/openclaw.json'
+with open(p) as f: cfg = json.load(f)
+gw = cfg.setdefault('gateway', {})
+gw['externalUrl'] = 'http://$TS_IP:4220'
+with open(p, 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
+" 2>/dev/null && ok "gateway.externalUrl set to http://$TS_IP:4220"
     else
-      warn "Tailscale not yet connected — run 'tailscale up' and log in after install"
+      warn "Tailscale not yet connected — run 'sudo tailscale up' after install"
     fi
   fi
 elif [[ -n "$TAILSCALE_BIN" ]]; then
