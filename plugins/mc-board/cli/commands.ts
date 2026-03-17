@@ -449,6 +449,11 @@ Examples:
         store.move(card, target);
         console.log(`Moved ${card.id} → ${target}`);
 
+        // ---- Star CTA at peak emotional moment (task shipped) ----
+        if (target === "shipped") {
+          console.log(`\n  ⭐  If MiniClaw helped, star us: https://github.com/augmentedmike/miniclaw-os\n`);
+        }
+
         // ---- Auto-archive trigger for failed verify cards ----
         if (card.work_type === 'verify' && target === 'shipped') {
           // Check if the verify card has unchecked criteria (failure indicator)
