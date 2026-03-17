@@ -1636,8 +1636,13 @@ step "Step 15e: Agent identity"
 
 WORKSPACE_DIR="$STATE_DIR/workspace"
 
-# Copy MiniClaw workspace templates (root + refs/) if they exist in the repo
+# Copy MiniClaw workspace templates (root + refs/) if they exist in the repo.
+# Prefer staged templates from the installer bundle (available offline/early),
+# fall back to the cloned repo's workspace/ directory.
 MC_WORKSPACE_TEMPLATES="$REPO_DIR/workspace"
+if [[ -d "${STATE_DIR}/.workspace-templates" ]]; then
+  MC_WORKSPACE_TEMPLATES="${STATE_DIR}/.workspace-templates"
+fi
 if [[ -d "$MC_WORKSPACE_TEMPLATES" ]]; then
   mkdir -p "$WORKSPACE_DIR" "$WORKSPACE_DIR/refs" "$WORKSPACE_DIR/memory"
   # Root files (always-loaded by the gateway)

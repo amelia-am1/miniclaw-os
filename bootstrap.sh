@@ -100,6 +100,16 @@ if [[ -d "$BUNDLED_PLUGINS" ]]; then
   mv "$BUNDLED_PLUGINS" "$PREBUILT_STAGING"
   echo "  ✓ Pre-built plugins staged"
 fi
+
+# Stage bundled workspace templates for install.sh to use (fallback if repo clone is slow/offline)
+BUNDLED_WORKSPACE="$EXTRACT_TMP/miniclaw-installer.app/Contents/Resources/workspace"
+WORKSPACE_TEMPLATES_STAGING="$STATE_DIR/.workspace-templates"
+rm -rf "$WORKSPACE_TEMPLATES_STAGING"
+if [[ -d "$BUNDLED_WORKSPACE" ]]; then
+  mv "$BUNDLED_WORKSPACE" "$WORKSPACE_TEMPLATES_STAGING"
+  echo "  ✓ Workspace templates staged"
+fi
+
 rm -rf "$EXTRACT_TMP"
 
 # ── Prep state dir ───────────────────────────────────────────────────────────
