@@ -265,6 +265,22 @@
       }
     },
     {
+      "id": "mc-oauth-guard",
+      "label": "OAuth Guard",
+      "description": "OAuth token refresh failure guard — detects retry storms, applies exponential backoff, auto-disables failing profiles, and attempts keychain recovery.",
+      "path": "plugins/mc-oauth-guard",
+      "entry": "index.ts",
+      "cli": false,
+      "tools": [],
+      "config": {
+        "enabled": true,
+        "maxConsecutiveFailures": 3,
+        "minBackoffMs": 300000,
+        "maxBackoffMs": 3600000,
+        "keychainRecovery": true
+      }
+    },
+    {
       "id": "mc-browser",
       "label": "Browser",
       "description": "Chrome auto-setup with remote debugging and extension management for browser automation.",
