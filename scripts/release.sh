@@ -109,6 +109,14 @@ cp "$REPO_DIR/.node-version" "$APP/Contents/Resources/.node-version"
 cp -a "$DIST/miniclaw-web" "$APP/Contents/Resources/miniclaw-web"
 cp -a "$PLUGINS_PREBUILT" "$APP/Contents/Resources/plugins-prebuilt"
 
+# Bundle workspace templates so bootstrap.sh can stage them before install.sh runs
+if [[ -d "$REPO_DIR/workspace" ]]; then
+  cp -r "$REPO_DIR/workspace" "$APP/Contents/Resources/workspace"
+  echo "  ✓ Workspace templates bundled ($(find "$REPO_DIR/workspace" -name '*.md' | wc -l | tr -d ' ') files)"
+else
+  echo "  ⚠ workspace/ not found in repo — skipping template bundle"
+fi
+
 ZIP="$DIST/MiniClaw-Installer-$TAG.zip"
 (cd "$DIST" && zip -r -q "$ZIP" "miniclaw-installer.app")
 echo "  ✓ Packaged: $(du -h "$ZIP" | awk '{print $1}')"
