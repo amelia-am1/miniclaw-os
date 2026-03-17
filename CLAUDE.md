@@ -42,9 +42,11 @@ Seed data: `plugins/mc-board/seed.sql`
 Every change needs a GitHub issue first. No exceptions.
 
 ```
-Issue → Branch → Work → Commit → PR → CI → Merge → Close
+Issue → Card → Branch → Work → Commit → PR → CI → Merge → Close
 ```
 
+- **Every issue gets a board card.** Before starting work on any issue or PR, create a brain board card with `openclaw mc-board create`. No exceptions — if there's no card, the work doesn't exist.
+- **Every PR you review gets a card.** When reviewing Amelia's PRs or any external PR, create a card tracking the review.
 - **Branch from the issue:** `fix/32-credentials-save`, `feat/34-mc-github-plugin`, `chore/35-branch-workflow`
 - **Commits reference the issue:** include `Resolves #N` or `Fixes #N` in the commit body
 - **PRs link to issues:** use `Fixes #N` in the PR body so the issue auto-closes on merge
