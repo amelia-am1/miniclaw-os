@@ -506,6 +506,24 @@
       "cli": true,
       "tools": [],
       "optional": true
+    },
+    {
+      "id": "mc-devlog",
+      "label": "Devlog",
+      "description": "Daily devlog cron — aggregates yesterday's git activity, credits contributors, publishes to GitHub Discussions, mc-blog, mc-substack, mc-reddit.",
+      "path": "plugins/mc-devlog",
+      "entry": "index.ts",
+      "cli": true,
+      "tools": ["devlog_run", "devlog_preview"],
+      "optional": true,
+      "config": {
+        "repoDir": "~/.openclaw/projects/miniclaw-os",
+        "githubRepo": "augmentedmike/miniclaw-os",
+        "discussionCategory": "Devlog",
+        "postsDir": "~/.openclaw/USER/blog/posts",
+        "substackEnabled": false,
+        "timezone": "America/Chicago"
+      }
     }
   ],
   "cli": [
@@ -576,6 +594,19 @@
       "timeoutSeconds": 600,
       "sessionTarget": "isolated",
       "requires": ["gmail-app-password"],
+      "optional": true
+    },
+    {
+      "name": "daily-devlog-cron",
+      "description": "Daily devlog: aggregates yesterday's git commits, PRs, issues, and shipped cards; credits contributors; publishes to GitHub Discussions, mc-blog, mc-substack, mc-reddit",
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 8 * * *",
+        "tz": "America/Chicago"
+      },
+      "timeoutSeconds": 900,
+      "sessionTarget": "isolated",
+      "requires": ["gh-token"],
       "optional": true
     }
   ],
