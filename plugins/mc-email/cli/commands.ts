@@ -7,7 +7,7 @@ import type { Command } from "commander";
 import type { Logger } from "openclaw/plugin-sdk";
 import type { EmailConfig } from "../src/config.js";
 import { GmailClient } from "../src/client.js";
-import { getAppPassword, saveAppPassword } from "../src/vault.js";
+import { getAppPassword, saveAppPassword, migrateLegacyKeys } from "../src/vault.js";
 
 interface Ctx {
   program: Command;
@@ -136,6 +136,25 @@ export function registerEmailCommands(ctx: Ctx): void {
       const client = getClient(cfg);
       const sentId = await client.replyToMessage(id, opts.body);
       console.log(`Reply sent. Message ID: ${sentId}`);
+    });
+
+  // ---- migrate ----
+  sub
+    .command("migrate")
+    .description("Migrate legacy gmail-* vault keys to email-* names")
+    .action(() => {
+      const result = migrateLegacyKeys(cfg.vaultBin);
+      if (result.migrated.length) {
+        for (const m of result.migrated) console.log(`  migrated: ${m}`);
+      }
+      if (result.skipped.length) {
+        for (const s of result.skipped) console.log(`  skipped (not found): ${s}`);
+      }
+      if (!result.migrated.length) {
+        console.log("Nothing to migrate — no legacy keys found.");
+      } else {
+        console.log(`Migration complete. ${result.migrated.length} key(s) renamed.`);
+      }
     });
 
   // ---- triage ----

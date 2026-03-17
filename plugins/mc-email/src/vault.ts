@@ -31,3 +31,45 @@ export function getAppPassword(vaultBin: string): string | null {
 export function saveAppPassword(vaultBin: string, password: string): void {
   vaultSet(vaultBin, EMAIL_PASSWORD_KEY, password);
 }
+
+const LEGACY_EMAIL_KEY = "gmail-email";
+const EMAIL_ADDRESS_KEY = "email-address";
+
+interface MigrationResult {
+  migrated: string[];
+  skipped: string[];
+}
+
+/**
+ * Migrate legacy gmail-* vault keys to email-* names.
+ * Idempotent: skips keys that don't exist or are already migrated.
+ */
+export function migrateLegacyKeys(vaultBin: string): MigrationResult {
+  const result: MigrationResult = { migrated: [], skipped: [] };
+
+  const keyMap: [string, string][] = [
+    [LEGACY_KEY, EMAIL_PASSWORD_KEY],
+    [LEGACY_EMAIL_KEY, EMAIL_ADDRESS_KEY],
+  ];
+
+  for (const [oldKey, newKey] of keyMap) {
+    const oldValue = vaultGet(vaultBin, oldKey);
+    if (!oldValue) {
+      result.skipped.push(oldKey);
+      continue;
+    }
+    vaultSet(vaultBin, newKey, oldValue);
+    vaultDelete(vaultBin, oldKey);
+    result.migrated.push(`${oldKey} → ${newKey}`);
+  }
+
+  return result;
+}
+
+export function vaultDelete(vaultBin: string, key: string): void {
+  try {
+    execSync(`${vaultBin} rm ${key}`, { stdio: ["pipe", "pipe", "pipe"] });
+  } catch {
+    // Key may not exist — ignore
+  }
+}
