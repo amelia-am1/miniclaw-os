@@ -4,7 +4,7 @@
  * Searches all three memory stores and returns merged results:
  *   1. mc-kb: hybrid FTS5+vector search (via hybridSearch)
  *   2. mc-memo: scan memo files for keyword + vector matches
- *   3. episodic: scan recent daily .md files for keyword + vector matches
+ *   3. episodic: scan individual .md memory files for keyword + vector matches
  *
  * Results are merged and sorted by relevance score with source attribution.
  */
@@ -106,7 +106,8 @@ function searchMemos(
 }
 
 /**
- * Scan episodic memory (daily .md files) for matching content.
+ * Scan episodic memory (individual .md files) for matching content.
+ * Files are named: YYYY-MM-DD-HHMMSS-slug.md
  * Returns scored results based on keyword frequency and recency.
  */
 function searchEpisodic(
@@ -129,44 +130,44 @@ function searchEpisodic(
     const files = fs.readdirSync(episodicDir)
       .filter((f) => f.endsWith(".md"))
       .filter((f) => {
-        const dateStr = f.replace(".md", "");
+        // Extract date prefix (YYYY-MM-DD) from filename
+        const dateStr = f.slice(0, 10);
         return dateStr >= cutoffStr;
       })
       .sort()
       .reverse(); // most recent first
 
     for (const file of files) {
-      const date = file.replace(".md", "");
+      const date = file.slice(0, 10);
       const filePath = path.join(episodicDir, file);
       const content = fs.readFileSync(filePath, "utf-8");
 
-      // Split into paragraphs/sections for granular results
-      const sections = content.split(/\n{2,}/);
+      // Strip frontmatter if present
+      const bodyMatch = content.match(/^---\n[\s\S]*?\n---\n\n?([\s\S]*)$/);
+      const body = bodyMatch ? bodyMatch[1] : content;
 
-      for (const section of sections) {
-        if (section.trim().length < 10) continue;
-        const lower = section.toLowerCase();
+      if (body.trim().length < 10) continue;
+      const lower = body.toLowerCase();
 
-        let matchCount = 0;
-        for (const term of queryTerms) {
-          if (lower.includes(term)) matchCount++;
-        }
-
-        if (matchCount === 0) continue;
-
-        // Score: keyword ratio + date recency bonus
-        const keywordScore = matchCount / queryTerms.length;
-        const daysAgo = Math.max(0, (now.getTime() - new Date(date).getTime()) / (24 * 60 * 60 * 1000));
-        const recencyBonus = Math.max(0, 1 - daysAgo / daysBack) * 0.3;
-        const score = keywordScore * 0.7 + recencyBonus;
-
-        results.push({
-          source: "episodic",
-          score,
-          date,
-          snippet: section.trim().slice(0, 300),
-        });
+      let matchCount = 0;
+      for (const term of queryTerms) {
+        if (lower.includes(term)) matchCount++;
       }
+
+      if (matchCount === 0) continue;
+
+      // Score: keyword ratio + date recency bonus
+      const keywordScore = matchCount / queryTerms.length;
+      const daysAgo = Math.max(0, (now.getTime() - new Date(date).getTime()) / (24 * 60 * 60 * 1000));
+      const recencyBonus = Math.max(0, 1 - daysAgo / daysBack) * 0.3;
+      const score = keywordScore * 0.7 + recencyBonus;
+
+      results.push({
+        source: "episodic",
+        score,
+        date,
+        snippet: body.trim().slice(0, 300),
+      });
     }
   } catch {
     // Silently handle fs errors

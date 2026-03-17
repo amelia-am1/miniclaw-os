@@ -126,6 +126,69 @@ export function registerMemoryCommands(
       }
     });
 
+  // ---- list ----
+  ctx.program
+    .command("list")
+    .description("List individual episodic memory entries")
+    .option("--days <daysBack>", "Days of memory to show", "7")
+    .option("--json", "Output as JSON")
+    .action(async (opts: { days: string; json?: boolean }) => {
+      try {
+        const fs = await import("node:fs");
+        const path = await import("node:path");
+
+        if (!fs.existsSync(episodicDir)) {
+          console.log("No episodic memories found.");
+          return;
+        }
+
+        const now = new Date();
+        const daysBack = parseInt(opts.days, 10);
+        const cutoff = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
+        const cutoffStr = cutoff.toISOString().slice(0, 10);
+
+        const files = fs.readdirSync(episodicDir)
+          .filter((f: string) => f.endsWith(".md"))
+          .filter((f: string) => f.slice(0, 10) >= cutoffStr)
+          .sort()
+          .reverse();
+
+        if (files.length === 0) {
+          console.log("No episodic memories found in the last " + daysBack + " days.");
+          return;
+        }
+
+        if (opts.json) {
+          const entries = files.map((file: string) => {
+            const content = fs.readFileSync(path.join(episodicDir, file), "utf-8");
+            const bodyMatch = content.match(/^---\n[\s\S]*?\n---\n\n?([\s\S]*)$/);
+            const body = bodyMatch ? bodyMatch[1] : content;
+            return {
+              file,
+              date: file.slice(0, 10),
+              preview: body.trim().slice(0, 120).replace(/\n/g, " "),
+            };
+          });
+          console.log(JSON.stringify(entries, null, 2));
+          return;
+        }
+
+        for (const file of files) {
+          const content = fs.readFileSync(path.join(episodicDir, file), "utf-8");
+          const bodyMatch = content.match(/^---\n[\s\S]*?\n---\n\n?([\s\S]*)$/);
+          const body = bodyMatch ? bodyMatch[1] : content;
+          const date = file.slice(0, 10);
+          const slug = file.replace(/^\d{4}-\d{2}-\d{2}-\d{6}-/, "").replace(/\.md$/, "");
+          console.log(`[${date}] ${slug}`);
+          console.log(`  ${body.trim().slice(0, 120).replace(/\n/g, " ")}`);
+          console.log();
+        }
+      } catch (e) {
+        console.error(`Error: ${e instanceof Error ? e.message : e}`);
+        process.exit(1);
+      }
+    });
+
   // ---- promote ----
   ctx.program
     .command("promote")

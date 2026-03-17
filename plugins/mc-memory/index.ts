@@ -42,7 +42,7 @@ function resolveConfig(api: OpenClawPluginApi): MemoryConfig {
   return {
     memoDir: resolvePath(raw.memoDir ?? "~/.openclaw/USER/memos"),
     kbDbDir: resolvePath(raw.kbDbDir ?? "~/.openclaw/USER/kb"),
-    episodicDir: resolvePath(raw.episodicDir ?? "~/.openclaw/workspace/memory"),
+    episodicDir: resolvePath(raw.episodicDir ?? "~/.openclaw/USER/memory"),
     modelPath: resolvePath(
       raw.modelPath ?? "~/.cache/qmd/models/hf_ggml-org_embeddinggemma-300M-Q8_0.gguf",
     ),

@@ -4,7 +4,7 @@
  * Handles memory_write by routing content to the appropriate store:
  *   - memo: append to card scratchpad
  *   - kb: add as structured KB entry (with embedding)
- *   - episodic: append to today's daily .md file
+ *   - episodic: create individual .md file per memory entry
  */
 
 import * as fs from "node:fs";
@@ -113,6 +113,20 @@ async function writeKb(
   };
 }
 
+/**
+ * Slugify a string for use in filenames.
+ * Lowercase, strip special chars, collapse whitespace to hyphens, truncate.
+ */
+function slugify(text: string, maxLen = 40): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, maxLen);
+}
+
 function writeEpisodic(
   episodicDir: string,
   content: string,
@@ -120,9 +134,13 @@ function writeEpisodic(
 ): WriteResult {
   fs.mkdirSync(episodicDir, { recursive: true });
   const date = timestamp.slice(0, 10);
-  const filePath = path.join(episodicDir, `${date}.md`);
-  const line = `\n${timestamp} ${content}\n`;
-  fs.appendFileSync(filePath, line, { encoding: "utf-8", flag: "a" });
+  const time = timestamp.slice(11, 19).replace(/:/g, "");
+  const slug = slugify(content.split("\n")[0] || "memory");
+  const fileName = `${date}-${time}-${slug}.md`;
+  const filePath = path.join(episodicDir, fileName);
+
+  const body = `---\ndate: ${timestamp}\n---\n\n${content}\n`;
+  fs.writeFileSync(filePath, body, { encoding: "utf-8" });
 
   return {
     stored_in: "episodic",
