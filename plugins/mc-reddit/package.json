@@ -1,0 +1,16 @@
+{
+  "name": "mc-reddit",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "index.ts",
+  "description": "Reddit API client — posts, comments, voting, subreddit moderation",
+  "dependencies": {},
+  "devDependencies": {
+    "openclaw": "npm:@miniclaw_official/openclaw@^2026.3.8"
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}

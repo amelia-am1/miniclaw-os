@@ -1,0 +1,399 @@
+#!/usr/bin/env bash
+# mc-doctor — diagnose and fix miniclaw issues
+#
+# Runs the same checks as mc-smoke, but attempts to repair failures.
+# Safe to re-run — skips anything already healthy.
+#
+# Usage:
+#   mc-doctor          Interactive — asks before each fix
+#   mc-doctor --auto   Auto-fix everything without prompting
+
+set -euo pipefail
+
+AUTO=false
+[[ "${1:-}" == "--auto" ]] && AUTO=true
+
+FIXED=0
+SKIPPED=0
+FAILED=0
+
+OPENCLAW_DIR="${HOME}/.openclaw"
+MINICLAW_DIR="$OPENCLAW_DIR/miniclaw"
+VAULT_ROOT="$MINICLAW_DIR/SYSTEM/vault"
+LOCAL_BIN="$HOME/.local/bin"
+
+# ── Colours ───────────────────────────────────────────────────────────────────
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+BLUE='\033[0;34m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+ok()      { echo -e "  ${GREEN}[✓]${NC} $1"; }
+fixed()   { echo -e "  ${GREEN}[+]${NC} $1"; FIXED=$(( FIXED + 1 )); }
+skip()    { echo -e "  ${YELLOW}[-]${NC} $1"; SKIPPED=$(( SKIPPED + 1 )); }
+broke()   { echo -e "  ${RED}[✗]${NC} $1"; FAILED=$(( FAILED + 1 )); }
+section() { echo -e "\n${BOLD}── $1${NC}"; }
+
+# Ask user before fixing (unless --auto)
+# Returns 0 = proceed, 1 = skip
+ask() {
+  local msg="$1"
+  if $AUTO; then
+    echo -e "  ${BLUE}[→]${NC} $msg"
+    return 0
+  fi
+  printf "  ${YELLOW}fix?${NC} %s [Y/n] " "$msg"
+  read -r ans
+  [[ -z "$ans" || "$ans" == "y" || "$ans" == "Y" ]]
+}
+
+echo ""
+echo -e "${BOLD}mc-doctor${NC}"
+$AUTO && echo "  mode: auto-fix" || echo "  mode: interactive"
+
+# ── Homebrew ──────────────────────────────────────────────────────────────────
+section "Homebrew"
+
+if command -v brew &>/dev/null; then
+  ok "Homebrew present"
+else
+  if ask "Install Homebrew?"; then
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" \
+      && fixed "Homebrew installed" || broke "Homebrew install failed"
+  else
+    skip "Homebrew"
+  fi
+fi
+
+# ── age ───────────────────────────────────────────────────────────────────────
+section "age"
+
+if command -v age &>/dev/null; then
+  ok "age present"
+else
+  if ask "Install age (brew install age)?"; then
+    brew install age && fixed "age installed" || broke "age install failed"
+  else
+    skip "age"
+  fi
+fi
+
+# ── qmd ───────────────────────────────────────────────────────────────────────
+section "qmd  [optional]"
+
+if command -v qmd &>/dev/null; then
+  ok "qmd present"
+else
+  if ask "Install qmd (npm install -g qmd)?"; then
+    npm install -g qmd && fixed "qmd installed" || broke "qmd install failed"
+  else
+    skip "qmd"
+  fi
+fi
+
+if command -v qmd &>/dev/null; then
+  for col in mc-memory workspace; do
+    if ! qmd collection list 2>/dev/null | grep -q "^${col}"; then
+      default_path="$OPENCLAW_DIR/USER/memory"
+      [[ "$col" == "workspace" ]] && default_path="$OPENCLAW_DIR/workspace"
+      if ask "Register qmd collection '$col' → $default_path?"; then
+        mkdir -p "$default_path"
+        qmd collection add "$col" "$default_path" \
+          && fixed "collection '$col' registered" || broke "failed to register '$col'"
+      else
+        skip "qmd collection '$col'"
+      fi
+    else
+      ok "qmd collection '$col' present"
+    fi
+  done
+fi
+
+# ── openclaw ──────────────────────────────────────────────────────────────────
+section "openclaw"
+
+if ! command -v openclaw &>/dev/null; then
+  if ask "Install openclaw (npm install -g openclaw@latest)?"; then
+    npm install -g openclaw@latest && fixed "openclaw installed" || broke "openclaw install failed"
+  else
+    skip "openclaw"
+  fi
+else
+  ok "openclaw present ($(openclaw --version 2>/dev/null | head -1))"
+fi
+
+if [[ ! -f "$OPENCLAW_DIR/openclaw.json" ]]; then
+  if ask "Create minimal openclaw.json?"; then
+    mkdir -p "$OPENCLAW_DIR"
+    python3 - "$OPENCLAW_DIR/openclaw.json" <<'PYEOF'
+import json, sys
+cfg = {
+  "meta": {},
+  "agents": { "defaults": { "model": { "primary": "claude-sonnet-4-6" }, "compaction": { "mode": "safeguard" } } },
+  "plugins": {}
+}
+with open(sys.argv[1], "w") as f:
+    json.dump(cfg, f, indent=2); f.write("\n")
+PYEOF
+    fixed "openclaw.json created"
+  else
+    skip "openclaw.json"
+  fi
+else
+  ok "openclaw.json present"
+fi
+
+# ── vault ─────────────────────────────────────────────────────────────────────
+section "vault"
+
+MC_VAULT="$LOCAL_BIN/mc-vault"
+
+if ! command -v mc-vault &>/dev/null; then
+  broke "mc-vault not found — run install.sh first"
+elif [[ ! -f "$VAULT_ROOT/key.txt" ]]; then
+  if ask "Initialise vault (mc-vault init)?"; then
+    OPENCLAW_VAULT_ROOT="$VAULT_ROOT" mc-vault init \
+      && fixed "vault initialised" || broke "vault init failed"
+  else
+    skip "vault init"
+  fi
+else
+  # Verify encrypt/decrypt works
+  TEST_VAL="doctor-test-$$"
+  if OPENCLAW_VAULT_ROOT="$VAULT_ROOT" mc-vault set _doctor_test "$TEST_VAL" &>/dev/null 2>&1 && \
+     OPENCLAW_VAULT_ROOT="$VAULT_ROOT" mc-vault export _doctor_test 2>/dev/null | grep -q "$TEST_VAL"; then
+    OPENCLAW_VAULT_ROOT="$VAULT_ROOT" mc-vault rm _doctor_test &>/dev/null 2>&1 || true
+    ok "vault encrypt/decrypt ok"
+  else
+    OPENCLAW_VAULT_ROOT="$VAULT_ROOT" mc-vault rm _doctor_test &>/dev/null 2>&1 || true
+    broke "vault encrypt/decrypt failed — age binaries ok but vault may be corrupt"
+  fi
+fi
+
+# ── directories ───────────────────────────────────────────────────────────────
+section "directories"
+
+for dir in \
+  "$OPENCLAW_DIR/soul-backups" \
+  "$OPENCLAW_DIR/projects" \
+  "$OPENCLAW_DIR/USER/memory"; do
+  if [[ ! -d "$dir" ]]; then
+    if ask "Create $dir?"; then
+      mkdir -p "$dir" && fixed "created $dir" || broke "failed to create $dir"
+    else
+      skip "$dir"
+    fi
+  else
+    ok "$dir"
+  fi
+done
+
+# ── plugin deps ───────────────────────────────────────────────────────────────
+section "plugin dependencies"
+
+PLUGINS_DIR="$MINICLAW_DIR/plugins"
+
+if [[ ! -d "$PLUGINS_DIR" ]]; then
+  broke "plugins dir not found — run install.sh first"
+elif ! command -v npm &>/dev/null; then
+  skip "npm not found — cannot install plugin deps"
+else
+  for plugin_dir in "$PLUGINS_DIR"/*/; do
+    plugin_name="$(basename "$plugin_dir")"
+    if [[ -f "$plugin_dir/package.json" && ! -d "$plugin_dir/node_modules" ]]; then
+      if ask "Install deps for $plugin_name (npm install)?"; then
+        (cd "$plugin_dir" && npm install 2>/dev/null) \
+          && fixed "$plugin_name deps installed" || broke "$plugin_name npm install failed"
+      else
+        skip "$plugin_name deps"
+      fi
+    else
+      ok "$plugin_name deps present"
+    fi
+  done
+fi
+
+# ── gateway ──────────────────────────────────────────────────────────────────
+section "gateway"
+
+GW_PLIST="$HOME/Library/LaunchAgents/ai.openclaw.gateway.plist"
+
+if command -v openclaw &>/dev/null; then
+  GW_STATUS=$(openclaw gateway status 2>&1 || true)
+  if echo "$GW_STATUS" | grep -qi "running\|listening\|connected\|uptime"; then
+    ok "gateway running"
+  elif [[ ! -f "$GW_PLIST" ]]; then
+    if ask "Install gateway LaunchAgent (openclaw gateway install --force)?"; then
+      openclaw gateway install --force 2>/dev/null \
+        && fixed "gateway LaunchAgent installed" || broke "gateway install failed"
+    else
+      skip "gateway install"
+    fi
+  else
+    if ask "Start gateway (openclaw gateway start)?"; then
+      openclaw gateway start 2>/dev/null \
+        && fixed "gateway started" || broke "gateway start failed — try: openclaw gateway install --force"
+    else
+      skip "gateway start"
+    fi
+  fi
+else
+  broke "openclaw not found — cannot manage gateway"
+fi
+
+# ── LaunchAgents ─────────────────────────────────────────────────────────────
+section "LaunchAgents"
+
+for label in com.miniclaw.board-web ai.openclaw.gateway; do
+  plist_path="$HOME/Library/LaunchAgents/$label.plist"
+  if [[ ! -f "$plist_path" ]]; then
+    if [[ "$label" == "ai.openclaw.gateway" ]]; then
+      # gateway plist is managed by openclaw gateway install
+      continue
+    fi
+    broke "$label plist missing — run install.sh"
+    continue
+  fi
+  if ! launchctl list 2>/dev/null | grep -q "$label"; then
+    if ask "Load LaunchAgent $label?"; then
+      launchctl load "$plist_path" 2>/dev/null \
+        && fixed "$label loaded" || broke "failed to load $label"
+    else
+      skip "$label"
+    fi
+  else
+    ok "$label loaded"
+  fi
+done
+
+# ── cron jobs ────────────────────────────────────────────────────────────────
+section "cron jobs"
+
+CRON_FILE="$OPENCLAW_DIR/cron/jobs.json"
+MANIFEST_FILE="$MINICLAW_DIR/MANIFEST.json"
+
+if [[ ! -f "$CRON_FILE" ]]; then
+  if ask "Create jobs.json with crons from MANIFEST?"; then
+    mkdir -p "$(dirname "$CRON_FILE")"
+    python3 - "$CRON_FILE" "$MANIFEST_FILE" <<'PYEOF'
+import json, uuid, os, sys
+cron_file, manifest_path = sys.argv[1], sys.argv[2]
+store = {"version": 1, "jobs": []}
+try:
+    with open(manifest_path) as f:
+        manifest = json.load(f)
+except (FileNotFoundError, json.JSONDecodeError):
+    manifest = {}
+for mc in manifest.get("crons", []):
+    store["jobs"].append({
+        "id": str(uuid.uuid4()),
+        "name": mc["name"],
+        "schedule": mc["schedule"],
+        "sessionTarget": mc.get("sessionTarget", "isolated"),
+        "model": mc.get("model", "claude-haiku-4-5-20251001"),
+        "payload": {"kind": "agentTurn", "timeoutSeconds": mc.get("timeoutSeconds", 600), "messageFile": f"prompts/{mc['name']}.md"},
+        "delivery": {"mode": "none"},
+        "enabled": True
+    })
+with open(cron_file, "w") as f:
+    json.dump(store, f, indent=2)
+print(f"  Created with {len(store['jobs'])} job(s)")
+PYEOF
+    fixed "jobs.json created"
+  else
+    skip "jobs.json"
+  fi
+elif [[ -f "$MANIFEST_FILE" ]] && command -v python3 &>/dev/null; then
+  MISSING_CRONS=$(python3 - "$CRON_FILE" "$MANIFEST_FILE" <<'PYEOF'
+import json, sys
+jobs_path, manifest_path = sys.argv[1], sys.argv[2]
+with open(jobs_path) as f: jobs = json.load(f)
+with open(manifest_path) as f: manifest = json.load(f)
+job_names = {j["name"] for j in jobs.get("jobs", [])}
+missing = [c["name"] for c in manifest.get("crons", []) if c["name"] not in job_names]
+print(",".join(missing) if missing else "")
+PYEOF
+  )
+  if [[ -n "$MISSING_CRONS" ]]; then
+    if ask "Add missing cron jobs ($MISSING_CRONS) to jobs.json?"; then
+      python3 - "$CRON_FILE" "$MANIFEST_FILE" <<'PYEOF'
+import json, uuid, sys
+cron_file, manifest_path = sys.argv[1], sys.argv[2]
+with open(cron_file) as f: store = json.load(f)
+with open(manifest_path) as f: manifest = json.load(f)
+existing = {j["name"] for j in store.get("jobs", [])}
+added = 0
+for mc in manifest.get("crons", []):
+    if mc["name"] not in existing:
+        store.setdefault("jobs", []).append({
+            "id": str(uuid.uuid4()),
+            "name": mc["name"],
+            "schedule": mc["schedule"],
+            "sessionTarget": mc.get("sessionTarget", "isolated"),
+            "model": mc.get("model", "claude-haiku-4-5-20251001"),
+            "payload": {"kind": "agentTurn", "timeoutSeconds": mc.get("timeoutSeconds", 600), "messageFile": f"prompts/{mc['name']}.md"},
+            "delivery": {"mode": "none"},
+            "enabled": True
+        })
+        added += 1
+with open(cron_file, "w") as f:
+    json.dump(store, f, indent=2)
+print(f"  Added {added} missing cron job(s)")
+PYEOF
+      fixed "missing cron jobs added"
+    else
+      skip "missing cron jobs"
+    fi
+  else
+    ok "all MANIFEST crons present in jobs.json"
+  fi
+fi
+
+# ── agent-assisted repair ────────────────────────────────────────────────────
+# For failures that simple bash fixes can't handle, dispatch to the openclaw
+# agent loop which has full tool access (filesystem, git, vault, plugins).
+if [[ $FAILED -gt 0 ]] && command -v openclaw &>/dev/null; then
+  section "agent-assisted repair"
+  GW_STATUS=$(openclaw gateway status 2>&1 || true)
+  if echo "$GW_STATUS" | grep -qi "running\|listening\|connected\|uptime"; then
+    if ask "Dispatch remaining $FAILED failure(s) to the openclaw agent loop for repair?"; then
+      # Build a summary of what failed
+      SMOKE_OUTPUT=$(mc-smoke 2>&1 || true)
+      FAILURES=$(echo "$SMOKE_OUTPUT" | grep '✗' | sed 's/^  ✗  /- /' || true)
+      AGENT_MSG="mc-doctor found $FAILED failure(s) that need repair. Here are the failing checks from mc-smoke:
+
+$FAILURES
+
+Please diagnose and fix each issue. You have access to the filesystem, vault, and all miniclaw tools. After fixing, run mc-smoke to verify."
+
+      openclaw agent --local --message "$AGENT_MSG" --timeout 300 2>&1 \
+        && fixed "agent repair completed — run mc-smoke to verify" \
+        || broke "agent repair failed or timed out"
+    else
+      skip "agent-assisted repair"
+    fi
+  else
+    broke "gateway not running — cannot use agent loop for repair (fix gateway first)"
+  fi
+fi
+
+# ── summary ───────────────────────────────────────────────────────────────────
+echo ""
+echo "────────────────────────────────────────"
+echo "  ${FIXED} fixed  ${SKIPPED} skipped  ${FAILED} failed"
+echo "────────────────────────────────────────"
+
+if [[ $FAILED -gt 0 ]]; then
+  echo ""
+  echo "  Run mc-smoke to verify remaining issues."
+  echo ""
+  exit 1
+fi
+
+if [[ $FIXED -gt 0 ]]; then
+  echo ""
+  echo "  Run mc-smoke to confirm everything is healthy."
+  echo ""
+fi
