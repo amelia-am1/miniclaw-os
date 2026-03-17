@@ -57,16 +57,40 @@ def _is_gmail(email_addr: str) -> bool:
     return domain in ("gmail.com", "googlemail.com")
 
 
+def _vault_get_optional(key: str) -> str:
+    """Read a secret from mc-vault, returning empty string on failure."""
+    try:
+        return _vault_get(key)
+    except Exception:
+        return ""
+
+
+def _derive_imap_host(smtp_host: str) -> str:
+    """Derive IMAP host from SMTP host (matches config.ts logic: smtp.X → mail.X)."""
+    import re
+    if smtp_host:
+        return re.sub(r"^smtp\.", "mail.", smtp_host)
+    return ""
+
+
 def _resolve_email_config() -> dict:
-    """Resolve email address and IMAP/SMTP hosts from setup-state or env."""
+    """Resolve email address and IMAP/SMTP hosts from setup-state, vault, or env."""
     state = _load_setup_state()
     email_addr = os.environ.get("AM_EMAIL") or state.get("emailAddress", "owner@example.com")
     gmail = _is_gmail(email_addr)
 
-    imap_host = state.get("emailImapHost") or ("imap.gmail.com" if gmail else "")
+    # SMTP: setup-state → vault → Gmail default
+    smtp_host = (state.get("emailSmtpHost")
+                 or _vault_get_optional("smtp-host")
+                 or ("smtp.gmail.com" if gmail else ""))
+    smtp_port = int(state.get("emailSmtpPort")
+                    or _vault_get_optional("smtp-port")
+                    or ("465" if gmail else "587"))
+
+    # IMAP: setup-state → Gmail default → derive from SMTP host
+    imap_host = (state.get("emailImapHost")
+                 or ("imap.gmail.com" if gmail else _derive_imap_host(smtp_host)))
     imap_port = int(state.get("emailImapPort") or 993)
-    smtp_host = state.get("emailSmtpHost") or ("smtp.gmail.com" if gmail else "")
-    smtp_port = int(state.get("emailSmtpPort") or (465 if gmail else 587))
 
     return {
         "email": email_addr,
@@ -473,6 +497,11 @@ def triage_inbox(password: str, system_prompt: str, limit: int = 20, dry_run: bo
     cfg = _resolve_email_config()
     print(f"\n=== Email triage {'(DRY RUN) ' if dry_run else ''}===")
     print(f"Account: {cfg['email']} | IMAP: {cfg['imap_host']}:{cfg['imap_port']} | SMTP: {cfg['smtp_host']}:{cfg['smtp_port']}")
+    if not cfg["imap_host"]:
+        raise RuntimeError(
+            f"Cannot determine IMAP host for {cfg['email']}. "
+            "Set emailSmtpHost in setup-state.json or emailImapHost directly."
+        )
     conn = imap_connect(password, cfg["email"], cfg["imap_host"], cfg["imap_port"])
     try:
         messages = list(fetch_unread(conn, limit=limit))

@@ -12,6 +12,7 @@ export interface EmailConfig {
   smtpPort: number;
   imapHost: string;
   imapPort: number;
+  signature: string;
 }
 
 function loadSetupState(): Record<string, unknown> {
