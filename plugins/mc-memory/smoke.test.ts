@@ -5,7 +5,7 @@
  * a running plugin runtime or embedder model.
  */
 
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect } from "vitest";
 import { route } from "./src/router.js";
 
 describe("mc-memory router", () => {

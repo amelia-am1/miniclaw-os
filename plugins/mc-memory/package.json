@@ -9,7 +9,8 @@
   },
   "devDependencies": {
     "openclaw": "npm:@miniclaw_official/openclaw@^2026.3.8",
-    "@types/better-sqlite3": "^7.6.13"
+    "@types/better-sqlite3": "^7.6.13",
+    "vitest": "^3.1.1"
   },
   "openclaw": {
     "extensions": [
