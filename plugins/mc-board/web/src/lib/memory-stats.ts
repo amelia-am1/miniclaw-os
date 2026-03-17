@@ -23,10 +23,9 @@ export interface MemoryStats {
 }
 
 export function getMemoryStats(): MemoryStats {
-  // Count .md files in USER/memory/ and workspace/memory/
+  // Count .md files in USER/memory/ only (matches what the Memory tab shows as SHORT TERM)
   const userMemDir = path.join(_STATE, "USER", "memory");
-  const wsMemDir = path.join(_STATE, "workspace", "memory");
-  const memoryFiles = walkMd(userMemDir).length + walkMd(wsMemDir).length;
+  const memoryFiles = walkMd(userMemDir).length;
 
   // Count KB entries via SQL
   let kbEntries = 0;
