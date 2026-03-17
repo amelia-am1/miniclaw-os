@@ -1,19 +1,13 @@
 {
-  "name": "mc-board",
+  "name": "mc-oauth-guard",
   "version": "0.1.0",
   "type": "module",
   "main": "index.ts",
-  "description": "State-machine kanban board — the agent's prefrontal cortex",
+  "description": "OAuth token refresh failure guard — detects retry storms, applies backoff, auto-disables failing profiles, and attempts keychain recovery",
   "scripts": {
     "test": "vitest run"
   },
-  "dependencies": {
-    "better-sqlite3": "^11.9.0",
-    "node-pty": "^1.1.0"
-  },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
-    "commander": "^14.0.3",
     "openclaw": "file:../../../openclaw",
     "vitest": "^4.1.0"
   },

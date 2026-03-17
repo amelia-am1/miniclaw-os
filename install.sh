@@ -1870,7 +1870,7 @@ except: existing_names = set()
 for job in store.get("jobs", []):
     if job["name"] in existing_names: continue
     expr = job.get("schedule", {}).get("expr", "*/5 * * * *")
-    args = ["openclaw", "cron", "add", "--name", job["name"], "--cron", expr, "--session", job.get("sessionTarget", "isolated")]
+    args = ["openclaw", "cron", "add", "--name", job["name"], "--cron", expr, "--session", job.get("sessionTarget", "isolated"), "--no-deliver"]
     if job.get("payload", {}).get("messageFile"):
         prompt_path = os.path.join(state_dir, "cron", job["payload"]["messageFile"])
         if os.path.exists(prompt_path):
