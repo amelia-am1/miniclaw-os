@@ -132,14 +132,13 @@ echo "  ✓ Tags pushed"
 
 # 5. GitHub release
 echo "  Creating GitHub release..."
-RELEASE_TAG="${TAG}-installer"
-gh release delete "$RELEASE_TAG" --yes --repo augmentedmike/miniclaw-os 2>/dev/null || true
-gh release create "$RELEASE_TAG" \
+gh release delete "$TAG" --yes --repo augmentedmike/miniclaw-os 2>/dev/null || true
+gh release create "$TAG" \
   --title "$TAG" \
   --notes "MiniClaw $TAG" \
   --repo augmentedmike/miniclaw-os \
   "$ZIP"
-echo "  ✓ Released: https://github.com/augmentedmike/miniclaw-os/releases/tag/$RELEASE_TAG"
+echo "  ✓ Released: https://github.com/augmentedmike/miniclaw-os/releases/tag/$TAG"
 
 echo ""
 echo "Done: miniclaw-os $TAG"

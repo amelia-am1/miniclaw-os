@@ -50,7 +50,7 @@ get_zip_url() {
     | python3 -c "
 import json, sys
 for r in json.load(sys.stdin):
-    if '-installer' in r.get('tag_name',''):
+    if r.get('tag_name','').startswith('v'):
         for a in r.get('assets', []):
             if a['name'].endswith('.zip'):
                 print(a['browser_download_url'])
