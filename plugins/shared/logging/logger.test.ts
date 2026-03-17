@@ -11,7 +11,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi, mock } from "vitest";
 import { createLogger, type LogEntry, type Logger } from "./logger.js";
 
-// ── Env stubbing (bun:test doesn't have vi.stubEnv / vi.unstubAllEnvs) ───
+// ── Env stubbing (manual implementation — vi.stubEnv requires vitest >= 0.23) ───
 const envBackup: Record<string, string | undefined> = {};
 function stubEnv(key: string, value: string) {
   if (!(key in envBackup)) envBackup[key] = process.env[key];

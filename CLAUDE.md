@@ -7,8 +7,8 @@ DO NOT mix runtimes. This project uses Node.js exclusively.
 - Use `better-sqlite3` for SQLite
 - Use `vitest` for tests
 - Use `node:fs`, `node:path`, `node:child_process` for system APIs
-- Use `bun install` for dependency installation only (it's faster) but ALL runtime code must be Node-compatible
-- Use `bun test` as a test runner (it runs vitest) but import from `vitest`, not `bun:test`
+- Use `npm install` for dependency installation
+- Use `npx vitest run` as the test runner; import from `vitest`, never from `bun:test`
 
 ## File naming
 
