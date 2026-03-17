@@ -105,12 +105,15 @@ function getFurnitureInfo(type: string): SimpleFurniture {
   return FURNITURE_DB[type] ?? { footprintW: 1, footprintH: 1, isChair: false, isDesk: false };
 }
 
+export type Zone = "desk" | "lounge" | "books";
+
 export interface OfficeState {
   layout: OfficeLayout;
   characters: Character[];
   seats: Seat[];
   blocked: Set<string>;
   walkable: { col: number; row: number }[];
+  zoneWaypoints: Record<Zone, { col: number; row: number }[]>;
   floorImages: Map<number, HTMLImageElement>;
   wallImage: HTMLImageElement | null;
   furnitureImages: Map<string, HTMLImageElement>;
@@ -121,6 +124,17 @@ export interface OfficeState {
   offsetX: number;
   offsetY: number;
   loaded: boolean;
+}
+
+/** Map card column to office zone */
+function columnToZone(column: string): Zone {
+  switch (column) {
+    case "in-progress": return "desk";
+    case "in-review": return "books";
+    case "backlog": return "lounge";
+    case "on-hold": return "lounge";
+    default: return "lounge";
+  }
 }
 
 function orientationToFacing(orientation?: string): Direction {
@@ -143,6 +157,7 @@ export function buildSeats(furniture: PlacedFurniture[]): Seat[] {
       col: item.col,
       row: item.row,
       facingDir: orientationToFacing(info.orientation),
+      action: "sit",
       assigned: false,
       assignedTo: null,
     });
@@ -193,6 +208,8 @@ export function createCharacter(
     seatId: null,
     seatTimer: 0,
     isActive: false,
+    cardId: null,
+    column: "idle",
     bubbleText: null,
     bubbleTimer: 0,
     paletteIndex,
@@ -229,35 +246,105 @@ function updateCharacter(
       break;
     }
 
+    case CharacterState.SIT_IDLE: {
+      // Slow idle sit animation (2 frames)
+      if (ch.frameTimer >= TYPE_FRAME_DUR * 3) {
+        ch.frameTimer -= TYPE_FRAME_DUR * 3;
+        ch.frame = (ch.frame + 1) % 2;
+      }
+      if (!ch.isActive) {
+        ch.seatTimer -= dt;
+        if (ch.seatTimer <= 0) {
+          ch.state = CharacterState.IDLE;
+          ch.wanderTimer = rand(WANDER_PAUSE_MIN, WANDER_PAUSE_MAX);
+        }
+      }
+      break;
+    }
+
     case CharacterState.IDLE: {
       ch.frame = 0;
-      // Active → pathfind to seat
+      const zone = columnToZone(ch.column);
+
+      // Active with assigned seat → pathfind near it, then snap to seat
       if (ch.isActive && ch.seatId) {
         const seat = state.seats.find((s) => s.uid === ch.seatId);
         if (seat) {
-          const path = findPath(
-            ch.tileCol, ch.tileRow,
-            seat.col, seat.row,
-            state.layout.tiles, state.layout.cols, state.layout.rows,
-            state.blocked
-          );
-          if (path.length > 0) {
-            ch.path = path;
+          // Already at or adjacent to seat → snap and sit/stand
+          const dx = Math.abs(ch.tileCol - seat.col);
+          const dy = Math.abs(ch.tileRow - seat.row);
+          if (dx + dy <= 1) {
+            ch.tileCol = seat.col;
+            ch.tileRow = seat.row;
+            ch.x = seat.col * TILE_SIZE + TILE_SIZE / 2;
+            ch.y = seat.row * TILE_SIZE + TILE_SIZE / 2;
+            // stand = READ (head bob), sit at desk = TYPE (typing), sit elsewhere = SIT_IDLE
+            ch.state = seat.action === "stand" ? CharacterState.READ
+              : zone === "desk" ? CharacterState.TYPE : CharacterState.SIT_IDLE;
+            ch.dir = seat.facingDir;
+            ch.frame = 0;
+            ch.frameTimer = 0;
+            break;
+          }
+          // Find walkable tile adjacent to seat and pathfind there
+          const neighbors = [
+            { col: seat.col, row: seat.row - 1 },
+            { col: seat.col, row: seat.row + 1 },
+            { col: seat.col - 1, row: seat.row },
+            { col: seat.col + 1, row: seat.row },
+          ];
+          let bestPath: { col: number; row: number }[] = [];
+          for (const nb of neighbors) {
+            if (state.blocked.has(`${nb.col},${nb.row}`)) continue;
+            const path = findPath(
+              ch.tileCol, ch.tileRow,
+              nb.col, nb.row,
+              state.layout.tiles, state.layout.cols, state.layout.rows,
+              state.blocked
+            );
+            if (path.length > 0 && (bestPath.length === 0 || path.length < bestPath.length)) {
+              bestPath = path;
+            }
+          }
+          if (bestPath.length > 0) {
+            ch.path = bestPath;
             ch.state = CharacterState.WALK;
             ch.moveProgress = 0;
             ch.frameTimer = 0;
             ch.frame = 0;
-          } else if (ch.tileCol === seat.col && ch.tileRow === seat.row) {
-            // Already at seat
-            ch.state = CharacterState.TYPE;
-            ch.dir = seat.facingDir;
-            ch.frame = 0;
-            ch.frameTimer = 0;
           }
+          break;
         }
       }
 
-      // Wander when idle
+      // Active without seat → wander within their zone
+      if (ch.isActive && !ch.seatId) {
+        ch.wanderTimer -= dt;
+        if (ch.wanderTimer <= 0) {
+          const zoneWps = state.zoneWaypoints[zone];
+          const wt = zoneWps.length > 0 ? zoneWps : state.walkable;
+          if (wt.length > 0) {
+            const target = wt[Math.floor(Math.random() * wt.length)];
+            const path = findPath(
+              ch.tileCol, ch.tileRow,
+              target.col, target.row,
+              state.layout.tiles, state.layout.cols, state.layout.rows,
+              state.blocked
+            );
+            if (path.length > 0 && path.length < 20) {
+              ch.path = path;
+              ch.state = CharacterState.WALK;
+              ch.moveProgress = 0;
+              ch.frameTimer = 0;
+              ch.frame = 0;
+            }
+          }
+          ch.wanderTimer = rand(WANDER_PAUSE_MIN, WANDER_PAUSE_MAX);
+        }
+        break;
+      }
+
+      // Inactive → wander randomly
       ch.wanderTimer -= dt;
       if (ch.wanderTimer <= 0 && !ch.isActive) {
         const wt = state.walkable;
@@ -322,14 +409,26 @@ function updateCharacter(
         ch.path.shift();
         ch.moveProgress = 0;
 
-        // Arrived at seat?
+        // Arrived near seat? Snap to it.
         if (ch.path.length === 0 && ch.isActive && ch.seatId) {
           const seat = state.seats.find((s) => s.uid === ch.seatId);
-          if (seat && ch.tileCol === seat.col && ch.tileRow === seat.row) {
-            ch.state = CharacterState.TYPE;
-            ch.dir = seat.facingDir;
-            ch.frame = 0;
-            ch.frameTimer = 0;
+          if (seat) {
+            const dist = Math.abs(ch.tileCol - seat.col) + Math.abs(ch.tileRow - seat.row);
+            if (dist <= 1) {
+              ch.tileCol = seat.col;
+              ch.tileRow = seat.row;
+              ch.x = seat.col * TILE_SIZE + TILE_SIZE / 2;
+              ch.y = seat.row * TILE_SIZE + TILE_SIZE / 2;
+              const arriveZone = columnToZone(ch.column);
+              ch.state = seat.action === "stand" ? CharacterState.READ
+                : arriveZone === "desk" ? CharacterState.TYPE : CharacterState.SIT_IDLE;
+              ch.dir = seat.facingDir;
+              ch.frame = 0;
+              ch.frameTimer = 0;
+            } else {
+              ch.state = CharacterState.IDLE;
+              ch.wanderTimer = rand(1, 3);
+            }
           } else {
             ch.state = CharacterState.IDLE;
             ch.wanderTimer = rand(1, 3);
@@ -438,7 +537,9 @@ export function renderOffice(
 
   // Characters
   for (const ch of characters) {
-    const zY = ch.y + TILE_SIZE / 2 + 0.5;
+    // Seated/standing characters render above furniture at their row
+    const seated = ch.state === CharacterState.TYPE || ch.state === CharacterState.READ || ch.state === CharacterState.SIT_IDLE;
+    const zY = seated ? 99999 : ch.y + TILE_SIZE / 2 + 0.5;
     drawQueue.push({
       zY,
       draw: () => renderCharacter(ctx, ch, state),
@@ -466,6 +567,14 @@ function getCharacterSprite(ch: Character): SpriteData | null {
 
   if (!dirSprites || dirSprites.length === 0) return null;
 
+  if (ch.state === CharacterState.SIT_IDLE) {
+    // Use dedicated sit idle sprites (direction-independent)
+    if (ch.sprites.sitIdle && ch.sprites.sitIdle.length > 0) {
+      return ch.sprites.sitIdle[ch.frame % ch.sprites.sitIdle.length] ?? ch.sprites.sitIdle[0];
+    }
+    // Fallback to first type frame if no sit idle sprites
+    return dirSprites[3] ?? dirSprites[0];
+  }
   if (ch.state === CharacterState.TYPE) {
     // Type frames: index 3+4 in original sheet, mapped to frame 0-1
     const typeIdx = 3 + (ch.frame % 2);
@@ -493,7 +602,7 @@ function renderCharacter(
   const { zoom, offsetX, offsetY } = state;
   const cached = getCachedSprite(sprite, zoom);
 
-  const sittingOff = (ch.state === CharacterState.TYPE || ch.state === CharacterState.READ) ? SITTING_OFFSET : 0;
+  const sittingOff = (ch.state === CharacterState.TYPE || ch.state === CharacterState.READ || ch.state === CharacterState.SIT_IDLE) ? SITTING_OFFSET : 0;
   const drawX = Math.round(offsetX + (ch.x - TILE_SIZE / 2) * zoom);
   const drawY = Math.round(offsetY + (ch.y - TILE_SIZE + sittingOff) * zoom);
 
@@ -509,21 +618,26 @@ function renderBubble(
   const text = ch.bubbleText || ch.label || ch.name;
   if (!text) return;
 
-  const sittingOff = (ch.state === CharacterState.TYPE || ch.state === CharacterState.READ) ? SITTING_OFFSET : 0;
+  const sittingOff = (ch.state === CharacterState.TYPE || ch.state === CharacterState.READ || ch.state === CharacterState.SIT_IDLE) ? SITTING_OFFSET : 0;
   const bubbleX = Math.round(offsetX + ch.x * zoom);
   const bubbleY = Math.round(offsetY + (ch.y + sittingOff - BUBBLE_OFFSET_Y) * zoom);
 
   // Measure text
-  const fontSize = Math.max(8, Math.round(8 * zoom));
-  ctx.font = `bold ${fontSize}px monospace`;
+  const fontSize = Math.max(6, Math.round(5 * zoom));
+  ctx.font = `${fontSize}px monospace`;
   const metrics = ctx.measureText(text);
   const tw = metrics.width;
   const pad = 4 * zoom;
   const bw = tw + pad * 2;
   const bh = fontSize + pad * 2;
 
-  // Background
-  ctx.fillStyle = ch.isActive ? "#22c55e" : "#3f3f46";
+  // Background — color by column (matches mc-board COLUMN_COLORS)
+  const bubbleColors: Record<string, string> = {
+    "backlog": "#c084fc",
+    "in-progress": "#60a5fa",
+    "in-review": "#fb923c",
+  };
+  ctx.fillStyle = ch.isActive ? (bubbleColors[ch.column] ?? "#60a5fa") : "#3f3f46";
   ctx.globalAlpha = 0.9;
   const rx = bubbleX - bw / 2;
   const ry = bubbleY - bh;
@@ -716,12 +830,56 @@ export async function initOffice(
     }
   }
 
+  // Build zone waypoints from furniture positions
+  const walkableSet = new Set(walkable.map(w => `${w.col},${w.row}`));
+  function nearbyWalkable(col: number, row: number, radius: number): { col: number; row: number }[] {
+    const pts: { col: number; row: number }[] = [];
+    for (let dr = -radius; dr <= radius; dr++) {
+      for (let dc = -radius; dc <= radius; dc++) {
+        const key = `${col + dc},${row + dr}`;
+        if (walkableSet.has(key)) pts.push({ col: col + dc, row: row + dr });
+      }
+    }
+    return pts;
+  }
+
+  const zoneWaypoints: Record<Zone, { col: number; row: number }[]> = {
+    desk: [],
+    lounge: [],
+    books: [],
+  };
+
+  for (const item of layout.furniture) {
+    const t = item.type;
+    if (t.startsWith("SOFA") || t === "COFFEE_TABLE" || t === "CUSHIONED_BENCH") {
+      zoneWaypoints.lounge.push(...nearbyWalkable(item.col, item.row, 2));
+    } else if (t.startsWith("DOUBLE_BOOKSHELF") || t.startsWith("BOOKSHELF")) {
+      zoneWaypoints.books.push(...nearbyWalkable(item.col, item.row, 2));
+    }
+  }
+  // Desk zone = walkable tiles near chairs (seats)
+  for (const seat of seats) {
+    zoneWaypoints.desk.push(...nearbyWalkable(seat.col, seat.row, 1));
+  }
+
+  // Deduplicate
+  for (const zone of Object.keys(zoneWaypoints) as Zone[]) {
+    const seen = new Set<string>();
+    zoneWaypoints[zone] = zoneWaypoints[zone].filter(p => {
+      const k = `${p.col},${p.row}`;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+  }
+
   return {
     layout,
     characters: [],
     seats,
     blocked,
     walkable,
+    zoneWaypoints,
     floorImages,
     wallImage,
     furnitureImages,
@@ -733,6 +891,27 @@ export async function initOffice(
     offsetY: 0,
     loaded: true,
   };
+}
+
+/** Determine which zone a seat belongs to based on zoneWaypoints */
+function seatZone(state: OfficeState, seatId: string): Zone | null {
+  const seat = state.seats.find(s => s.uid === seatId);
+  if (!seat) return null;
+  const key = `${seat.col},${seat.row}`;
+  for (const [zone, wps] of Object.entries(state.zoneWaypoints) as [Zone, { col: number; row: number }[]][]) {
+    if (wps.some(w => `${w.col},${w.row}` === key)) return zone;
+  }
+  return null;
+}
+
+/** Find a free seat within a specific zone */
+function findFreeSeatInZone(state: OfficeState, zone: Zone): Seat | undefined {
+  const zoneKeys = new Set(state.zoneWaypoints[zone].map(w => `${w.col},${w.row}`));
+  // First try to find a seat whose position is in the zone
+  const match = state.seats.find(s => !s.assigned && zoneKeys.has(`${s.col},${s.row}`));
+  if (match) return match;
+  // Fallback: any free seat
+  return state.seats.find(s => !s.assigned);
 }
 
 // Sync agent list → characters
@@ -752,15 +931,38 @@ export function syncAgents(
     }
   }
 
-  // Add characters for new agents
+  // Add or update characters for agents
   for (const agent of agents) {
+    const zone = columnToZone(agent.column);
+
     if (existingIds.has(agent.worker)) {
       // Update existing character
       const ch = state.characters.find((c) => c.id === agent.worker)!;
       ch.isActive = true;
-      ch.label = truncate(agent.title || agent.cardId, 20);
-      ch.bubbleText = truncate(agent.title || agent.cardId, 20);
+      ch.cardId = agent.cardId;
+      ch.column = agent.column;
+      ch.label = agent.cardId;
+      ch.bubbleText = agent.cardId;
       ch.bubbleTimer = 10;
+
+      // If column changed, release old seat and reassign
+      const oldZone = ch.seatId ? seatZone(state, ch.seatId) : null;
+      if (ch.seatId && oldZone !== zone) {
+        const oldSeat = state.seats.find(s => s.uid === ch.seatId);
+        if (oldSeat) { oldSeat.assigned = false; oldSeat.assignedTo = null; }
+        ch.seatId = null;
+        ch.state = CharacterState.IDLE;
+      }
+      // Assign a seat in the correct zone if needed
+      if (!ch.seatId) {
+        const freeSeat = findFreeSeatInZone(state, zone);
+        if (freeSeat) {
+          freeSeat.assigned = true;
+          freeSeat.assignedTo = agent.worker;
+          ch.seatId = freeSeat.uid;
+          ch.state = CharacterState.IDLE;
+        }
+      }
       continue;
     }
 
@@ -769,13 +971,15 @@ export function syncAgents(
 
     const idx = state.characters.length;
     const baseIdx = idx % state.baseSprites.length;
-    const hueShift = HUE_SHIFTS[idx % HUE_SHIFTS.length];
-    const sprites = adjustCharacterHue(state.baseSprites[baseIdx], hueShift);
+    // Use character sprites as-is — each char file has unique art, no hue shift needed
+    const sprites = state.baseSprites[baseIdx];
 
-    // Find a spawn point
-    const spawn = state.walkable.length > 0
-      ? state.walkable[Math.floor(Math.random() * state.walkable.length)]
-      : { col: 3, row: 5 };
+    // Spawn in the appropriate zone
+    const zoneWps = state.zoneWaypoints[zone];
+    const spawnPool = zoneWps.length > 0 ? zoneWps : state.walkable;
+    const spawn = spawnPool.length > 0
+      ? spawnPool[Math.floor(Math.random() * spawnPool.length)]
+      : { col: 5, row: 14 };
 
     const ch = createCharacter(
       agent.worker,
@@ -786,16 +990,20 @@ export function syncAgents(
       spawn.row
     );
     ch.isActive = true;
-    ch.label = truncate(agent.title || agent.cardId, 20);
-    ch.bubbleText = truncate(agent.title || agent.cardId, 20);
+    ch.cardId = agent.cardId;
+    ch.column = agent.column;
+    ch.label = agent.cardId;
+    ch.bubbleText = agent.cardId;
     ch.bubbleTimer = 10;
 
-    // Assign to a seat
-    const freeSeat = state.seats.find((s) => !s.assigned);
-    if (freeSeat) {
-      freeSeat.assigned = true;
-      freeSeat.assignedTo = agent.worker;
-      ch.seatId = freeSeat.uid;
+    // Assign a seat in the character's zone
+    {
+      const freeSeat = findFreeSeatInZone(state, zone);
+      if (freeSeat) {
+        freeSeat.assigned = true;
+        freeSeat.assignedTo = agent.worker;
+        ch.seatId = freeSeat.uid;
+      }
     }
 
     state.characters.push(ch);
@@ -828,14 +1036,141 @@ function truncate(s: string, maxLen: number): string {
   return s.slice(0, maxLen - 1) + "…";
 }
 
-// Auto-center the view
+// Auto-fit the visible content to fill the canvas
 export function centerView(
   state: OfficeState,
   canvasWidth: number,
   canvasHeight: number
 ): void {
-  const worldW = state.layout.cols * TILE_SIZE * state.zoom;
-  const worldH = state.layout.rows * TILE_SIZE * state.zoom;
-  state.offsetX = Math.round((canvasWidth - worldW) / 2);
-  state.offsetY = Math.round((canvasHeight - worldH) / 2);
+  const { cols, rows, tiles } = state.layout;
+
+  // Find content bounds (skip void/wall-only rows/cols)
+  let minR = rows, maxR = 0, minC = cols, maxC = 0;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const t = tiles[r * cols + c];
+      if (t !== 0 && t !== 255) {
+        if (r < minR) minR = r;
+        if (r > maxR) maxR = r;
+        if (c < minC) minC = c;
+        if (c > maxC) maxC = c;
+      }
+    }
+  }
+  // Add 1-tile padding
+  minR = Math.max(0, minR - 1);
+  minC = Math.max(0, minC - 1);
+  maxR = Math.min(rows - 1, maxR + 1);
+  maxC = Math.min(cols - 1, maxC + 1);
+
+  const contentW = (maxC - minC + 1) * TILE_SIZE;
+  const contentH = (maxR - minR + 1) * TILE_SIZE;
+
+  // Auto-zoom to fit within the canvas without clipping
+  if (canvasWidth > 0 && canvasHeight > 0 && contentW > 0 && contentH > 0) {
+    state.zoom = Math.min(canvasWidth / contentW, canvasHeight / contentH);
+  }
+
+  const scaledW = contentW * state.zoom;
+  const scaledH = contentH * state.zoom;
+  const TOP_MARGIN = 60;
+  state.offsetX = Math.round((canvasWidth - scaledW) / 2) - minC * TILE_SIZE * state.zoom;
+  state.offsetY = Math.max(TOP_MARGIN, Math.round((canvasHeight - scaledH) / 2)) - minR * TILE_SIZE * state.zoom;
+}
+
+interface SpotData {
+  col: number;
+  row: number;
+  facing: string;
+  action: string;
+}
+
+/** Apply user-defined zone map and spots, overriding furniture-based zones/seats. */
+export function applyZoneMap(
+  state: OfficeState,
+  zoneMap: Record<string, string>,
+  spotsData?: SpotData[]
+): void {
+  const COLUMN_TO_ZONE: Record<string, Zone> = {
+    "in-progress": "desk",
+    "backlog": "lounge",
+    "in-review": "books",
+  };
+  const FACING_TO_DIR: Record<string, Direction> = {
+    up: Direction.UP,
+    down: Direction.DOWN,
+    left: Direction.LEFT,
+    right: Direction.RIGHT,
+  };
+
+  const zoneWaypoints: Record<Zone, { col: number; row: number }[]> = {
+    desk: [],
+    lounge: [],
+    books: [],
+  };
+  for (const [key, column] of Object.entries(zoneMap)) {
+    const zone = COLUMN_TO_ZONE[column];
+    if (!zone) continue;
+    const [col, row] = key.split(",").map(Number);
+    zoneWaypoints[zone].push({ col, row: row - 1 });
+  }
+  if (Object.keys(zoneMap).length > 0) {
+    state.zoneWaypoints = zoneWaypoints;
+  }
+
+  // Apply user-defined spots as seats, replacing auto-detected ones
+  if (spotsData && spotsData.length > 0) {
+    // Release all existing seat assignments
+    for (const seat of state.seats) {
+      seat.assigned = false;
+      seat.assignedTo = null;
+    }
+    state.seats = spotsData.map((s, i) => ({
+      uid: `user-spot-${i}`,
+      col: s.col,
+      row: s.row - 1,
+      facingDir: FACING_TO_DIR[s.facing] ?? Direction.DOWN,
+      action: (s.action === "stand" ? "stand" : "sit") as "sit" | "stand",
+      assigned: false,
+      assignedTo: null,
+    }));
+    // Reset character seat assignments since seats changed
+    for (const ch of state.characters) {
+      ch.seatId = null;
+      ch.state = CharacterState.IDLE;
+    }
+  }
+}
+
+/** Hit-test: returns the cardId of the character whose bubble was clicked, or null. */
+export function hitTestBubble(
+  state: OfficeState,
+  canvasX: number,
+  canvasY: number,
+  ctx: CanvasRenderingContext2D
+): string | null {
+  const { zoom, offsetX, offsetY } = state;
+  for (const ch of state.characters) {
+    if (!ch.isActive || !ch.cardId) continue;
+    const text = ch.bubbleText || ch.label || ch.name;
+    if (!text) continue;
+
+    const sittingOff = (ch.state === CharacterState.TYPE || ch.state === CharacterState.READ || ch.state === CharacterState.SIT_IDLE) ? SITTING_OFFSET : 0;
+    const bubbleX = Math.round(offsetX + ch.x * zoom);
+    const bubbleY = Math.round(offsetY + (ch.y + sittingOff - BUBBLE_OFFSET_Y) * zoom);
+
+    const fontSize = Math.max(8, Math.round(8 * zoom));
+    ctx.font = `bold ${fontSize}px monospace`;
+    const tw = ctx.measureText(text).width;
+    const pad = 4 * zoom;
+    const bw = tw + pad * 2;
+    const bh = fontSize + pad * 2;
+    const rx = bubbleX - bw / 2;
+    const ry = bubbleY - bh;
+
+    if (canvasX >= rx && canvasX <= rx + bw && canvasY >= ry && canvasY <= ry + bh) {
+      return ch.cardId;
+    }
+  }
+  return null;
 }

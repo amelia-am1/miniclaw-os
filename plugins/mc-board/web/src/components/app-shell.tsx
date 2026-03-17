@@ -156,7 +156,7 @@ export function AppShell({ initialTab, initialCardId, initialProjectId }: { init
         <div className="flex items-stretch">
           <div className="brand">MiniClaw Brain</div>
           <div className="tab-bar">
-            {(["board", "office", "memory", "rolodex", "settings"] as Tab[]).map(t => {
+            {(["office", "board", "memory", "rolodex", "settings"] as Tab[]).map(t => {
               const activeCount = t === "board" && counts ? counts.inProgress : 0;
               const memoryCount = t === "memory" && memoryStats ? memoryStats.total : 0;
               const badgeCount = t === "rolodex" && rolodexCount ? rolodexCount.count : t === "memory" ? memoryCount : activeCount;
@@ -304,7 +304,7 @@ export function AppShell({ initialTab, initialCardId, initialProjectId }: { init
             />
           </div>
           <div className={`tab-panel${tab === "office" ? " active" : ""}`}>
-            <PixelOfficeTab />
+            <PixelOfficeTab onSwitchToBoard={() => switchTab("board")} />
           </div>
           <div className={`tab-panel${tab === "memory" ? " active" : ""}`}>
             <MemoryTab />

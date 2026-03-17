@@ -12,7 +12,7 @@ export enum TileType {
 
 export enum Direction { DOWN = 0, UP = 1, RIGHT = 2, LEFT = 3 }
 
-export enum CharacterState { IDLE = 0, WALK = 1, TYPE = 2, READ = 3 }
+export enum CharacterState { IDLE = 0, WALK = 1, TYPE = 2, READ = 3, SIT_IDLE = 4 }
 
 export type SpriteData = string[][]; // 2D array of hex color strings ('' = transparent)
 
@@ -21,6 +21,7 @@ export interface CharacterSprites {
   up: SpriteData[];
   right: SpriteData[];
   left: SpriteData[];
+  sitIdle: SpriteData[]; // sit idle frames (direction-independent)
 }
 
 export interface Character {
@@ -43,6 +44,8 @@ export interface Character {
   seatId: string | null;
   seatTimer: number;
   isActive: boolean;
+  cardId: string | null;
+  column: string;
   bubbleText: string | null;
   bubbleTimer: number;
   paletteIndex: number;
@@ -78,6 +81,7 @@ export interface Seat {
   col: number;
   row: number;
   facingDir: Direction;
+  action: "sit" | "stand";
   assigned: boolean;
   assignedTo: string | null;
 }

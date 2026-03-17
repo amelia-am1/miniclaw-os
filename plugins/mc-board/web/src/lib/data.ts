@@ -8,6 +8,7 @@
  */
 
 import Database from "better-sqlite3";
+import { randomBytes } from "node:crypto";
 import * as path from "node:path";
 import * as fs from "node:fs";
 import type { Card, BoardCard, Column, Priority, Project, ActiveEntry, HistoryEntry, LogEntry, WorkLogEntry, PickupLogEntry, CardTimeline, TimelineEvent, AgentRun } from "./types";
@@ -233,6 +234,27 @@ export function getShippedIds(): string[] {
   try {
     return (db.prepare(`SELECT id FROM cards WHERE col = 'shipped'`).all() as { id: string }[]).map(r => r.id);
   } catch { return []; }
+}
+
+/** Create a new card in backlog from a work description (web request). */
+export function createCard(description: string): string | null {
+  const db = getDb();
+  if (!db) return null;
+  const id = "crd_" + randomBytes(4).toString("hex");
+  const now = new Date().toISOString();
+  // Mirror how TG/CLI creates: title = description, everything else defaults
+  const title = description.length > 120 ? description.slice(0, 117) + "..." : description;
+  db.prepare(
+    `INSERT INTO cards
+       (id, title, col, priority, tags, project_id, work_type, linked_card_id, depends_on,
+        created_at, updated_at,
+        problem_description, implementation_plan, acceptance_criteria, notes, review_notes, research, verify_url, work_log)
+     VALUES (?, ?, 'backlog', 'medium', '[]', NULL, NULL, NULL, '[]', ?, ?, ?, '', '', '', '', '', '', '[]')`,
+  ).run(id, title, now, now, description);
+  db.prepare(
+    `INSERT INTO card_history (card_id, col, moved_at) VALUES (?, 'backlog', ?)`,
+  ).run(id, now);
+  return id;
 }
 
 export function getCard(id: string): Card | null {

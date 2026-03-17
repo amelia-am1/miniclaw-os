@@ -12,6 +12,8 @@ const CHAR_W = 16;
 const CHAR_H = 32;
 const FRAMES_PER_DIR = 7;
 const DIRS_PER_CHAR = 3; // down, up, right (left = flip of right)
+const SIT_IDLE_ROW = 3; // 4th row: sit idle frames
+const SIT_IDLE_FRAMES = 2;
 
 export function loadCharacterSheet(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -83,12 +85,20 @@ export function extractCharacter(img: HTMLImageElement, charIndex: number): Char
     dirs.push(frames);
   }
 
+  // Extract sit idle frames from 4th row
+  const sitIdleFrames: SpriteData[] = [];
+  const sitY = baseY + SIT_IDLE_ROW * CHAR_H;
+  for (let f = 0; f < SIT_IDLE_FRAMES; f++) {
+    sitIdleFrames.push(extractSpriteData(img, f * CHAR_W, sitY, CHAR_W, CHAR_H));
+  }
+
   // down=0, up=1, right=2, left=flip(right)
   return {
     down: dirs[0],
     up: dirs[1],
     right: dirs[2],
     left: dirs[2].map(flipHorizontal),
+    sitIdle: sitIdleFrames,
   };
 }
 
@@ -160,6 +170,7 @@ export function adjustCharacterHue(
     up: adj(sprites.up),
     right: adj(sprites.right),
     left: adj(sprites.left),
+    sitIdle: adj(sprites.sitIdle),
   };
 }
 
