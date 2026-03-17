@@ -837,7 +837,7 @@ else
   ok "Vault already initialised"
 fi
 
-# All secrets (gh-token, gmail-app-password, gemini-api-key) are collected
+# All secrets (gh-token, email-app-password, gemini-api-key) are collected
 # in the board web setup wizard (port 4220) — not in the terminal installer.
 
 
@@ -1787,8 +1787,8 @@ if [[ -n "$CONFIG_FILE" && -f "$CONFIG_FILE" ]]; then
 
   vault_set "telegram-bot-token" "$TG_TOKEN"
   vault_set "gh-token" "$GH_TOKEN"
-  vault_set "gmail-app-password" "$EMAIL_PASS"
-  vault_set "gmail-email" "$EMAIL_ADDR"
+  vault_set "email-app-password" "$EMAIL_PASS"
+  vault_set "email-address" "$EMAIL_ADDR"
   [[ -n "$EMAIL_SMTP_HOST" ]] && vault_set "smtp-host" "$EMAIL_SMTP_HOST"
   [[ -n "$EMAIL_SMTP_PORT" ]] && vault_set "smtp-port" "$EMAIL_SMTP_PORT"
   vault_set "gemini-api-key" "$GEMINI_KEY"
@@ -1971,6 +1971,27 @@ with open(p, 'w') as f: json.dump(s, f, indent=2); f.write('\n')
     mc-smoke && ok "mc-smoke passed" || warn "mc-smoke had failures — check output above"
   else
     warn "mc-smoke not found on PATH (checked: $MINICLAW_DIR/SYSTEM/bin)"
+  fi
+fi
+
+# ── Post-install: vault key migrations ────────────────────────────────────────
+VAULT_BIN="$SYSTEM_BIN/mc-vault"
+if [[ -x "$VAULT_BIN" ]]; then
+  # Migrate legacy gmail-app-password → email-app-password
+  if "$VAULT_BIN" get gmail-app-password &>/dev/null; then
+    LEGACY_PASS=$("$VAULT_BIN" get gmail-app-password 2>/dev/null)
+    if [[ -n "$LEGACY_PASS" ]] && ! "$VAULT_BIN" get email-app-password &>/dev/null; then
+      "$VAULT_BIN" set email-app-password "$LEGACY_PASS" &>/dev/null && \
+        ok "Migrated vault: gmail-app-password → email-app-password"
+    fi
+  fi
+  # Migrate legacy gmail-email → email-address
+  if "$VAULT_BIN" get gmail-email &>/dev/null; then
+    LEGACY_EMAIL=$("$VAULT_BIN" get gmail-email 2>/dev/null)
+    if [[ -n "$LEGACY_EMAIL" ]] && ! "$VAULT_BIN" get email-address &>/dev/null; then
+      "$VAULT_BIN" set email-address "$LEGACY_EMAIL" &>/dev/null && \
+        ok "Migrated vault: gmail-email → email-address"
+    fi
   fi
 fi
 
