@@ -4,7 +4,7 @@ import { Board } from "./board";
 import { MemoryTab } from "./memory-tab";
 import { RolodexTab } from "./rolodex-tab";
 import { SettingsPage } from "./settings-page";
-import { AgentsTab } from "./agents-tab";
+import { PixelOfficeTab } from "./pixel-office-tab";
 import { Modal } from "./modal";
 import { ChatPanel } from "./chat-panel";
 import { WelcomeWizard, useWelcomeWizard } from "./welcome-wizard";
@@ -12,7 +12,7 @@ import { Project, BoardCard } from "@/lib/types";
 
 import useSWR from "swr";
 
-type Tab = "board" | "memory" | "rolodex" | "agents" | "settings";
+type Tab = "board" | "memory" | "rolodex" | "settings" | "office";
 interface Toast { id: number; icon: string; title: string; sub?: string; exiting?: boolean; }
 interface Counts { backlog: number; inProgress: number; inReview: number; shipped: number; }
 
@@ -42,7 +42,7 @@ function DailyStats() {
   );
 }
 
-const TAB_PATHS: Record<Tab, string> = { board: "/board", memory: "/memory", rolodex: "/rolodex", agents: "/agents", settings: "/settings" };
+const TAB_PATHS: Record<Tab, string> = { board: "/board", memory: "/memory", rolodex: "/rolodex", settings: "/settings", office: "/office" };
 
 function getNotifsEnabled(): boolean {
   try { return localStorage.getItem("brain-toasts") !== "false"; } catch { return true; }
@@ -75,7 +75,6 @@ export function AppShell({ initialTab, initialCardId, initialProjectId }: { init
   const [assistantName, setAssistantName] = useState("Am");
   const { data: rolodexCount } = useSWR<{ count: number }>("/api/rolodex/count", fetcher, { refreshInterval: 60000 });
   const { data: memoryStats } = useSWR<{ memoryFiles: number; kbEntries: number; total: number }>("/api/memory/stats", fetcher, { refreshInterval: 60000 });
-  const { data: health } = useSWR<{ version: string }>("/api/health", fetcher, { refreshInterval: 300000 });
 
   // Fetch assistant name for empty-state message
   useEffect(() => {
@@ -157,27 +156,15 @@ export function AppShell({ initialTab, initialCardId, initialProjectId }: { init
         <div className="flex items-stretch">
           <div className="brand">MiniClaw Brain</div>
           <div className="tab-bar">
-            {(["board", "memory", "rolodex", "agents", "settings"] as Tab[]).map(t => {
-              const activeCount = t === "board" && counts ? counts.inProgress + counts.inReview : 0;
-              const badgeCount = t === "rolodex" && rolodexCount ? rolodexCount.count : t === "board" ? activeCount : 0;
-              const memoryBadge = t === "memory" && memoryStats && memoryStats.total > 0
-                ? `${memoryStats.memoryFiles}\u2009/\u2009${memoryStats.kbEntries}` : "";
+            {(["board", "office", "memory", "rolodex", "settings"] as Tab[]).map(t => {
+              const activeCount = t === "board" && counts ? counts.inProgress : 0;
+              const memoryCount = t === "memory" && memoryStats ? memoryStats.total : 0;
+              const badgeCount = t === "rolodex" && rolodexCount ? rolodexCount.count : t === "memory" ? memoryCount : activeCount;
               return (
                 <button key={t} onClick={() => switchTab(t)}
                   className={`tab-btn${tab === t ? " active" : ""}`}
                   style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  {t === "board" ? "Board" : t === "memory" ? "Memory" : t === "rolodex" ? "Contacts" : t === "agents" ? "Agents" : "Settings"}
-                  {memoryBadge && (
-                    <span style={{
-                      fontSize: 10,
-                      fontWeight: 600,
-                      background: "#52525b",
-                      color: "#fafafa",
-                      borderRadius: 10,
-                      padding: "1px 6px",
-                      lineHeight: "14px",
-                    }}>{memoryBadge}</span>
-                  )}
+                  {t === "board" ? "Board" : t === "office" ? "Office" : t === "memory" ? "Memory" : t === "rolodex" ? "Contacts" : "Settings"}
                   {badgeCount > 0 && (
                     <span style={{
                       fontSize: 10,
@@ -277,6 +264,11 @@ export function AppShell({ initialTab, initialCardId, initialProjectId }: { init
             <span className="stat-pill">in&nbsp;review<b>{counts.inReview}</b></span>
             <span className="stat-pill">shipped<b>{counts.shipped}</b></span>
             <DailyStats />
+            {memoryStats && (
+              <span className="stat-pill" title={`${memoryStats.memoryFiles} memory files, ${memoryStats.kbEntries} KB entries`}>
+                memory<b>{memoryStats.memoryFiles}&thinsp;/&thinsp;{memoryStats.kbEntries}</b>
+              </span>
+            )}
           </div>
         )}
 
@@ -294,11 +286,6 @@ export function AppShell({ initialTab, initialCardId, initialProjectId }: { init
               fill="currentColor" />
           </svg>
         </button>
-        {health?.version && (
-          <span className="flex items-center px-3 border-l border-zinc-800 text-zinc-500 text-xs font-mono shrink-0 h-full">
-            v{health.version}
-          </span>
-        )}
       </div>
 
       {/* Main content + Chat panel flex row */}
@@ -316,14 +303,14 @@ export function AppShell({ initialTab, initialCardId, initialProjectId }: { init
               onCardOpen={setOpenCardId}
             />
           </div>
+          <div className={`tab-panel${tab === "office" ? " active" : ""}`}>
+            <PixelOfficeTab />
+          </div>
           <div className={`tab-panel${tab === "memory" ? " active" : ""}`}>
             <MemoryTab />
           </div>
           <div className={`tab-panel${tab === "rolodex" ? " active" : ""}`}>
             <RolodexTab />
-          </div>
-          <div className={`tab-panel${tab === "agents" ? " active" : ""}`}>
-            <AgentsTab />
           </div>
           <div className={`tab-panel${tab === "settings" ? " active" : ""}`}>
             <SettingsPage />
