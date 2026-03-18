@@ -34,40 +34,108 @@ _STATE_DIR       = os.environ.get("OPENCLAW_STATE_DIR", os.path.expanduser("~/.o
 VAULT_BIN        = os.path.join(_STATE_DIR, "miniclaw", "system", "bin", "mc-vault")
 SEND_ALERT       = os.path.join(_STATE_DIR, "miniclaw", "system", "bin", "send-alert")
 MC_BIN           = "/opt/homebrew/bin/openclaw"
-FROM_EMAIL       = os.environ.get("AM_EMAIL", "owner@example.com")
-IMAP_HOST        = "imap.gmail.com"
-IMAP_PORT        = 993
-SMTP_HOST        = "smtp.gmail.com"
-SMTP_PORT        = 465
 PROMPT_FILE      = os.path.join(_STATE_DIR, "cron", "prompts", "email-triage.md")
 MODEL            = "haiku"  # openclaw model alias for haiku
 MAX_BODY_CHARS   = 2000
 # OpenClaw local gateway — exposes OpenAI-compatible endpoint
 OPENCLAW_BASE_URL   = "http://localhost:18789/v1"
 
+# Gmail domains — used to auto-derive IMAP/SMTP hosts
+_GMAIL_DOMAINS = {"gmail.com", "googlemail.com"}
 
-def _vault_get(key: str) -> str:
-    """Read a secret from mc-vault."""
-    result = subprocess.run(
-        [VAULT_BIN, "get", key],
-        capture_output=True, text=True, check=True,
-    )
-    raw = result.stdout.strip()
-    if " = " in raw:
-        return raw.split(" = ", 1)[1].strip()
-    return raw
+
+def _vault_get(key: str) -> Optional[str]:
+    """Read a secret from mc-vault. Returns None if key not found."""
+    try:
+        result = subprocess.run(
+            [VAULT_BIN, "get", key],
+            capture_output=True, text=True, check=True,
+        )
+        raw = result.stdout.strip()
+        if " = " in raw:
+            return raw.split(" = ", 1)[1].strip() or None
+        return raw or None
+    except subprocess.CalledProcessError:
+        return None
+
+
+def _vault_get_required(key: str) -> str:
+    """Read a secret from mc-vault. Raises if missing."""
+    val = _vault_get(key)
+    if not val:
+        raise RuntimeError(f"Required vault key '{key}' is not set")
+    return val
+
+
+def _read_setup_state() -> dict:
+    """Read setup-state.json, returning {} on any error."""
+    state_file = os.path.join(_STATE_DIR, "USER", "setup-state.json")
+    try:
+        with open(state_file) as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def _derive_imap_host(smtp_host: str) -> str:
+    """Derive IMAP host from SMTP host (e.g. smtp.example.com → imap.example.com)."""
+    if smtp_host.startswith("smtp."):
+        return "imap." + smtp_host[5:]
+    # For mail.example.com style hosts, IMAP is usually on the same host
+    return smtp_host
+
+
+def _resolve_email_config() -> dict:
+    """Resolve email config from setup-state.json + vault, with Gmail defaults."""
+    state = _read_setup_state()
+    email_addr = state.get("emailAddress") or os.environ.get("AM_EMAIL", "owner@example.com")
+    domain = email_addr.split("@")[-1].lower() if "@" in email_addr else ""
+    is_gmail = domain in _GMAIL_DOMAINS
+
+    # SMTP host: setup-state > vault > Gmail default
+    smtp_host = state.get("emailSmtpHost") or _vault_get("smtp-host") or ""
+    smtp_port = int(state.get("emailSmtpPort") or _vault_get("smtp-port") or 0)
+    imap_host = state.get("emailImapHost") or ""
+    imap_port = int(state.get("emailImapPort") or 0)
+
+    if is_gmail:
+        smtp_host = smtp_host or "smtp.gmail.com"
+        smtp_port = smtp_port or 465
+        imap_host = imap_host or "imap.gmail.com"
+        imap_port = imap_port or 993
+    else:
+        smtp_port = smtp_port or 587
+        imap_host = imap_host or (_derive_imap_host(smtp_host) if smtp_host else "")
+        imap_port = imap_port or 993
+
+    return {
+        "email": email_addr,
+        "smtp_host": smtp_host,
+        "smtp_port": smtp_port,
+        "imap_host": imap_host,
+        "imap_port": imap_port,
+    }
+
+
+# Resolve config at module load
+cfg = _resolve_email_config()
+FROM_EMAIL = cfg["email"]
+IMAP_HOST  = cfg["imap_host"]
+IMAP_PORT  = cfg["imap_port"]
+SMTP_HOST  = cfg["smtp_host"]
+SMTP_PORT  = cfg["smtp_port"]
 
 
 def _get_openclaw_token() -> str:
-    return _vault_get("openclaw-gateway-token")
+    return _vault_get_required("openclaw-gateway-token")
 
 
 def _get_tg_bot_token() -> str:
-    return _vault_get("tg-bot-token")
+    return _vault_get_required("tg-bot-token")
 
 
 def _get_tg_chat_id() -> str:
-    return _vault_get("tg-chat-id")
+    return _vault_get_required("tg-chat-id")
 
 # ── Event log ────────────────────────────────────────────────────────────
 EMAIL_EVENTS_FILE = os.path.join(
@@ -87,14 +155,11 @@ INTERESTING_SCORES = {
 
 # ── Vault ───────────────────────────────────────────────────────────────
 def get_app_password() -> str:
-    result = subprocess.run(
-        [VAULT_BIN, "get", "gmail-app-password"],
-        capture_output=True, text=True, check=True,
-    )
-    raw = result.stdout.strip()
-    if " = " in raw:
-        return raw.split(" = ", 1)[1].strip()
-    return raw
+    """Get email app password — tries canonical key first, falls back to legacy gmail-* key."""
+    pw = _vault_get("email-app-password") or _vault_get("gmail-app-password")
+    if not pw:
+        raise RuntimeError("No email app password found in vault (tried 'email-app-password' and 'gmail-app-password')")
+    return pw
 
 
 # ── Email parsing ────────────────────────────────────────────────────────
@@ -419,6 +484,10 @@ def run_test_set(system_prompt: str, dry_run: bool = True) -> bool:
 
 # ── Main triage loop ──────────────────────────────────────────────────────
 def triage_inbox(password: str, system_prompt: str, limit: int = 20, dry_run: bool = False) -> None:
+    if not cfg["imap_host"]:
+        raise RuntimeError(f"Cannot determine IMAP host for {cfg['email']}. Set emailImapHost in setup-state.json or emailSmtpHost to derive it.")
+    if not cfg["smtp_host"]:
+        raise RuntimeError(f"Cannot determine SMTP host for {cfg['email']}. Set emailSmtpHost in setup-state.json.")
     print(f"\n=== Email triage {'(DRY RUN) ' if dry_run else ''}===")
     conn = imap_connect(password)
     try:

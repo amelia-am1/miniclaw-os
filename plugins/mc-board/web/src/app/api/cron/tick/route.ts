@@ -3,32 +3,9 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { listCronJobs, updateCronJob } from "@/lib/cron";
-import { listCards, getActiveWork, getRunningByCol, getDb } from "@/lib/data";
+import { listCards, getActiveWork, getRunningByCol } from "@/lib/data";
 import { releaseCard } from "@/lib/actions";
 import { sortCards } from "@/lib/sort";
-
-/**
- * Clear stale agent_queue entries: running entries for cards that have
- * moved to a different column or entries older than STALE_MS.
- */
-function cleanStaleRunning(column: string): void {
-  const db = getDb();
-  if (!db) return;
-  try {
-    // Mark as done: entries where the card is no longer in the expected column
-    db.prepare(`
-      UPDATE agent_queue SET status = 'done'
-      WHERE status = 'running' AND col = ?
-      AND card_id NOT IN (SELECT id FROM cards WHERE column = ?)
-    `).run(column, column);
-    // Mark as done: entries older than 20 minutes (stale agents)
-    const cutoff = new Date(Date.now() - STALE_MS).toISOString();
-    db.prepare(`
-      UPDATE agent_queue SET status = 'done'
-      WHERE status = 'running' AND col = ? AND started_at < ?
-    `).run(column, cutoff);
-  } catch { /* best effort */ }
-}
 
 export const dynamic = "force-dynamic";
 
@@ -165,8 +142,6 @@ export async function GET(req: Request) {
       c.column === "backlog" &&
       c.depends_on.length > 0 &&
       c.depends_on.every(dep => shippedIds.has(dep)) &&
-      !c.tags.includes("hold") &&
-      !c.tags.includes("blocked") &&
       !activeIds.has(c.id) &&
       !agentStillRunning(c.id, "backlog") &&
       !recentlyProcessed(c.id, "backlog", MIN_COOLDOWN_MS)
@@ -205,9 +180,6 @@ export async function GET(req: Request) {
 
     const maxConcurrent = job.maxConcurrent ?? 3;
 
-    // Clean up stale running entries (cards that shipped or agents that died)
-    cleanStaleRunning(column);
-
     // Subtract already-running agents from the available slots
     const runningByCol = getRunningByCol();
     const runningCount = (runningByCol[column] ?? []).length;
@@ -226,7 +198,6 @@ export async function GET(req: Request) {
         if (c.column !== column) return false;
         if (projectId && c.project_id !== projectId) return false;
         if (c.tags.includes("hold")) return false;
-        if (c.tags.includes("blocked")) return false;
         if (activeIds.has(c.id)) return false;
         if (agentStillRunning(c.id, column)) return false;
         if (recentlyProcessed(c.id, column, cooldownMs)) return false;

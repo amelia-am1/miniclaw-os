@@ -1,6 +1,7 @@
 import type { AnyAgentTool } from "openclaw/plugin-sdk";
 import type { ContributeConfig } from "../src/config.js";
 import { CONTRIBUTION_GUIDELINES } from "../src/guidelines.js";
+import { runPreflight, formatPreflight } from "../src/preflight.js";
 import {
   sanitizePluginName,
   sanitizeBranchTopic,
@@ -58,7 +59,6 @@ function collectCloneIdentity(): string {
 
   let botId = "(unknown)";
   try {
-    // Try to read bot ID from the agent config
     const agentConfig = path.join(stateDir, "agents", "main", "agent", "agent.json");
     if (fs.existsSync(agentConfig)) {
       const cfg = JSON.parse(fs.readFileSync(agentConfig, "utf-8"));
@@ -69,6 +69,38 @@ function collectCloneIdentity(): string {
   return `- Clone hostname: ${hostname}\n- Bot ID: ${botId}\n- State dir: ${stateDir}`;
 }
 
+/**
+ * Build the attribution line from config (auto-resolved).
+ */
+function buildAttribution(cfg: ContributeConfig): string {
+  return `Created by ${cfg.agentName} (@${cfg.ghUsername})`;
+}
+
+/**
+ * Check if the current branch is a contribution branch (not main).
+ * Used to gate issue tools — they should only work when a PR branch is ready.
+ */
+function isOnContribBranch(repoRoot: string): boolean {
+  try {
+    const branch = run("git", ["branch", "--show-current"], repoRoot);
+    return branch !== "main" && branch !== "master" && branch.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Gate message returned when trying to file an issue without a PR branch.
+ */
+const GATE_MESSAGE =
+  `BLOCKED: You must have a contribution branch with changes before filing issues.\n\n` +
+  `The mc-contribute rule is: NO issue without a matching PR.\n\n` +
+  `Steps:\n` +
+  `1. Create a branch: contribute_branch or 'mc mc-contribute branch <topic>'\n` +
+  `2. Make your changes and commit them\n` +
+  `3. Then file the issue — it will be submitted alongside your PR.\n\n` +
+  `This prevents orphaned issues with no code to back them up.`;
+
 interface DuplicateMatch {
   number: number;
   title: string;
@@ -78,7 +110,6 @@ interface DuplicateMatch {
 
 /**
  * Search for existing issues or PRs that may match a given title/query.
- * Returns matches so callers can decide whether to create or comment.
  */
 function findDuplicates(
   repo: string,
@@ -135,16 +166,16 @@ function commentOnExisting(
 /**
  * Format duplicate matches for display to the agent.
  */
-function formatDuplicates(matches: DuplicateMatch[], kind: string): string {
+function formatDuplicates(matches: DuplicateMatch[], _kind: string): string {
   return matches
     .map((m) => `  #${m.number}: ${m.title} (${m.url})`)
     .join("\n");
 }
 
 export function createContributeTools(cfg: ContributeConfig, logger: Logger): AnyAgentTool[] {
-  // Validate config at registration time
   const upstreamRepo = validateRepo(cfg.upstreamRepo);
   const forkRemote = validateRemote(cfg.forkRemote);
+  const attribution = buildAttribution(cfg);
 
   return [
     // ── Scaffold a new plugin ──────────────────────────────────────────
@@ -153,7 +184,7 @@ export function createContributeTools(cfg: ContributeConfig, logger: Logger): An
       label: "contribute_scaffold_plugin",
       description:
         "Scaffold a new MiniClaw plugin with the correct directory structure, " +
-        "openclaw.plugin.json, package.json, index.ts, tools/, and cli/. " +
+        "openclaw.plugin.json, package.json, index.ts, tools/, cli/, and a test stub. " +
         "Returns the file paths created so the agent can fill in the implementation.",
       parameters: {
         type: "object",
@@ -186,14 +217,12 @@ export function createContributeTools(cfg: ContributeConfig, logger: Logger): An
           return ok(`Plugin ${fullName} already exists at ${pluginDir}`);
         }
 
-        // Create directories
         for (const sub of ["src", "tools", "cli", "docs"]) {
           fs.mkdirSync(path.join(pluginDir, sub), { recursive: true });
         }
 
         const cap = name.charAt(0).toUpperCase() + name.slice(1);
 
-        // openclaw.plugin.json
         fs.writeFileSync(
           path.join(pluginDir, "openclaw.plugin.json"),
           JSON.stringify(
@@ -213,7 +242,6 @@ export function createContributeTools(cfg: ContributeConfig, logger: Logger): An
           )
         );
 
-        // package.json
         fs.writeFileSync(
           path.join(pluginDir, "package.json"),
           JSON.stringify(
@@ -229,7 +257,6 @@ export function createContributeTools(cfg: ContributeConfig, logger: Logger): An
           )
         );
 
-        // index.ts
         fs.writeFileSync(
           path.join(pluginDir, "index.ts"),
           `import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
@@ -250,7 +277,6 @@ export default function register(api: OpenClawPluginApi): void {
 `
         );
 
-        // tools/definitions.ts stub
         fs.writeFileSync(
           path.join(pluginDir, "tools", "definitions.ts"),
           `import type { AnyAgentTool } from "openclaw/plugin-sdk";
@@ -265,7 +291,6 @@ export function create${cap}Tools(logger: Logger): AnyAgentTool[] {
 `
         );
 
-        // cli/commands.ts stub
         fs.writeFileSync(
           path.join(pluginDir, "cli", "commands.ts"),
           `import type { Command } from "commander";
@@ -286,7 +311,34 @@ export function register${cap}Commands(
 `
         );
 
-        // docs/README.md
+        // Generate cli/commands.test.ts stub
+        fs.writeFileSync(
+          path.join(pluginDir, "cli", "commands.test.ts"),
+          `import { test, expect } from "vitest";
+import { register${cap}Commands } from "./commands.js";
+
+test("register${cap}Commands is a function", () => {
+  expect(typeof register${cap}Commands).toBe("function");
+});
+
+// TODO: Add tests for your CLI commands
+`
+        );
+
+        // Generate smoke.test.ts
+        fs.writeFileSync(
+          path.join(pluginDir, "smoke.test.ts"),
+          `import { test, expect } from "vitest";
+import register from "./index.js";
+
+test("register is a function", () => {
+  expect(typeof register).toBe("function");
+});
+
+// TODO: Add smoke tests for your plugin
+`
+        );
+
         fs.writeFileSync(
           path.join(pluginDir, "docs", "README.md"),
           `# ${fullName}\n\n**Brain region:** ${brainRegion}\n\n${description}\n`
@@ -298,6 +350,8 @@ export function register${cap}Commands(
           "index.ts",
           "tools/definitions.ts",
           "cli/commands.ts",
+          "cli/commands.test.ts",
+          "smoke.test.ts",
           "docs/README.md",
         ];
 
@@ -309,7 +363,8 @@ export function register${cap}Commands(
             `1. Add tools in tools/definitions.ts\n` +
             `2. Add CLI commands in cli/commands.ts\n` +
             `3. Add config properties in openclaw.plugin.json\n` +
-            `4. Test with: mc plugin test ${fullName}`
+            `4. Write tests in cli/commands.test.ts and smoke.test.ts\n` +
+            `5. Test with: mc plugin test ${fullName}`
         );
       },
     } as AnyAgentTool,
@@ -337,13 +392,10 @@ export function register${cap}Commands(
         const branch = `contrib/${slug}`;
         const repoRoot = run("git", ["rev-parse", "--show-toplevel"]);
 
-        // Make sure we're on main and up to date
         run("git", ["checkout", "main"], repoRoot);
         try {
           run("git", ["pull", "--ff-only"], repoRoot);
-        } catch {
-          // May fail if no upstream — that's fine
-        }
+        } catch {}
         run("git", ["checkout", "-b", branch], repoRoot);
 
         logger.info(`Created branch ${branch}`);
@@ -361,8 +413,7 @@ export function register${cap}Commands(
       label: "contribute_security_check",
       description:
         "Run the MiniClaw security scanner on the repo. " +
-        "Checks for hardcoded secrets, API keys, tokens, and PII. " +
-        "Use --staged to check only staged files, or --all for the full repo.",
+        "Checks for hardcoded secrets, API keys, tokens, and PII.",
       parameters: {
         type: "object",
         required: [],
@@ -399,8 +450,9 @@ export function register${cap}Commands(
       label: "contribute_pr",
       description:
         "Push the current branch and create a pull request to the upstream " +
-        "miniclaw-os repo. Runs the security check first. " +
-        "Generates a PR title and body from the commit history.",
+        "miniclaw-os repo. Runs pre-flight checks first (tests in diff, tests passing, " +
+        "docs updated, security clean). Blocks if any check fails. " +
+        "Automatically adds agent attribution.",
       parameters: {
         type: "object",
         required: ["title", "summary"],
@@ -435,6 +487,7 @@ export function register${cap}Commands(
             `Another agent attempted to open a PR with a similar title:\n` +
             `**"${title}"**\n\n` +
             `**Summary:** ${summary}\n\n` +
+            `**${attribution}**\n\n` +
             `**Clone identity**\n${identity}\n\n` +
             `---\nDetected by mc-contribute duplicate check (ref: issue #63)`;
           commentOnExisting(upstreamRepo, "pr", prMatches[0].number, commentBody, logger);
@@ -445,15 +498,12 @@ export function register${cap}Commands(
           );
         }
 
-        // Run security check first
-        const script = path.join(repoRoot, "scripts", "security-check.sh");
-        try {
-          run("bash", [script, "--all"], repoRoot);
-        } catch (err: unknown) {
-          const e = err as { stdout?: string };
+        // Run pre-flight checklist (replaces the old security-only check)
+        const preflight = runPreflight(repoRoot, logger);
+        if (!preflight.passed) {
           return ok(
-            `PR blocked — security issues found:\n\n${e.stdout || ""}\n\n` +
-              `Fix these first, then try again.`
+            `PR blocked — pre-flight checks failed:\n\n${formatPreflight(preflight)}\n\n` +
+            `Fix all issues above before submitting.`
           );
         }
 
@@ -465,11 +515,17 @@ export function register${cap}Commands(
           return ok(`Failed to push branch ${branch}. Make sure your fork remote is set up.`);
         }
 
-        // Create PR — body written to temp file, never shell-interpolated
+        // Create PR with attribution
         const body =
           `## Summary\n\n${summary}\n\n` +
           `## Plugin(s) affected\n\n${plugins}\n\n` +
+          `## Pre-flight checklist\n\n` +
+          `- [x] Test files in diff\n` +
+          `- [x] All tests passing\n` +
+          `- [x] Docs updated (if applicable)\n` +
+          `- [x] Security check clean\n\n` +
           `## Security check\n\n- [x] Ran ./scripts/security-check.sh (passed)\n- [x] No secrets, tokens, or PII in this PR\n\n` +
+          `## Attribution\n\n${attribution}\n\n` +
           `## Clone identity\n\n${collectCloneIdentity()}\n\n` +
           `---\nSubmitted via mc-contribute`;
 
@@ -495,7 +551,7 @@ export function register${cap}Commands(
       label: "contribute_status",
       description:
         "Check the status of your contribution — current branch, " +
-        "uncommitted changes, open PRs, and security scan result.",
+        "uncommitted changes, open PRs, and agent attribution.",
       parameters: {
         type: "object",
         required: [],
@@ -519,7 +575,8 @@ export function register${cap}Commands(
           `Branch: ${branch}\n\n` +
             `Uncommitted changes:\n${status || "(clean)"}\n\n` +
             `Recent commits:\n${log}\n\n` +
-            `Open PRs:\n${prs}`
+            `Open PRs:\n${prs}\n\n` +
+            `Agent: ${attribution}`
         );
       },
     } as AnyAgentTool,
@@ -531,7 +588,7 @@ export function register${cap}Commands(
       description:
         "Get the full MiniClaw contribution guidelines — architecture rules, " +
         "code style, security requirements, branch naming, PR format, " +
-        "bug report format, and discussion etiquette. " +
+        "pre-flight checklist, and attribution rules. " +
         "Read this FIRST before making any contribution.",
       parameters: {
         type: "object",
@@ -543,16 +600,14 @@ export function register${cap}Commands(
       },
     } as AnyAgentTool,
 
-    // ── File a bug report ──────────────────────────────────────────────
+    // ── File a bug report (GATED) ─────────────────────────────────────
     {
       name: "contribute_bug_report",
       label: "contribute_bug_report",
       description:
-        "File a bug report on the miniclaw-os repo. Automatically collects " +
-        "environment info (macOS version, Node version, mc version), clone " +
-        "identity, and runs mc-doctor for diagnostics. Reports upstream to " +
-        "augmentedmike/miniclaw-os by default so all clones feed back to the " +
-        "original repo.",
+        "File a bug report on the miniclaw-os repo. GATED: You must be on a " +
+        "contribution branch with a fix before filing. Automatically collects " +
+        "environment info and adds agent attribution.",
       parameters: {
         type: "object",
         required: ["title", "whatHappened", "expected", "stepsToReproduce"],
@@ -580,6 +635,13 @@ export function register${cap}Commands(
         },
       },
       async execute(_id: string, params: unknown) {
+        const repoRoot = run("git", ["rev-parse", "--show-toplevel"]);
+
+        // GATE: Must be on a contribution branch
+        if (!isOnContribBranch(repoRoot)) {
+          return ok(GATE_MESSAGE);
+        }
+
         const p = params as Record<string, string>;
         const title = sanitizeTitle(p.title);
         const whatHappened = sanitizeBody(p.whatHappened);
@@ -587,7 +649,7 @@ export function register${cap}Commands(
         const steps = sanitizeBody(p.stepsToReproduce);
         const plugins = p.pluginsInvolved ? sanitizeFreeText(p.pluginsInvolved, "plugins") : "N/A";
 
-        // Check for existing open issues with similar title (agent coordination)
+        // Check for duplicates
         const bugMatches = findDuplicates(upstreamRepo, "issue", `[Bug] ${title}`, logger);
         if (bugMatches.length > 0) {
           const identity = collectCloneIdentity();
@@ -596,17 +658,17 @@ export function register${cap}Commands(
             `**What happened:** ${whatHappened}\n\n` +
             `**Expected:** ${expected}\n\n` +
             `**Steps:** ${steps}\n\n` +
+            `**${attribution}**\n\n` +
             `**Clone identity**\n${identity}\n\n` +
             `---\nDuplicate detected by mc-contribute (ref: issue #63)`;
           commentOnExisting(upstreamRepo, "issue", bugMatches[0].number, commentBody, logger);
           return ok(
-            `Duplicate bug report detected — commented on existing issue instead of creating a new one.\n\n` +
+            `Duplicate bug report detected — commented on existing issue instead.\n\n` +
             `Existing issues matching "[Bug] ${title}":\n${formatDuplicates(bugMatches, "issue")}\n\n` +
             `Your report details were added as a comment on issue #${bugMatches[0].number}.`
           );
         }
 
-        // Collect environment info safely (no shell interpolation)
         let macosVersion = "unknown";
         let nodeVersion = "unknown";
         let mcVersion = "unknown";
@@ -626,6 +688,7 @@ export function register${cap}Commands(
           `- Node version: ${nodeVersion}\n` +
           `- MiniClaw version: ${mcVersion}\n` +
           `- Plugin(s) involved: ${plugins}\n\n` +
+          `**Attribution**\n${attribution}\n\n` +
           `**Clone identity**\n${collectCloneIdentity()}\n\n` +
           `**mc-doctor output**\n\n${doctorOutput}\n\n` +
           `---\nFiled via mc-contribute`;
@@ -640,18 +703,19 @@ export function register${cap}Commands(
           return ok(`Bug report filed: ${issueUrl}`);
         } catch (err: unknown) {
           const e = err as { stderr?: string };
-          return ok(`Failed to file bug report: ${e.stderr || "unknown error"}\n\nYou can file it manually at: https://github.com/${upstreamRepo}/issues/new`);
+          return ok(`Failed to file bug report: ${e.stderr || "unknown error"}\n\nFile manually at: https://github.com/${upstreamRepo}/issues/new`);
         }
       },
     } as AnyAgentTool,
 
-    // ── Request a feature ──────────────────────────────────────────────
+    // ── Request a feature (GATED) ─────────────────────────────────────
     {
       name: "contribute_feature_request",
       label: "contribute_feature_request",
       description:
-        "Submit a feature request or plugin idea to miniclaw-os. Reports " +
-        "upstream so all clones can suggest improvements to the ecosystem.",
+        "Submit a feature request or plugin idea to miniclaw-os. GATED: You must " +
+        "be on a contribution branch with an implementation before filing. " +
+        "Automatically adds agent attribution.",
       parameters: {
         type: "object",
         required: ["title", "problem", "proposedSolution"],
@@ -687,6 +751,13 @@ export function register${cap}Commands(
         },
       },
       async execute(_id: string, params: unknown) {
+        const repoRoot = run("git", ["rev-parse", "--show-toplevel"]);
+
+        // GATE: Must be on a contribution branch
+        if (!isOnContribBranch(repoRoot)) {
+          return ok(GATE_MESSAGE);
+        }
+
         const p = params as Record<string, unknown>;
         const title = sanitizeTitle(p.title as string);
         const problem = sanitizeBody(p.problem as string);
@@ -696,7 +767,6 @@ export function register${cap}Commands(
         const isPlugin = p.isNewPlugin as boolean;
         const pluginName = p.pluginName ? sanitizeFreeText(p.pluginName as string, "plugin name") : "mc-???";
 
-        // Check for existing open issues with similar title (agent coordination)
         const prefix = isPlugin ? "[Plugin]" : "[Feature]";
         const featureMatches = findDuplicates(upstreamRepo, "issue", `${prefix} ${title}`, logger);
         if (featureMatches.length > 0) {
@@ -705,11 +775,12 @@ export function register${cap}Commands(
             `## Additional request from another clone\n\n` +
             `**Problem:** ${problem}\n\n` +
             `**Proposed solution:** ${solution}\n\n` +
+            `**${attribution}**\n\n` +
             `**Clone identity**\n${identity}\n\n` +
             `---\nDuplicate detected by mc-contribute (ref: issue #63)`;
           commentOnExisting(upstreamRepo, "issue", featureMatches[0].number, commentBody, logger);
           return ok(
-            `Duplicate feature request detected — commented on existing issue instead of creating a new one.\n\n` +
+            `Duplicate feature request detected — commented on existing issue instead.\n\n` +
             `Existing issues matching "${prefix} ${title}":\n${formatDuplicates(featureMatches, "issue")}\n\n` +
             `Your request details were added as a comment on issue #${featureMatches[0].number}.`
           );
@@ -728,6 +799,7 @@ export function register${cap}Commands(
             `**What it does**\n${solution}\n\n` +
             `**Problem it solves**\n${problem}\n\n` +
             (exampleUsage ? `**Example usage**\n\n${exampleUsage}\n\n` : "") +
+            `**Attribution**\n${attribution}\n\n` +
             `**Clone identity**\n${collectCloneIdentity()}\n\n` +
             `---\nSubmitted via mc-contribute`;
         } else {
@@ -738,6 +810,7 @@ export function register${cap}Commands(
             `**Proposed solution**\n${solution}\n\n` +
             `**Which plugin/brain region?**\n${brainRegion}\n\n` +
             (exampleUsage ? `**Example usage**\n\n${exampleUsage}\n\n` : "") +
+            `**Attribution**\n${attribution}\n\n` +
             `**Clone identity**\n${collectCloneIdentity()}\n\n` +
             `---\nSubmitted via mc-contribute`;
         }
@@ -810,7 +883,7 @@ export function register${cap}Commands(
 
         const title = sanitizeTitle(p.title);
         const category = p.category || "Ideas";
-        const body = `${sanitizeBody(p.body)}\n\n---\nStarted via mc-contribute`;
+        const body = `${sanitizeBody(p.body)}\n\n${attribution}\n\n---\nStarted via mc-contribute`;
 
         try {
           const url = ghWithBodyFile(

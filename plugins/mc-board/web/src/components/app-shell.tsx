@@ -74,7 +74,6 @@ export function AppShell({ initialTab, initialCardId, initialProjectId }: { init
   const [assistantName, setAssistantName] = useState("Am");
   const { data: rolodexCount } = useSWR<{ count: number }>("/api/rolodex/count", fetcher, { refreshInterval: 60000 });
   const { data: memoryStats } = useSWR<{ memoryFiles: number; kbEntries: number; total: number }>("/api/memory/stats", fetcher, { refreshInterval: 60000 });
-  const { data: versionData } = useSWR<{ version: string }>("/api/version", fetcher, { refreshInterval: 0 });
 
   // Fetch assistant name for empty-state message
   useEffect(() => {
@@ -157,26 +156,14 @@ export function AppShell({ initialTab, initialCardId, initialProjectId }: { init
           <div className="brand">MiniClaw Brain</div>
           <div className="tab-bar">
             {(["board", "memory", "rolodex", "settings"] as Tab[]).map(t => {
-              const activeCount = t === "board" && counts ? counts.inProgress : 0;
-              const badgeCount = t === "rolodex" && rolodexCount ? rolodexCount.count : t === "board" ? activeCount : 0;
-              const memoryBadge = t === "memory" && memoryStats && memoryStats.total > 0
-                ? `${memoryStats.memoryFiles}\u2009/\u2009${memoryStats.kbEntries}` : "";
+              const activeCount = t === "board" && counts ? counts.inProgress + counts.inReview : 0;
+              const memoryCount = t === "memory" && memoryStats ? memoryStats.total : 0;
+              const badgeCount = t === "rolodex" && rolodexCount ? rolodexCount.count : t === "memory" ? memoryCount : activeCount;
               return (
                 <button key={t} onClick={() => switchTab(t)}
                   className={`tab-btn${tab === t ? " active" : ""}`}
                   style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   {t === "board" ? "Board" : t === "memory" ? "Memory" : t === "rolodex" ? "Contacts" : "Settings"}
-                  {memoryBadge && (
-                    <span style={{
-                      fontSize: 10,
-                      fontWeight: 600,
-                      background: "#52525b",
-                      color: "#fafafa",
-                      borderRadius: 10,
-                      padding: "1px 6px",
-                      lineHeight: "14px",
-                    }}>{memoryBadge}</span>
-                  )}
                   {badgeCount > 0 && (
                     <span style={{
                       fontSize: 10,
@@ -276,30 +263,28 @@ export function AppShell({ initialTab, initialCardId, initialProjectId }: { init
             <span className="stat-pill">in&nbsp;review<b>{counts.inReview}</b></span>
             <span className="stat-pill">shipped<b>{counts.shipped}</b></span>
             <DailyStats />
+            {memoryStats && (
+              <span className="stat-pill" title={`${memoryStats.memoryFiles} memory files, ${memoryStats.kbEntries} KB entries`}>
+                memory<b>{memoryStats.memoryFiles}&thinsp;/&thinsp;{memoryStats.kbEntries}</b>
+              </span>
+            )}
           </div>
         )}
 
         {/* Chat toggle — disabled until chat daemon is ready */}
 
-        {/* Far right: alerts icon + version */}
-        <div className="flex items-center border-l border-zinc-800 shrink-0 h-full">
-          <button
-            onClick={toggleNotifs}
-            className="flex items-center justify-center w-11 hover:bg-zinc-900 transition-colors h-full"
-            title={notifsEnabled ? "Alerts on — click to mute" : "Alerts muted — click to enable"}
-          >
-            <svg width="18" height="18" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"
-              style={{ opacity: notifsEnabled ? 1 : 0.35 }}>
-              <path d="M24 18L20 10V6C20 2.686 17.314 0 14 0C10.686 0 8 2.686 8 6V10L4 18H11.184C11.597 19.163 12.695 20 14 20C15.305 20 16.403 19.163 16.816 18H24Z"
-                fill="currentColor" />
-            </svg>
-          </button>
-          {versionData?.version && (
-            <span style={{ fontSize: 11, color: "#71717a", paddingRight: 10, paddingLeft: 2, whiteSpace: "nowrap" }}>
-              v{versionData.version}
-            </span>
-          )}
-        </div>
+        {/* Far right: alerts icon */}
+        <button
+          onClick={toggleNotifs}
+          className="flex items-center justify-center w-11 border-l border-zinc-800 shrink-0 hover:bg-zinc-900 transition-colors h-full"
+          title={notifsEnabled ? "Alerts on — click to mute" : "Alerts muted — click to enable"}
+        >
+          <svg width="18" height="18" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"
+            style={{ opacity: notifsEnabled ? 1 : 0.35 }}>
+            <path d="M24 18L20 10V6C20 2.686 17.314 0 14 0C10.686 0 8 2.686 8 6V10L4 18H11.184C11.597 19.163 12.695 20 14 20C15.305 20 16.403 19.163 16.816 18H24Z"
+              fill="currentColor" />
+          </svg>
+        </button>
       </div>
 
       {/* Main content + Chat panel flex row */}

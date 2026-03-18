@@ -4,9 +4,15 @@
   "type": "module",
   "main": "index.ts",
   "description": "Queue triage enforcement for miniclaw channel sessions",
-  "dependencies": {},
   "devDependencies": {
+<<<<<<< ours
+    "openclaw": "file:../../../openclaw",
+    "vitest": "^4.1.0"
+||||||| ancestor
+    "openclaw": "file:../../../openclaw"
+=======
     "openclaw": "npm:@miniclaw_official/openclaw@^2026.3.8"
+>>>>>>> theirs
   },
   "openclaw": {
     "extensions": [

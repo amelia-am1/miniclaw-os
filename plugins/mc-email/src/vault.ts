@@ -22,6 +22,8 @@ export function vaultSet(vaultBin: string, key: string, value: string): void {
 
 const EMAIL_PASSWORD_KEY = "email-app-password";
 const LEGACY_KEY = "gmail-app-password";
+const EMAIL_ADDRESS_KEY = "email-address";
+const LEGACY_EMAIL_KEY = "gmail-email";
 
 export function getAppPassword(vaultBin: string): string | null {
   // Try canonical key first, fall back to legacy gmail-app-password for existing installs
@@ -32,8 +34,13 @@ export function saveAppPassword(vaultBin: string, password: string): void {
   vaultSet(vaultBin, EMAIL_PASSWORD_KEY, password);
 }
 
-const LEGACY_EMAIL_KEY = "gmail-email";
-const EMAIL_ADDRESS_KEY = "email-address";
+export function vaultDelete(vaultBin: string, key: string): void {
+  try {
+    execSync(`${vaultBin} rm ${key}`, { stdio: ["pipe", "pipe", "pipe"] });
+  } catch {
+    // Key may not exist — ignore
+  }
+}
 
 interface MigrationResult {
   migrated: string[];
@@ -58,18 +65,14 @@ export function migrateLegacyKeys(vaultBin: string): MigrationResult {
       result.skipped.push(oldKey);
       continue;
     }
+    const newValue = vaultGet(vaultBin, newKey);
+    if (newValue) {
+      result.skipped.push(oldKey);
+      continue;
+    }
     vaultSet(vaultBin, newKey, oldValue);
-    vaultDelete(vaultBin, oldKey);
     result.migrated.push(`${oldKey} → ${newKey}`);
   }
 
   return result;
-}
-
-export function vaultDelete(vaultBin: string, key: string): void {
-  try {
-    execSync(`${vaultBin} rm ${key}`, { stdio: ["pipe", "pipe", "pipe"] });
-  } catch {
-    // Key may not exist — ignore
-  }
 }

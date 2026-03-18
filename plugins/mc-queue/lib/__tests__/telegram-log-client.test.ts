@@ -2,30 +2,29 @@
  * telegram-log-client.test.ts
  *
  * Unit tests for TelegramLogClient.
- * Run with: npx vitest run lib/__tests__/telegram-log-client.test.ts
+ * Run with: npm test -- lib/__tests__/telegram-log-client.test.ts
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { TelegramLogClient, createLogClientFromEnv } from "../telegram-log-client";
 
 describe("TelegramLogClient", () => {
   const botToken = "123:ABC-XYZ";
   const chatId = "-1001234567890";
 
-  let mockLogger: { info: ReturnType<typeof vi.fn>; warn: ReturnType<typeof vi.fn>; error: ReturnType<typeof vi.fn> };
+  let mockLogger: { info: jest.Mock; warn: jest.Mock; error: jest.Mock };
 
   beforeEach(() => {
     mockLogger = {
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
     };
 
-    global.fetch = vi.fn() as any;
+    global.fetch = jest.fn();
   });
 
   afterEach(() => {
-    vi.resetAllMocks();
+    jest.resetAllMocks();
   });
 
   describe("constructor", () => {
@@ -42,7 +41,7 @@ describe("TelegramLogClient", () => {
 
   describe("send", () => {
     it("sends a message with HTML parse mode", async () => {
-      const mockFetch = global.fetch as ReturnType<typeof vi.fn>;
+      const mockFetch = global.fetch as jest.Mock;
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ ok: true, result: { message_id: 123 } }),
@@ -62,7 +61,7 @@ describe("TelegramLogClient", () => {
     });
 
     it("defaults to HTML parse mode", async () => {
-      const mockFetch = global.fetch as ReturnType<typeof vi.fn>;
+      const mockFetch = global.fetch as jest.Mock;
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ ok: true, result: { message_id: 123 } }),
@@ -76,7 +75,7 @@ describe("TelegramLogClient", () => {
     });
 
     it("disables web page preview by default", async () => {
-      const mockFetch = global.fetch as ReturnType<typeof vi.fn>;
+      const mockFetch = global.fetch as jest.Mock;
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ ok: true, result: { message_id: 123 } }),
@@ -90,7 +89,7 @@ describe("TelegramLogClient", () => {
     });
 
     it("allows enabling web page preview", async () => {
-      const mockFetch = global.fetch as ReturnType<typeof vi.fn>;
+      const mockFetch = global.fetch as jest.Mock;
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ ok: true, result: { message_id: 123 } }),
@@ -104,7 +103,7 @@ describe("TelegramLogClient", () => {
     });
 
     it("returns false on API error", async () => {
-      const mockFetch = global.fetch as ReturnType<typeof vi.fn>;
+      const mockFetch = global.fetch as jest.Mock;
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 401,
@@ -119,7 +118,7 @@ describe("TelegramLogClient", () => {
     });
 
     it("returns false on network error", async () => {
-      const mockFetch = global.fetch as ReturnType<typeof vi.fn>;
+      const mockFetch = global.fetch as jest.Mock;
       mockFetch.mockRejectedValueOnce(new Error("Network error"));
 
       const client = new TelegramLogClient({ botToken, chatId, logger: mockLogger });
@@ -146,7 +145,7 @@ describe("TelegramLogClient", () => {
     });
 
     it("includes replyToMessageId when provided", async () => {
-      const mockFetch = global.fetch as ReturnType<typeof vi.fn>;
+      const mockFetch = global.fetch as jest.Mock;
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ ok: true, result: { message_id: 123 } }),
@@ -160,7 +159,7 @@ describe("TelegramLogClient", () => {
     });
 
     it("includes threadId when provided", async () => {
-      const mockFetch = global.fetch as ReturnType<typeof vi.fn>;
+      const mockFetch = global.fetch as jest.Mock;
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ ok: true, result: { message_id: 123 } }),
@@ -176,7 +175,7 @@ describe("TelegramLogClient", () => {
 
   describe("sendBatch", () => {
     it("sends multiple messages", async () => {
-      const mockFetch = global.fetch as ReturnType<typeof vi.fn>;
+      const mockFetch = global.fetch as jest.Mock;
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({ ok: true, result: { message_id: 123 } }),
@@ -190,7 +189,7 @@ describe("TelegramLogClient", () => {
     });
 
     it("counts successful sends only", async () => {
-      const mockFetch = global.fetch as ReturnType<typeof vi.fn>;
+      const mockFetch = global.fetch as jest.Mock;
       mockFetch
         .mockResolvedValueOnce({
           ok: true,
@@ -253,7 +252,7 @@ describe("TelegramLogClient", () => {
 
   describe("sendWithButton", () => {
     it("sends a message with inline button", async () => {
-      const mockFetch = global.fetch as ReturnType<typeof vi.fn>;
+      const mockFetch = global.fetch as jest.Mock;
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ ok: true, result: { message_id: 123 } }),
@@ -274,7 +273,7 @@ describe("TelegramLogClient", () => {
     });
 
     it("returns false on error", async () => {
-      const mockFetch = global.fetch as ReturnType<typeof vi.fn>;
+      const mockFetch = global.fetch as jest.Mock;
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 401,

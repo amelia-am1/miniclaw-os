@@ -6,7 +6,7 @@ mc-email provides Gmail access via IMAP/SMTP for reading, sending, replying, arc
 
 ## Overview
 
-The plugin connects to Gmail using IMAP (for reading) and SMTP (for sending) via `imapflow` and `nodemailer`. Credentials are stored securely in the vault under the `gmail-app-password` key. The triage command delegates to an external Python script for autonomous email classification and response.
+The plugin connects to your email provider using IMAP (for reading) and SMTP (for sending) via `imapflow` and `nodemailer`. Credentials are stored securely in the vault under the `email-app-password` key. Gmail is auto-detected; non-Gmail accounts use SMTP/IMAP hosts from setup-state.json. The triage command delegates to an external Python script for autonomous email classification and response.
 
 ---
 
@@ -111,7 +111,7 @@ mc-email does not currently register agent tools. All operations are CLI-only.
 1. Enable 2-factor authentication on the Google account
 2. Generate a 16-character app password at https://myaccount.google.com/apppasswords
 3. Run `openclaw mc-email auth` and paste the password
-4. The password is stored in the vault under `gmail-app-password`
+4. The password is stored in the vault under `email-app-password`
 
 The plugin uses:
 - **IMAP** (`imap.gmail.com:993`, TLS) for reading

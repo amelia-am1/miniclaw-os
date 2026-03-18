@@ -830,7 +830,7 @@ else
   ok "Vault already initialised"
 fi
 
-# All secrets (gh-token, gmail-app-password, gemini-api-key) are collected
+# All secrets (gh-token, email-app-password, gemini-api-key) are collected
 # in the board web setup wizard (port 4220) — not in the terminal installer.
 
 
@@ -1008,11 +1008,9 @@ mkdir -p "$CRON_DIR"
 
 # Merge cron jobs from MANIFEST into jobs.json (preserves any existing jobs)
 python3 << PYEOF
-import json, uuid, os, sys, subprocess
+import json, uuid, os, sys
 
 cron_file = "$CRON_FILE"
-vault_bin = "$MC_VAULT"
-vault_root = "$VAULT_ROOT"
 
 # Load existing
 store = {"version": 1, "jobs": []}
@@ -1023,15 +1021,6 @@ except (FileNotFoundError, json.JSONDecodeError):
     pass
 
 existing_names = {j.get("name") for j in store.get("jobs", [])}
-
-def vault_has(key):
-    """Check if a vault secret exists."""
-    try:
-        env = dict(os.environ, OPENCLAW_VAULT_ROOT=vault_root)
-        r = subprocess.run([vault_bin, "get", key], capture_output=True, text=True, env=env)
-        return r.returncode == 0 and r.stdout.strip() != ""
-    except Exception:
-        return False
 
 # Read expected crons from MANIFEST.json
 manifest_path = os.path.join("$REPO_DIR", "MANIFEST.json")
@@ -1044,16 +1033,6 @@ except (FileNotFoundError, json.JSONDecodeError):
 
 workers = []
 for mc in manifest_crons:
-    # Check if this cron requires vault secrets
-    requires = mc.get("requires", [])
-    has_deps = all(vault_has(k) for k in requires) if requires else True
-    is_optional = mc.get("optional", False)
-
-    # Skip optional crons whose dependencies are missing
-    if is_optional and not has_deps:
-        print(f"  Skipping {mc['name']} (missing: {', '.join(requires)})")
-        continue
-
     w = {
         "name": mc["name"],
         "schedule": mc["schedule"],
@@ -1065,7 +1044,7 @@ for mc in manifest_crons:
             "messageFile": f"prompts/{mc['name']}.md"
         },
         "delivery": {"mode": "none"},
-        "enabled": has_deps
+        "enabled": True
     }
     workers.append(w)
 
@@ -1125,9 +1104,9 @@ with open(cron_file, "w") as f:
     json.dump(store, f, indent=2)
 
 if added:
-    print(f"  Added {added} cron worker(s) to jobs.json")
+    print(f"  Added {added} board worker(s) to jobs.json")
 else:
-    print("  All cron workers already in jobs.json")
+    print("  Board workers already in jobs.json")
 PYEOF
 ok "Cron workers written to $CRON_FILE"
 
@@ -1597,15 +1576,15 @@ if [[ -d "$TAILSCALE_APP" ]]; then
     TS_IP=$("$TAILSCALE_BIN" ip -4 2>/dev/null || echo "")
     if [[ -n "$TS_IP" ]]; then
       ok "Tailscale connected ($TS_IP)"
-      # Save the Tailscale IP — store under 'miniclaw' key (not 'gateway' which has strict schema)
+      # Save the Tailscale IP for gateway externalUrl
       python3 -c "
 import json
 p = '$STATE_DIR/openclaw.json'
 with open(p) as f: cfg = json.load(f)
-mc = cfg.setdefault('miniclaw', {})
-mc['externalUrl'] = 'http://$TS_IP:4220'
+gw = cfg.setdefault('gateway', {})
+gw['externalUrl'] = 'http://$TS_IP:4220'
 with open(p, 'w') as f: json.dump(cfg, f, indent=2); f.write('\n')
-" 2>/dev/null && ok "miniclaw.externalUrl set to http://$TS_IP:4220"
+" 2>/dev/null && ok "gateway.externalUrl set to http://$TS_IP:4220"
     else
       warn "Tailscale not yet connected — run 'sudo tailscale up' after install"
     fi
@@ -1663,8 +1642,6 @@ name = state.get("assistantName", "")
 short = state.get("shortName", name)
 pronouns = state.get("pronouns", "they/them")
 blurb = state.get("personaBlurb", "")
-email = state.get("emailAddress", "")
-gh_user = state.get("ghUsername", "")
 
 if not name:
     print("  No assistant name in setup state — skipping")
@@ -1698,8 +1675,6 @@ replacements = {
     "{{PRONOUNS_POSSESSIVE}}": poss,
     "{{VERSION}}": version,
     "{{DATE}}": today,
-    "{{EMAIL}}": email,
-    "{{GITHUB}}": gh_user,
 }
 
 for dirpath, _dirs, files in os.walk(workspace):
@@ -1775,8 +1750,8 @@ if [[ -n "$CONFIG_FILE" && -f "$CONFIG_FILE" ]]; then
 
   vault_set "telegram-bot-token" "$TG_TOKEN"
   vault_set "gh-token" "$GH_TOKEN"
-  vault_set "gmail-app-password" "$EMAIL_PASS"
-  vault_set "gmail-email" "$EMAIL_ADDR"
+  vault_set "email-app-password" "$EMAIL_PASS"
+  vault_set "email-address" "$EMAIL_ADDR"
   [[ -n "$EMAIL_SMTP_HOST" ]] && vault_set "smtp-host" "$EMAIL_SMTP_HOST"
   [[ -n "$EMAIL_SMTP_PORT" ]] && vault_set "smtp-port" "$EMAIL_SMTP_PORT"
   vault_set "gemini-api-key" "$GEMINI_KEY"
@@ -1861,11 +1836,11 @@ cfg = json.load(open(sys.argv[1]))
 contacts = [
     {"id": str(uuid.uuid4()), "name": "My Human", "emails": [], "phones": [], "domains": [],
      "tags": ["owner", "human"], "trustStatus": "verified", "lastVerified": datetime.utcnow().isoformat(),
-     "notes": "Human owner — added during setup."},
+     "notes": f"GitHub: {cfg.get('ghUsername', '')}. Added during headless setup." if cfg.get('ghUsername') else "Human owner."},
     {"id": str(uuid.uuid4()), "name": cfg.get("assistantName", "MiniClaw"),
      "emails": [cfg["emailAddress"]] if cfg.get("emailAddress") else [], "phones": [], "domains": [],
      "tags": ["agent", "self"], "trustStatus": "verified", "lastVerified": datetime.utcnow().isoformat(),
-     "notes": f"AI agent ({cfg.get('shortName', 'mc')}). GitHub: {cfg.get('ghUsername')}." if cfg.get("ghUsername") else f"AI agent ({cfg.get('shortName', 'mc')})."}
+     "notes": f"AI agent ({cfg.get('shortName', cfg.get('assistantName', 'mc'))})."}
 ]
 with open(sys.argv[2], "w") as f: json.dump(contacts, f, indent=2); f.write("\n")
 print(f"  Seeded {len(contacts)} contacts")
@@ -1895,7 +1870,7 @@ except: existing_names = set()
 for job in store.get("jobs", []):
     if job["name"] in existing_names: continue
     expr = job.get("schedule", {}).get("expr", "*/5 * * * *")
-    args = ["openclaw", "cron", "add", "--name", job["name"], "--cron", expr, "--session", job.get("sessionTarget", "isolated"), "--no-deliver"]
+    args = ["openclaw", "cron", "add", "--name", job["name"], "--cron", expr, "--session", job.get("sessionTarget", "isolated")]
     if job.get("payload", {}).get("messageFile"):
         prompt_path = os.path.join(state_dir, "cron", job["payload"]["messageFile"])
         if os.path.exists(prompt_path):

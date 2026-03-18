@@ -240,15 +240,13 @@ function setGithubDefaultRepo() {
   } catch { /* start fresh */ }
 
   const plugins = (cfg.plugins ?? {}) as Record<string, unknown>;
-  const installs = (plugins.installs ?? {}) as Record<string, Record<string, unknown>>;
-  const mcGithub = installs["mc-github"] ?? {};
-  const mcGithubConfig = (mcGithub.config ?? {}) as Record<string, unknown>;
-  if (!mcGithubConfig.defaultRepo) {
-    mcGithubConfig.defaultRepo = `${username}/miniclaw-os`;
+  const entries = (plugins.entries ?? {}) as Record<string, Record<string, unknown>>;
+  const mcGithub = entries["mc-github"] ?? {};
+  if (!mcGithub.defaultRepo) {
+    mcGithub.defaultRepo = `${username}/miniclaw-os`;
   }
-  mcGithub.config = mcGithubConfig;
-  installs["mc-github"] = mcGithub;
-  plugins.installs = installs;
+  entries["mc-github"] = mcGithub;
+  plugins.entries = entries;
   cfg.plugins = plugins;
 
   fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2) + "\n", "utf-8");
@@ -306,8 +304,9 @@ function personalizeWorkspace() {
   const name = setupState.assistantName;
   if (!name) return;
 
-  const workspace = path.join(STATE_DIR, "workspace");
-  const manifestPath = path.join(STATE_DIR, "miniclaw", "MANIFEST.json");
+  const miniclaw = path.join(STATE_DIR, "miniclaw");
+  const workspace = path.join(miniclaw, "workspace");
+  const manifestPath = path.join(miniclaw, "MANIFEST.json");
 
   if (!fs.existsSync(workspace)) return;
 
@@ -323,8 +322,6 @@ name = state.get("assistantName", "")
 short = state.get("shortName", name)
 pronouns = state.get("pronouns", "they/them")
 blurb = state.get("personaBlurb", "")
-email = state.get("emailAddress", "")
-gh_user = state.get("ghUsername", "")
 
 if not name:
     sys.exit(0)
@@ -345,7 +342,6 @@ replacements = {
     "{{HUMAN_NAME}}": "my human", "{{PRONOUNS}}": pronouns,
     "{{PRONOUNS_SUBJECT}}": subj, "{{PRONOUNS_POSSESSIVE}}": poss,
     "{{VERSION}}": version, "{{DATE}}": today,
-    "{{EMAIL}}": email, "{{GITHUB}}": gh_user,
 }
 
 for dirpath, _dirs, files in os.walk(workspace):
@@ -469,7 +465,8 @@ function seedRolodexContacts() {
 
   const contacts = [];
 
-  // Human owner contact — we don't collect the human's name during setup
+  // Human owner contact — ghUsername is their GitHub handle, email step is the AGENT's email
+  const humanGh = (setupState as Record<string, string>).ghUsername || "";
   contacts.push({
     id: crypto.randomUUID(),
     name: "My Human",
@@ -479,14 +476,13 @@ function seedRolodexContacts() {
     tags: ["owner", "human"],
     trustStatus: "verified",
     lastVerified: new Date().toISOString(),
-    notes: "Human owner — added during setup.",
+    notes: humanGh ? `GitHub: ${humanGh}. Added during setup.` : "Human owner — added during setup.",
   });
 
-  // Agent contact — all wizard fields are the AGENT's info
+  // Agent contact — emailAddress from the wizard is the AGENT's email
   const agentName = setupState.assistantName || "MiniClaw";
   const agentShort = setupState.shortName || agentName;
   const agentEmail = setupState.emailAddress || "";
-  const agentGh = (setupState as Record<string, string>).ghUsername || "";
   contacts.push({
     id: crypto.randomUUID(),
     name: agentName,
@@ -496,7 +492,7 @@ function seedRolodexContacts() {
     tags: ["agent", "self"],
     trustStatus: "verified",
     lastVerified: new Date().toISOString(),
-    notes: agentGh ? `AI agent (${agentShort}). GitHub: ${agentGh}.` : `AI agent (${agentShort}) — added during setup.`,
+    notes: `AI agent (${agentShort}) — added during setup.`,
   });
 
   fs.writeFileSync(contactsPath, JSON.stringify(contacts, null, 2) + "\n", "utf-8");

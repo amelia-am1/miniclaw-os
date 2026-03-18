@@ -16,6 +16,14 @@
         "type": "string",
         "description": "Git remote name for your fork",
         "default": "origin"
+      },
+      "agentName": {
+        "type": "string",
+        "description": "Agent name for attribution (auto-resolved from IDENTITY.md if not set)"
+      },
+      "ghUsername": {
+        "type": "string",
+        "description": "GitHub username for attribution (auto-resolved from gh auth if not set)"
       }
     }
   }

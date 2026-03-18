@@ -171,7 +171,7 @@ export default function register(api: OpenClawPluginApi) {
   const imagePlaceholder = cfg.imagePlaceholder ?? "[image removed from history]";
   const applyToChannels = cfg.applyToChannels ?? true;
   const applyToDMs = cfg.applyToDMs ?? false;
-  const replaceMessages = cfg.replaceMessages ?? true;
+  const replaceMessages = cfg.replaceMessages ?? false;
 
   // Cumulative stats (in-memory, resets on restart)
   const stats: SessionStats = {

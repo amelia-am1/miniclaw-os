@@ -7,12 +7,6 @@ export interface EmailMessage {
   date: string;
   snippet: string;
   body?: string;
-  attachments?: {
-    filename: string;
-    contentType: string;
-    size: number;
-    content: Buffer;
-  }[];
   labelIds: string[];
 }
 
