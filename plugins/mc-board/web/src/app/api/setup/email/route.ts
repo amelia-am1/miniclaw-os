@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { checkImapAuth, checkSmtpAuth } from "@/lib/email-check";
-import { writeSetupState } from "@/lib/setup-state";
+import { writeSetupState, isSetupComplete } from "@/lib/setup-state";
 import { consumeToken } from "@/lib/sensitive-auth";
 
 function isGmail(email: string): boolean {
@@ -13,7 +13,7 @@ function isGmail(email: string): boolean {
 export async function POST(req: Request) {
   const { email, appPassword, smtpHost, smtpPort, sensitiveToken } = await req.json();
 
-  if (!consumeToken(sensitiveToken)) {
+  if (isSetupComplete() && !consumeToken(sensitiveToken)) {
     return NextResponse.json(
       { ok: false, error: "Password confirmation required" },
       { status: 403 },
