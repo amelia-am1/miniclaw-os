@@ -16,6 +16,11 @@
   <a href="https://github.com/augmentedmike/miniclaw-os/actions/workflows/test.yml"><img src="https://img.shields.io/github/actions/workflow/status/augmentedmike/miniclaw-os/test.yml?branch=stable&style=for-the-badge&label=tests" alt="Tests"></a>
 </p>
 
+<p align="center">
+  <strong>If this is the future you want to build, give us a star.</strong><br />
+  <a href="https://github.com/augmentedmike/miniclaw-os/stargazers"><img src="https://img.shields.io/github/stars/augmentedmike/miniclaw-os?style=social&label=Star%20miniclaw-os" alt="Star miniclaw-os"></a>
+</p>
+
 ---
 
 AI agents don't fail because of the model. They fail because they have **no memory, no planning, and no continuity** between sessions. Every run starts from zero.
