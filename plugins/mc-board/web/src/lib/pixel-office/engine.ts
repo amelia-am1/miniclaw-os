@@ -538,8 +538,9 @@ export function renderOffice(
     drawFurnitureItem(item);
   }
 
-  // Layer 4: Characters (on top of everything except _BACK)
-  for (const ch of characters) renderCharacter(ctx, ch, state);
+  // Layer 4: Characters sorted by Y (lower on screen = drawn last = on top)
+  const sortedChars = [...characters].sort((a, b) => a.y - b.y);
+  for (const ch of sortedChars) renderCharacter(ctx, ch, state);
 
   // Layer 5: _BACK furniture only (the only things that occlude characters)
   for (const item of layout.furniture) {
