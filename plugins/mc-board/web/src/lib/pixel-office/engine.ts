@@ -35,7 +35,7 @@ const SEAT_REST_MIN = 30; // shorter than original for demo appeal
 const SEAT_REST_MAX = 60;
 const SITTING_OFFSET = 6;
 const MAX_DELTA = 0.1;
-const BUBBLE_OFFSET_Y = 24;
+const BUBBLE_OFFSET_Y = 8;
 
 // Character hue shifts for variety
 const HUE_SHIFTS = [0, 60, 120, 180, 240, 300, 45, 135, 225, 315];
@@ -533,21 +533,24 @@ export function renderOffice(
     }
   }
 
-  // Layer 3: All non-BACK furniture (rendered behind characters)
+  // Layer 3: Non-occluding furniture (rendered behind characters)
+  // BACK furniture occludes characters EXCEPT PC_BACK (monitor, not a physical barrier)
+  const shouldOcclude = (item: { type: string }) =>
+    item.type.includes("BACK") && !item.type.startsWith("PC_");
   for (const item of layout.furniture) {
-    if (item.type.includes("BACK")) continue;
+    if (shouldOcclude(item)) continue;
     drawFurnitureItem(item);
   }
 
-  // Layer 4: Characters (rendered on top of non-BACK furniture)
+  // Layer 4: Characters (rendered on top of non-occluding furniture)
   const sortedChars = [...characters].sort((a, b) => a.y - b.y);
   for (const ch of sortedChars) {
     renderCharacter(ctx, ch, state);
   }
 
-  // Layer 5: BACK furniture only (occludes characters)
+  // Layer 5: Chair backs only (occludes characters sitting at desks)
   for (const item of layout.furniture) {
-    if (!item.type.includes("BACK")) continue;
+    if (!shouldOcclude(item)) continue;
     drawFurnitureItem(item);
   }
 
