@@ -3,11 +3,14 @@ import { execFileSync } from "child_process";
 import fs from "fs";
 import path from "path";
 import os from "os";
+import { enforceRepoProtection } from "../src/repo-protection.js";
 
 type Logger = { info(m: string): void; warn(m: string): void; error(m: string): void };
 
 interface GithubConfig {
   defaultRepo?: string;
+  protectedBranches?: string[];
+  ownerUsername?: string;
 }
 
 function ok(text: string) {
@@ -568,6 +571,37 @@ export function createGithubTools(cfg: GithubConfig, logger: Logger): AnyAgentTo
         } catch (err: unknown) {
           const e = err as { stderr?: string };
           return ok(`Failed to trigger workflow: ${e.stderr || "unknown error"}`);
+        }
+      },
+    } as AnyAgentTool,
+
+    // ── Enforce repo protection policies ──────────────────────────────
+    {
+      name: "github_repo_protect",
+      label: "github_repo_protect",
+      description:
+        "Enforce repository protection policies: branch protection (require PRs, status checks, no force push), set external collaborators to triage-only, detect and revert unauthorized pushes to main.",
+      parameters: {
+        type: "object",
+        required: [],
+        properties: {
+          repo: { type: "string", description: "Repository (owner/name). If omitted, uses defaultRepo or git remote." },
+          branches: { type: "string", description: "Comma-separated branches to protect (default: main)" },
+        },
+      },
+      async execute(_id: string, params: unknown) {
+        const p = params as Record<string, string>;
+        const protectCfg = {
+          defaultRepo: p.repo || cfg.defaultRepo,
+          protectedBranches: p.branches ? p.branches.split(",").map((b) => b.trim()) : cfg.protectedBranches,
+          ownerUsername: cfg.ownerUsername,
+        };
+        try {
+          await enforceRepoProtection(protectCfg, logger);
+          return ok("Repo protection enforcement complete");
+        } catch (err: unknown) {
+          const e = err as { message?: string };
+          return ok(`Repo protection failed: ${e.message || "unknown error"}`);
         }
       },
     } as AnyAgentTool,

@@ -10,6 +10,15 @@
       "defaultRepo": {
         "type": "string",
         "description": "Default GitHub repo (owner/name). If omitted, detected from git remote."
+      },
+      "protectedBranches": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Branches to protect (default: ['main'])."
+      },
+      "ownerUsername": {
+        "type": "string",
+        "description": "GitHub username of the repo owner/agent. If omitted, auto-detected from gh auth."
       }
     }
   }

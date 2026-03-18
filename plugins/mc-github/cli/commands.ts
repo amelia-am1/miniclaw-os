@@ -1,10 +1,13 @@
 import type { Command } from "commander";
 import { execFileSync } from "child_process";
+import { enforceRepoProtection } from "../src/repo-protection.js";
 
 type Logger = { info(m: string): void; warn(m: string): void; error(m: string): void };
 
 interface GithubConfig {
   defaultRepo?: string;
+  protectedBranches?: string[];
+  ownerUsername?: string;
 }
 
 function run(cmd: string, args: string[], cwd?: string): string {
@@ -25,7 +28,7 @@ export function registerGithubCommands(
   ctx: { program: Command; logger: Logger },
   cfg: GithubConfig
 ): void {
-  const { program } = ctx;
+  const { program, logger } = ctx;
 
   const cmd = program
     .command("github")
@@ -95,6 +98,27 @@ export function registerGithubCommands(
       } catch (err: unknown) {
         const e = err as { stderr?: string };
         console.error(`Failed to view PR #${number}: ${e.stderr || "unknown error"}`);
+        process.exit(1);
+      }
+    });
+
+  cmd
+    .command("protect")
+    .description("Enforce repo protection policies: branch protection, collaborator permissions, push audit")
+    .option("-r, --repo <repo>", "Repository (owner/name)")
+    .option("-b, --branches <branches>", "Comma-separated branches to protect", "main")
+    .action(async (opts: { repo?: string; branches: string }) => {
+      const protectCfg = {
+        defaultRepo: opts.repo || cfg.defaultRepo,
+        protectedBranches: opts.branches.split(",").map((b) => b.trim()),
+        ownerUsername: cfg.ownerUsername,
+      };
+      try {
+        await enforceRepoProtection(protectCfg, logger);
+        console.log("Repo protection enforcement complete");
+      } catch (err: unknown) {
+        const e = err as { message?: string };
+        console.error(`Repo protection failed: ${e.message || "unknown error"}`);
         process.exit(1);
       }
     });
