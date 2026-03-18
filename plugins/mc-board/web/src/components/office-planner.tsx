@@ -248,7 +248,7 @@ export function OfficePlanner({ onClose }: Props) {
       switch (e.key.toLowerCase()) {
         case "e": setMode("erase"); break;
         case "h": setMode("hand"); break;
-        case "p": setMode("spawn"); break;
+        case "p": break; // spawn mode removed
         case "s": if (!e.ctrlKey && !e.metaKey) { setMode("select"); setSelectedUids(new Set()); } break;
         case "g":
           // Group selected furniture into a component
@@ -997,8 +997,11 @@ export function OfficePlanner({ onClose }: Props) {
       await fetch(`/api/office/layouts/${encodeURIComponent(layoutName)}`, {
         method: "DELETE",
       });
-      setLayouts((prev) => prev.filter((n) => n !== layoutName));
-      setLayoutName("default");
+      setLayouts((prev) => {
+        const remaining = prev.filter((n) => n !== layoutName);
+        setLayoutName(remaining[0] || "");
+        return remaining;
+      });
     } catch {}
   }
 
@@ -1090,12 +1093,6 @@ export function OfficePlanner({ onClose }: Props) {
           );
         })}
         <div style={{ width: 1, height: 20, background: "#3f3f46", margin: "0 2px" }} />
-        <button onClick={() => setMode("spawn")} style={{
-          ...toolbarBtnStyle(mode === "spawn"),
-          ...(mode === "spawn" ? { background: "#22c55e33", borderColor: "#22c55e", color: "#22c55e" } : {}),
-        }}>
-          Spawn [P]
-        </button>
         <button onClick={() => setMode("erase")} style={toolbarBtnStyle(mode === "erase")}>
           Erase {layer} [E]
         </button>
@@ -1336,23 +1333,9 @@ export function OfficePlanner({ onClose }: Props) {
                 ))}
               </div>
 
-              {/* Spawn points */}
-              <div style={{ fontSize: 10, color: "#71717a", marginBottom: 4 }}>SPAWN POINTS</div>
-              <button onClick={() => setMode("spawn")}
-                style={{
-                  background: mode === "spawn" ? "#22c55e33" : "#27272a",
-                  border: mode === "spawn" ? "2px solid #22c55e" : "1px solid #3f3f46",
-                  color: mode === "spawn" ? "#22c55e" : "#e4e4e7", borderRadius: 4,
-                  padding: "6px 8px", cursor: "pointer", fontSize: 11, width: "100%", textAlign: "left", marginBottom: 12,
-                }}>
-                Paint Spawn Points
-              </button>
-
               {/* Info */}
               <div style={{ fontSize: 10, color: "#52525b", marginBottom: 12 }}>
-                {mode === "zone" ? "Click to paint zone, then click adjacent tile to set seat facing. Esc to skip."
-                  : mode === "spawn" ? "Click/drag to paint spawn points (green). Click again to remove."
-                  : ""}
+                {mode === "zone" ? "Click to paint zone, then click adjacent tile to set seat facing. Esc to skip." : ""}
               </div>
 
               {/* Stats */}

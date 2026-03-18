@@ -99,9 +99,10 @@ export function ChatPanel({ open, onToggle, pendingContext, onContextConsumed, p
     setTimeout(() => textareaRef.current?.focus(), 50);
   }, [pendingContext, onContextConsumed]);
 
-  // Scroll to bottom
+  // Scroll to bottom and focus textarea on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    textareaRef.current?.focus();
   }, [messages, streamingText]);
 
   const send = useCallback(() => {
@@ -136,7 +137,7 @@ export function ChatPanel({ open, onToggle, pendingContext, onContextConsumed, p
   }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && e.shiftKey) {
       e.preventDefault();
       send();
     }
@@ -334,7 +335,7 @@ export function ChatPanel({ open, onToggle, pendingContext, onContextConsumed, p
           value={draft}
           onChange={e => setDraft(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={`Message ${agentName}… (Enter to send)`}
+          placeholder={`Message ${agentName}…`}
           rows={3}
           style={{
             width: "100%", background: "#18181b", border: "1px solid #3f3f46",
@@ -345,21 +346,7 @@ export function ChatPanel({ open, onToggle, pendingContext, onContextConsumed, p
           onFocus={e => { e.currentTarget.style.borderColor = "#52525b"; }}
           onBlur={e => { e.currentTarget.style.borderColor = "#3f3f46"; }}
         />
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span style={{ fontSize: 10, color: "#3f3f46" }}>Shift+Enter for newline</span>
-          <button
-            onClick={send}
-            disabled={!draft.trim() || !connected}
-            style={{
-              background: draft.trim() && connected ? "#16a34a" : "#27272a",
-              border: "none", borderRadius: 5,
-              color: draft.trim() && connected ? "#f0fdf4" : "#52525b",
-              fontSize: 12, fontWeight: 600, padding: "5px 14px",
-              cursor: draft.trim() && connected ? "pointer" : "not-allowed",
-              fontFamily: "inherit", transition: "background 0.15s, color 0.15s",
-            }}
-          >{streaming ? "…" : "Send"}</button>
-        </div>
+        <span style={{ fontSize: 10, color: "#3f3f46" }}>Shift+Enter to send</span>
       </div>
     </div>
   );
