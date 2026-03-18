@@ -1,0 +1,10 @@
+{
+  "id": "mc-x",
+  "name": "Miniclaw X/Twitter",
+  "description": "X/Twitter API v2 client — post tweets, read timelines, reply to tweets.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": true,
+    "properties": {}
+  }
+}

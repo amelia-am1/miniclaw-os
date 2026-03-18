@@ -1,0 +1,16 @@
+{
+  "name": "mc-x",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "index.ts",
+  "description": "X/Twitter API v2 client — post tweets, read timelines, reply to tweets",
+  "dependencies": {},
+  "devDependencies": {
+    "openclaw": "file:../../../openclaw"
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}
