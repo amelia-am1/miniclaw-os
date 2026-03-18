@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import type { ContributeConfig } from "../src/config.js";
 import { CONTRIBUTION_GUIDELINES } from "../src/guidelines.js";
+import { runPreflight, formatPreflight } from "../src/preflight.js";
 import {
   sanitizePluginName,
   sanitizeBranchTopic,
@@ -23,7 +24,6 @@ function run(cmd: string, args: string[], cwd?: string): string {
 
 /**
  * Run security-check.sh and decide pass/fail based on exit code only.
- * Uses a longer timeout (120s) since --all scans the entire repo.
  */
 function runSecurityCheck(script: string, args: string[], cwd: string): { passed: boolean; output: string } {
   try {
@@ -35,14 +35,12 @@ function runSecurityCheck(script: string, args: string[], cwd: string): { passed
     return { passed: true, output };
   } catch (err: unknown) {
     const e = err as { status?: number | null; stdout?: string; stderr?: string; killed?: boolean; signal?: string };
-    // Timeout or signal kill — not a security finding
     if (e.killed || e.signal) {
       return {
         passed: false,
         output: `Security scan timed out or was killed (signal: ${e.signal || "unknown"}). Run manually: ./scripts/security-check.sh --all`,
       };
     }
-    // Non-zero exit code means the script found real issues
     return {
       passed: false,
       output: e.stdout || e.stderr || "Security check failed (unknown error)",
@@ -79,6 +77,30 @@ function collectCloneIdentity(): string {
   return `- Clone hostname: ${hostname}\n- Bot ID: ${botId}\n- State dir: ${stateDir}`;
 }
 
+/**
+ * Build the attribution line from config (auto-resolved).
+ */
+function buildAttribution(cfg: ContributeConfig): string {
+  return `Created by ${cfg.agentName} (@${cfg.ghUsername})`;
+}
+
+/**
+ * Check if the current branch is a contribution branch (not main).
+ */
+function isOnContribBranch(repoRoot: string): boolean {
+  try {
+    const branch = run("git", ["branch", "--show-current"], repoRoot);
+    return branch !== "main" && branch !== "master" && branch.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+const GATE_MESSAGE =
+  `BLOCKED: You must have a contribution branch with changes before filing issues.\n` +
+  `The mc-contribute rule is: NO issue without a matching PR.\n` +
+  `Create a branch, make your changes, then file the issue alongside your PR.`;
+
 export function registerContributeCommands(
   ctx: { program: Command; logger: Logger },
   cfg: ContributeConfig
@@ -86,6 +108,7 @@ export function registerContributeCommands(
   const { program, logger } = ctx;
   const upstreamRepo = validateRepo(cfg.upstreamRepo);
   const forkRemote = validateRemote(cfg.forkRemote);
+  const attribution = buildAttribution(cfg);
 
   const cmd = program
     .command("mc-contribute")
@@ -172,6 +195,30 @@ export function register${cap}Commands(
 }
 `);
 
+      // Generate cli/commands.test.ts stub
+      fs.writeFileSync(path.join(pluginDir, "cli", "commands.test.ts"),
+`import { test, expect } from "vitest";
+import { register${cap}Commands } from "./commands.js";
+
+test("register${cap}Commands is a function", () => {
+  expect(typeof register${cap}Commands).toBe("function");
+});
+
+// TODO: Add tests for your CLI commands
+`);
+
+      // Generate smoke.test.ts
+      fs.writeFileSync(path.join(pluginDir, "smoke.test.ts"),
+`import { test, expect } from "vitest";
+import register from "./index.js";
+
+test("register is a function", () => {
+  expect(typeof register).toBe("function");
+});
+
+// TODO: Add smoke tests for your plugin
+`);
+
       fs.writeFileSync(path.join(pluginDir, "docs", "README.md"),
         `# ${fullName}\n\n**Brain region:** ${opts.region}\n\n${description}\n`
       );
@@ -179,13 +226,14 @@ export function register${cap}Commands(
       logger.info(`Scaffolded ${fullName} at ${pluginDir}`);
       console.log(`Scaffolded ${fullName} at plugins/${fullName}/`);
       console.log(`\nFiles created:`);
-      for (const f of ["openclaw.plugin.json", "package.json", "index.ts", "tools/definitions.ts", "cli/commands.ts", "docs/README.md"]) {
+      for (const f of ["openclaw.plugin.json", "package.json", "index.ts", "tools/definitions.ts", "cli/commands.ts", "cli/commands.test.ts", "smoke.test.ts", "docs/README.md"]) {
         console.log(`  ${fullName}/${f}`);
       }
       console.log(`\nNext steps:`);
       console.log(`  1. Add tools in tools/definitions.ts`);
       console.log(`  2. Add CLI commands in cli/commands.ts`);
-      console.log(`  3. Test with: mc plugin test ${fullName}`);
+      console.log(`  3. Write tests in cli/commands.test.ts`);
+      console.log(`  4. Test with: mc plugin test ${fullName}`);
     });
 
   cmd
@@ -224,7 +272,7 @@ export function register${cap}Commands(
 
   cmd
     .command("pr")
-    .description("Submit a pull request to miniclaw-os")
+    .description("Submit a pull request to miniclaw-os (runs pre-flight checks first)")
     .requiredOption("-t, --title <title>", "PR title (short, under 70 chars)")
     .requiredOption("-s, --summary <summary>", "What this PR does (1-3 bullet points)")
     .option("-p, --plugins <plugins>", "Comma-separated list of affected plugins")
@@ -234,10 +282,14 @@ export function register${cap}Commands(
       const plugins = opts.plugins ? sanitizeFreeText(opts.plugins, "plugins") : "N/A";
       const repoRoot = run("git", ["rev-parse", "--show-toplevel"]);
 
-      const script = path.join(repoRoot, "scripts", "security-check.sh");
-      const secResult = runSecurityCheck(script, ["--all"], repoRoot);
-      if (!secResult.passed) {
-        console.error(`PR blocked — security issues found:\n\n${secResult.output}`);
+      // Run pre-flight checklist
+      console.log("Running pre-flight checks...\n");
+      const preflight = runPreflight(repoRoot, logger);
+      console.log(formatPreflight(preflight));
+      console.log("");
+
+      if (!preflight.passed) {
+        console.error(`PR blocked — fix the issues above before submitting.`);
         process.exit(1);
       }
 
@@ -252,7 +304,13 @@ export function register${cap}Commands(
       const body =
         `## Summary\n\n${summary}\n\n` +
         `## Plugin(s) affected\n\n${plugins}\n\n` +
+        `## Pre-flight checklist\n\n` +
+        `- [x] Test files in diff\n` +
+        `- [x] All tests passing\n` +
+        `- [x] Docs updated (if applicable)\n` +
+        `- [x] Security check clean\n\n` +
         `## Security check\n\n- [x] Ran ./scripts/security-check.sh (passed)\n- [x] No secrets, tokens, or PII in this PR\n\n` +
+        `## Attribution\n\n${attribution}\n\n` +
         `## Clone identity\n\n${collectCloneIdentity()}\n\n` +
         `---\nSubmitted via mc-contribute`;
 
@@ -273,12 +331,20 @@ export function register${cap}Commands(
 
   cmd
     .command("bug <title>")
-    .description("File a bug report with auto-collected diagnostics")
+    .description("File a bug report (GATED: must be on a contribution branch)")
     .requiredOption("-w, --what <what>", "What happened")
     .requiredOption("-e, --expected <expected>", "What should have happened")
     .option("-s, --steps <steps>", "Steps to reproduce")
     .option("-p, --plugins <plugins>", "Affected plugins")
     .action(async (title: string, opts: { what: string; expected: string; steps?: string; plugins?: string }) => {
+      const repoRoot = run("git", ["rev-parse", "--show-toplevel"]);
+
+      // GATE: Must be on a contribution branch
+      if (!isOnContribBranch(repoRoot)) {
+        console.error(GATE_MESSAGE);
+        process.exit(1);
+      }
+
       const safeTitle = sanitizeTitle(title);
       const what = sanitizeBody(opts.what);
       const expected = sanitizeBody(opts.expected);
@@ -304,6 +370,7 @@ export function register${cap}Commands(
         `- Node version: ${nodeVersion}\n` +
         `- MiniClaw version: ${mcVersion}\n` +
         `- Plugin(s) involved: ${plugins}\n\n` +
+        `**Attribution**\n${attribution}\n\n` +
         `**Clone identity**\n${collectCloneIdentity()}\n\n` +
         `**mc-doctor output**\n\n${doctorOutput}\n\n` +
         `---\nFiled via mc-contribute`;
@@ -325,13 +392,21 @@ export function register${cap}Commands(
 
   cmd
     .command("feature <title>")
-    .description("Submit a feature request or plugin idea")
+    .description("Submit a feature request (GATED: must be on a contribution branch)")
     .requiredOption("-p, --problem <problem>", "What problem does this solve?")
     .requiredOption("-s, --solution <solution>", "How should it work?")
     .option("-r, --region <region>", "Brain region / plugin")
     .option("--new-plugin", "This is a new plugin proposal")
     .option("--plugin-name <name>", "Proposed plugin name (mc-???)")
     .action(async (title: string, opts: { problem: string; solution: string; region?: string; newPlugin?: boolean; pluginName?: string }) => {
+      const repoRoot = run("git", ["rev-parse", "--show-toplevel"]);
+
+      // GATE: Must be on a contribution branch
+      if (!isOnContribBranch(repoRoot)) {
+        console.error(GATE_MESSAGE);
+        process.exit(1);
+      }
+
       const safeTitle = sanitizeTitle(title);
       const problem = sanitizeBody(opts.problem);
       const solution = sanitizeBody(opts.solution);
@@ -350,6 +425,7 @@ export function register${cap}Commands(
           `**Brain region**\n${region}\n\n` +
           `**What it does**\n${solution}\n\n` +
           `**Problem it solves**\n${problem}\n\n` +
+          `**Attribution**\n${attribution}\n\n` +
           `**Clone identity**\n${collectCloneIdentity()}\n\n` +
           `---\nSubmitted via mc-contribute`;
       } else {
@@ -359,6 +435,7 @@ export function register${cap}Commands(
           `**What problem does this solve?**\n${problem}\n\n` +
           `**Proposed solution**\n${solution}\n\n` +
           `**Which plugin/brain region?**\n${region}\n\n` +
+          `**Attribution**\n${attribution}\n\n` +
           `**Clone identity**\n${collectCloneIdentity()}\n\n` +
           `---\nSubmitted via mc-contribute`;
       }
@@ -379,7 +456,7 @@ export function register${cap}Commands(
 
   cmd
     .command("status")
-    .description("Check contribution status — branch, changes, open PRs")
+    .description("Check contribution status — branch, changes, open PRs, attribution")
     .action(async () => {
       const repoRoot = run("git", ["rev-parse", "--show-toplevel"]);
       const branch = run("git", ["branch", "--show-current"], repoRoot);
@@ -397,7 +474,20 @@ export function register${cap}Commands(
       console.log(`Branch: ${branch}\n`);
       console.log(`Uncommitted changes:\n${status || "(clean)"}\n`);
       console.log(`Recent commits:\n${log}\n`);
-      console.log(`Open PRs:\n${prs}`);
+      console.log(`Open PRs:\n${prs}\n`);
+      console.log(`Agent: ${attribution}`);
+    });
+
+  cmd
+    .command("preflight")
+    .description("Run the pre-flight checklist (tests, docs, security) without submitting a PR")
+    .action(async () => {
+      const repoRoot = run("git", ["rev-parse", "--show-toplevel"]);
+      const result = runPreflight(repoRoot, logger);
+      console.log(formatPreflight(result));
+      if (!result.passed) {
+        process.exit(1);
+      }
     });
 
   cmd
