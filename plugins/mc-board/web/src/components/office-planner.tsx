@@ -575,16 +575,21 @@ export function OfficePlanner({ onClose }: Props) {
           setDirty(true);
         }
       } else if (layer === "walls") {
-        // Only erase wall tiles (set to VOID), leave floor alone
+        // Only erase wall tiles (set to VOID), check clicked row and row+1 for offset
         const idx = row * state.layout.cols + col;
+        const idx1 = (row + 1) * state.layout.cols + col;
         if (state.layout.tiles[idx] === TileType.WALL) {
           state.layout.tiles[idx] = TileType.VOID;
+          setLayout({ ...state.layout });
+          setDirty(true);
+        } else if (row + 1 < state.layout.rows && state.layout.tiles[idx1] === TileType.WALL) {
+          state.layout.tiles[idx1] = TileType.VOID;
           setLayout({ ...state.layout });
           setDirty(true);
         }
       }
     },
-    []
+    [layer]
   );
 
   const removeFurnitureAt = useCallback(
@@ -772,14 +777,20 @@ export function OfficePlanner({ onClose }: Props) {
     }
   }
 
+  const [activated, setActivated] = useState(false);
+
   async function handleSetActive() {
     setSaving(true);
     try {
-      await fetch("/api/office/layouts/active", {
+      const resp = await fetch("/api/office/layouts/active", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: layoutName }),
+        body: JSON.stringify({ active: layoutName }),
       });
+      if (resp.ok) {
+        setActivated(true);
+        setTimeout(() => setActivated(false), 2000);
+      }
     } finally {
       setSaving(false);
     }
@@ -867,10 +878,10 @@ export function OfficePlanner({ onClose }: Props) {
         </button>
         <button
           onClick={handleSetActive}
-          style={{ ...toolbarBtnStyle(false), background: "#065f46", color: "#34d399" }}
-          title="Set as active layout"
+          style={{ ...toolbarBtnStyle(false), background: activated ? "#22c55e" : "#065f46", color: activated ? "#fff" : "#34d399" }}
+          title="Set as active layout for the office view"
         >
-          Activate
+          {activated ? "Active!" : "Activate"}
         </button>
 
         <div style={{ width: 1, height: 20, background: "#3f3f46", margin: "0 4px" }} />
@@ -878,7 +889,7 @@ export function OfficePlanner({ onClose }: Props) {
         {/* Layer tabs — z-index order */}
         {(["floor", "walls", "furniture", "objects"] as Layer[]).map((l, i) => {
           const labels: Record<Layer, string> = { floor: "Floor", walls: "Walls", furniture: "Furniture", objects: "Objects" };
-          const active = layer === l && mode !== "erase" && mode !== "hand";
+          const active = layer === l;
           return (
             <button key={l}
               onClick={() => { setLayer(l); setMode(l === "furniture" || l === "objects" ? "furniture" : "tile"); }}
@@ -892,7 +903,7 @@ export function OfficePlanner({ onClose }: Props) {
         })}
         <div style={{ width: 1, height: 20, background: "#3f3f46", margin: "0 2px" }} />
         <button onClick={() => setMode("erase")} style={toolbarBtnStyle(mode === "erase")}>
-          Erase [E]
+          Erase {layer} [E]
         </button>
         <button onClick={() => { setMode("select"); setSelectedUids(new Set()); }} style={toolbarBtnStyle(mode === "select")}>
           Select [S]

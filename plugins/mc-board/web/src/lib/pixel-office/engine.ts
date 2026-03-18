@@ -276,9 +276,10 @@ function updateCharacter(
         const seat = state.seats.find((s) => s.uid === ch.seatId);
         if (seat) {
           // Already at or adjacent to seat → snap and sit/stand
+          // seat.row is offset by -1 for rendering, so check within 2
           const dx = Math.abs(ch.tileCol - seat.col);
           const dy = Math.abs(ch.tileRow - seat.row);
-          if (dx + dy <= 1) {
+          if (dx + dy <= 2) {
             ch.tileCol = seat.col;
             ch.tileRow = seat.row;
             ch.x = seat.col * TILE_SIZE + TILE_SIZE / 2;
@@ -289,6 +290,7 @@ function updateCharacter(
             ch.dir = seat.facingDir;
             ch.frame = 0;
             ch.frameTimer = 0;
+            ch.seatTimer = 999;
             break;
           }
           // Find walkable tile adjacent to seat and pathfind there
@@ -419,7 +421,7 @@ function updateCharacter(
           const seat = state.seats.find((s) => s.uid === ch.seatId);
           if (seat) {
             const dist = Math.abs(ch.tileCol - seat.col) + Math.abs(ch.tileRow - seat.row);
-            if (dist <= 1) {
+            if (dist <= 2) {
               ch.tileCol = seat.col;
               ch.tileRow = seat.row;
               ch.x = seat.col * TILE_SIZE + TILE_SIZE / 2;
@@ -430,6 +432,7 @@ function updateCharacter(
               ch.dir = seat.facingDir;
               ch.frame = 0;
               ch.frameTimer = 0;
+              ch.seatTimer = 999;
             } else {
               ch.state = CharacterState.IDLE;
               ch.wanderTimer = rand(1, 3);
@@ -529,23 +532,20 @@ export function renderOffice(
     }
   }
 
-  // Layer 3: Furniture (sorted by row for depth)
-  const furnitureItems = layout.furniture.filter(f => !OBJECT_SET.has(f.type));
-  furnitureItems.sort((a, b) => (a.row + getFurnitureInfo(a.type).footprintH) - (b.row + getFurnitureInfo(b.type).footprintH));
-  for (const item of furnitureItems) drawFurnitureItem(item);
+  // Layer 3: All furniture + objects EXCEPT _BACK items
+  for (const item of layout.furniture) {
+    if (item.type.includes("BACK")) continue;
+    drawFurnitureItem(item);
+  }
 
-  // Layer 4: Objects on top (sorted by row)
-  const objectItems = layout.furniture.filter(f => OBJECT_SET.has(f.type));
-  objectItems.sort((a, b) => (a.row + getFurnitureInfo(a.type).footprintH) - (b.row + getFurnitureInfo(b.type).footprintH));
-  for (const item of objectItems) drawFurnitureItem(item);
+  // Layer 4: Characters (on top of everything except _BACK)
+  for (const ch of characters) renderCharacter(ctx, ch, state);
 
-  // Layer 5: Characters on top of everything
-  const charQueue = characters.map(ch => ({
-    zY: ch.y + TILE_SIZE / 2,
-    ch,
-  }));
-  charQueue.sort((a, b) => a.zY - b.zY);
-  for (const { ch } of charQueue) renderCharacter(ctx, ch, state);
+  // Layer 5: _BACK furniture only (the only things that occlude characters)
+  for (const item of layout.furniture) {
+    if (!item.type.includes("BACK")) continue;
+    drawFurnitureItem(item);
+  }
 
   // Speech bubbles (always on top)
   for (const ch of characters) {
@@ -565,7 +565,13 @@ function getCharacterSprite(ch: Character): SpriteData | null {
   if (!dirSprites || dirSprites.length === 0) return null;
 
   if (ch.state === CharacterState.SIT_IDLE) {
-    // Use first type frame (seated pose) from the correct direction
+    const sit = ch.sprites.sitIdle;
+    if (sit && sit.length > 0 && (ch.dir === Direction.RIGHT || ch.dir === Direction.LEFT)) {
+      // Both frames are right-facing side sit. Flip for left.
+      if (ch.dir === Direction.RIGHT) return sit[ch.frame % sit.length];
+      return sit[ch.frame % sit.length].map(row => [...row].reverse());
+    }
+    // DOWN/UP: use seated type frame (frame 3) — sits without typing arms
     return dirSprites[3] ?? dirSprites[0];
   }
   if (ch.state === CharacterState.TYPE) {
@@ -898,13 +904,21 @@ function seatZone(state: OfficeState, seatId: string): Zone | null {
 }
 
 /** Find a free seat within a specific zone */
-function findFreeSeatInZone(state: OfficeState, zone: Zone): Seat | undefined {
+function findFreeSeatInZone(state: OfficeState, zone: Zone, charCol?: number, charRow?: number): Seat | undefined {
   const zoneKeys = new Set(state.zoneWaypoints[zone].map(w => `${w.col},${w.row}`));
-  // First try to find a seat whose position is in the zone
-  const match = state.seats.find(s => !s.assigned && zoneKeys.has(`${s.col},${s.row}`));
-  if (match) return match;
-  // Fallback: any free seat
-  return state.seats.find(s => !s.assigned);
+  const candidates = state.seats.filter(s => !s.assigned && zoneKeys.has(`${s.col},${s.row}`));
+  if (candidates.length === 0) {
+    // Fallback: any free seat
+    return state.seats.find(s => !s.assigned);
+  }
+  if (charCol === undefined || charRow === undefined) return candidates[0];
+  // Pick closest seat to the character
+  candidates.sort((a, b) => {
+    const da = Math.abs(a.col - charCol) + Math.abs(a.row - charRow);
+    const db = Math.abs(b.col - charCol) + Math.abs(b.row - charRow);
+    return da - db;
+  });
+  return candidates[0];
 }
 
 // Sync agent list → characters
@@ -948,7 +962,7 @@ export function syncAgents(
       }
       // Assign a seat in the correct zone if needed
       if (!ch.seatId) {
-        const freeSeat = findFreeSeatInZone(state, zone);
+        const freeSeat = findFreeSeatInZone(state, zone, ch.tileCol, ch.tileRow);
         if (freeSeat) {
           freeSeat.assigned = true;
           freeSeat.assignedTo = agent.worker;
@@ -991,7 +1005,7 @@ export function syncAgents(
 
     // Assign a seat in the character's zone
     {
-      const freeSeat = findFreeSeatInZone(state, zone);
+      const freeSeat = findFreeSeatInZone(state, zone, spawn.col, spawn.row);
       if (freeSeat) {
         freeSeat.assigned = true;
         freeSeat.assignedTo = agent.worker;
@@ -1002,25 +1016,13 @@ export function syncAgents(
     state.characters.push(ch);
   }
 
-  // Clean up long-inactive characters (> 60 sync cycles idle)
+  // Remove inactive characters immediately — no ghosts
   state.characters = state.characters.filter((ch) => {
-    if (ch.isActive) {
-      ch.inactiveTimer = 0;
-      return true;
-    }
-    // Track how long this character has been inactive
-    ch.inactiveTimer = (ch.inactiveTimer ?? 0) + 1;
-    // Remove after ~60 sync cycles of being inactive and idle
-    if (ch.inactiveTimer > 60 && ch.state === CharacterState.IDLE) {
-      // Free the seat
-      const seat = state.seats.find((s) => s.assignedTo === ch.id);
-      if (seat) {
-        seat.assigned = false;
-        seat.assignedTo = null;
-      }
-      return false;
-    }
-    return true;
+    if (ch.isActive) return true;
+    // Free the seat
+    const seat = state.seats.find((s) => s.assignedTo === ch.id);
+    if (seat) { seat.assigned = false; seat.assignedTo = null; }
+    return false;
   });
 }
 
@@ -1107,7 +1109,7 @@ export function centerView(
 
   // Auto-zoom to fit within the canvas without clipping
   if (canvasWidth > 0 && canvasHeight > 0 && contentW > 0 && contentH > 0) {
-    state.zoom = Math.min(canvasWidth / contentW, canvasHeight / contentH);
+    state.zoom = Math.min(canvasWidth / contentW, canvasHeight / contentH) * 0.9;
   }
 
   const scaledW = contentW * state.zoom;

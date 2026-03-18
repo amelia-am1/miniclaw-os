@@ -68,10 +68,24 @@ export function PixelOfficeTab({ onSwitchToBoard }: Props) {
     async function init() {
       try {
         let layout: OfficeLayout | null = null;
+        // Try active saved layout first
         try {
-          const resp = await fetch("/pixel-office/assets/default-layout-1.json");
-          if (resp.ok) layout = await resp.json();
+          const ar = await fetch("/api/office/layouts/active");
+          if (ar.ok) {
+            const ad = await ar.json();
+            if (ad.active && ad.active !== "default") {
+              const lr = await fetch(`/api/office/layouts/${encodeURIComponent(ad.active)}`);
+              if (lr.ok) layout = await lr.json();
+            }
+          }
         } catch {}
+        // Fallback to default
+        if (!layout) {
+          try {
+            const resp = await fetch("/pixel-office/assets/default-layout-1.json");
+            if (resp.ok) layout = await resp.json();
+          } catch {}
+        }
         const state = await initOffice(layout);
         if (cancelled) return;
         // Load user-defined zones
