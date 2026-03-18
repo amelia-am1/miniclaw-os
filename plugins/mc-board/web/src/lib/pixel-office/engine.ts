@@ -533,21 +533,24 @@ export function renderOffice(
     }
   }
 
-  // Layer 3: All non-BACK furniture (rendered behind characters)
+  // Layer 3: Non-occluding furniture (rendered behind characters)
+  // Only chair backs (orientation: "back") should occlude characters
+  const shouldOcclude = (item: { type: string }) =>
+    getFurnitureInfo(item.type).orientation === "back";
   for (const item of layout.furniture) {
-    if (item.type.includes("BACK")) continue;
+    if (shouldOcclude(item)) continue;
     drawFurnitureItem(item);
   }
 
-  // Layer 4: Characters (rendered on top of non-BACK furniture)
+  // Layer 4: Characters (rendered on top of non-occluding furniture)
   const sortedChars = [...characters].sort((a, b) => a.y - b.y);
   for (const ch of sortedChars) {
     renderCharacter(ctx, ch, state);
   }
 
-  // Layer 5: BACK furniture only (occludes characters)
+  // Layer 5: Chair backs only (occludes characters sitting at desks)
   for (const item of layout.furniture) {
-    if (!item.type.includes("BACK")) continue;
+    if (!shouldOcclude(item)) continue;
     drawFurnitureItem(item);
   }
 
