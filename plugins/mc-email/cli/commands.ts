@@ -122,7 +122,7 @@ export function registerEmailCommands(ctx: Ctx): void {
         const dir = opts.saveAttachments;
         await mkdir(dir, { recursive: true });
         for (const a of msg.attachments) {
-          const dest = path.join(dir, sanitize(a.filename));
+          const dest = path.join(dir, sanitize(path.basename(a.filename)));
           await writeFile(dest, a.content);
           console.log(`Saved: ${dest}`);
         }
@@ -139,7 +139,7 @@ export function registerEmailCommands(ctx: Ctx): void {
           process.exit(1);
         }
         const a = msg.attachments[idx];
-        const dest = path.join(process.cwd(), sanitize(a.filename));
+        const dest = path.join(process.cwd(), sanitize(path.basename(a.filename)));
         await writeFile(dest, a.content);
         console.log(`Saved: ${dest}`);
       }
