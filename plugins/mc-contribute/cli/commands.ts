@@ -18,6 +18,16 @@ import os from "os";
 
 type Logger = { info(m: string): void; warn(m: string): void; error(m: string): void };
 
+/**
+ * Strip known prefix markers from the beginning of a title.
+ * Removes [Bug], [Feature], [Plugin] (case-insensitive, with optional trailing space).
+ * Does not strip prefixes in the middle of the string.
+ */
+export function stripKnownPrefix(title: string): string {
+  const prefixes = /^\s*\[(bug|feature|plugin)\]\s*/i;
+  return title.replace(prefixes, "").trim();
+}
+
 function run(cmd: string, args: string[], cwd?: string): string {
   return execFileSync(cmd, args, { encoding: "utf-8", cwd, timeout: 30_000 }).trim();
 }
@@ -293,7 +303,7 @@ export function register${cap}Commands(
     .option("-s, --steps <steps>", "Steps to reproduce")
     .option("-p, --plugins <plugins>", "Affected plugins")
     .action(async (title: string, opts: { what: string; expected: string; steps?: string; plugins?: string }) => {
-      const safeTitle = sanitizeTitle(title);
+      const safeTitle = sanitizeTitle(stripKnownPrefix(title));
       const what = sanitizeBody(opts.what);
       const expected = sanitizeBody(opts.expected);
       const steps = opts.steps ? sanitizeBody(opts.steps) : "(not provided)";
@@ -346,7 +356,7 @@ export function register${cap}Commands(
     .option("--new-plugin", "This is a new plugin proposal")
     .option("--plugin-name <name>", "Proposed plugin name (mc-???)")
     .action(async (title: string, opts: { problem: string; solution: string; region?: string; newPlugin?: boolean; pluginName?: string }) => {
-      const safeTitle = sanitizeTitle(title);
+      const safeTitle = sanitizeTitle(stripKnownPrefix(title));
       const problem = sanitizeBody(opts.problem);
       const solution = sanitizeBody(opts.solution);
       const region = opts.region ? sanitizeFreeText(opts.region, "region") : "N/A";
