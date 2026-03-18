@@ -335,7 +335,6 @@ export function AppShell({ initialTab, initialCardId, initialProjectId }: { init
           onContextConsumed={() => setPendingContext(null)}
           projectId={selectedProject}
           activeCardId={openCardId ?? undefined}
-          agentName={assistantName}
         />
       </div>
 
