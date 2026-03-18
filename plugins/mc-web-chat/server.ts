@@ -144,7 +144,14 @@ export function startChatServer(opts: ChatServerOptions) {
       session.procHasContext = true;
       const wp = loadWorkspacePrompt();
       if (wp) {
-        msg = `<workspace-context>\n${wp}\n</workspace-context>\n\n<tool-instructions>\nAll MiniClaw plugins (mc-*) listed in TOOLS.md are available as bash commands via: mc <plugin-id> <command> [args]\nExamples: mc mc-board list, mc mc-calendar list, mc mc-email list, mc mc-kb search "query"\nThese are YOUR tools. Use them directly.\n</tool-instructions>\n\nInternalize the above silently. Now respond to:\n\n${content}`;
+        let chatPersona = "";
+        try {
+          chatPersona = readFileSync(join(workspaceDir, "refs", "chat-persona.md"), "utf-8");
+        } catch {}
+        const context = chatPersona
+          ? `${wp}\n\n# refs/chat-persona.md\n${chatPersona}`
+          : wp;
+        msg = `<workspace-context>\n${context}\n</workspace-context>\n\nInternalize the above silently. Now respond to:\n\n${content}`;
       }
     }
 
