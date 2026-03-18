@@ -344,10 +344,8 @@ export function AppShell({ initialTab, initialCardId, initialProjectId }: { init
         {toasts.map(t => (
           <div key={t.id} className={`toast${t.exiting ? " toast-out" : ""}`}>
             <span className="toast-icon">{t.icon}</span>
-            <div>
-              <div className="toast-title">{t.title}</div>
-              {t.sub && <div className="toast-sub">{t.sub}</div>}
-            </div>
+            <span className="toast-title">{t.title}</span>
+            {t.sub && <span className="toast-sub">{t.sub}</span>}
           </div>
         ))}
       </div>

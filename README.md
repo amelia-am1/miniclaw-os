@@ -55,12 +55,17 @@ curl -fsSL https://raw.githubusercontent.com/augmentedmike/miniclaw-os/main/boot
 
 ## Demo
 
-<!-- 15-30s demo GIF: agent picks a task from kanban, executes it, writes to memory, ships it -->
 <p align="center">
   <img src="https://raw.githubusercontent.com/augmentedmike/miniclaw-os/main/assets/demo.gif" alt="MiniClaw OS Demo — agent picks task, executes, remembers, ships" width="720">
 </p>
 
 *An agent picks a task from its kanban board, executes it autonomously, writes learnings to long-term memory, and ships the result — all without human intervention.*
+
+<p align="center">
+  <img src="./assets/pixel-office.png" alt="MiniClaw Pixel Office — live agent workspace visualization" width="720">
+</p>
+
+*The Pixel Office — a retro-pixel visualization of your agent's live workspace, showing active tasks and real-time status.*
 
 <a id="install-demo"></a>
 
@@ -72,14 +77,15 @@ https://github.com/user-attachments/assets/937327da-40a8-423c-ab34-d3fe088099c9
 
 Every agent framework gives you **tool calling**. None of them give you a **brain**.
 
-| | LangChain | CrewAI | AutoGPT | **MiniClaw OS** |
-|---|---|---|---|---|
-| Memory across sessions | No | No | Partial | **Yes — hybrid vector + keyword** |
-| Autonomous task planning | No | Partial | Partial | **Yes — full kanban lifecycle** |
-| Self-repair | No | No | No | **Yes — agents file issues and PRs** |
-| Identity & personality | No | No | No | **Yes — persistent soul** |
-| Runs locally | Depends | Depends | Depends | **Yes — your Mac, your data** |
-| Nightly self-reflection | No | No | No | **Yes — learns from its own day** |
+| | LangChain | CrewAI | AutoGPT | Claude Code | Devin | SWE-Agent | **MiniClaw OS** |
+|---|---|---|---|---|---|---|---|
+| Memory across sessions | No | No | Partial | No | Partial | No | **Yes — hybrid vector + keyword** |
+| Autonomous task planning | No | Partial | Partial | No | Yes | Partial | **Yes — full kanban lifecycle** |
+| Self-repair | No | No | No | No | No | No | **Yes — agents file issues and PRs** |
+| Identity & personality | No | No | No | No | No | No | **Yes — persistent soul** |
+| Runs locally | Depends | Depends | Depends | Yes | No (cloud) | Yes | **Yes — your Mac, your data** |
+| Nightly self-reflection | No | No | No | No | No | No | **Yes — learns from its own day** |
+| Plugin ecosystem | Yes | Partial | Partial | No | No | No | **Yes — 41 modular plugins** |
 
 MiniClaw OS isn't another wrapper around an LLM. It's the **operating system** for agents that need to think, remember, and improve over time.
 
@@ -105,7 +111,7 @@ MiniClaw OS isn't another wrapper around an LLM. It's the **operating system** f
 
 ## The Plugin Brain
 
-40 plugins + 4 standalone tools. Each one is a cognitive region — modular, composable, replaceable.
+41 plugins + 4 standalone tools. Each one is a cognitive region — modular, composable, replaceable.
 
 ### Core Cognition
 
@@ -163,6 +169,7 @@ MiniClaw OS isn't another wrapper around an LLM. It's the **operating system** f
 | **[mc-calendar](./plugins/mc-calendar)** | Apple Calendar — create, update, delete, search events via EventKit |
 | **[mc-contribute](./docs/mc-contribute.md)** | Self-improvement — scaffold plugins, file bugs, submit PRs |
 | **[mc-oauth-guard](./plugins/mc-oauth-guard)** | OAuth guard — detects refresh failures, exponential backoff, auto-recovery |
+| **[mc-research](./plugins/mc-research)** | Competitive intelligence — Perplexity queries, web search, competitor tracking, reports |
 
 ### Commerce
 
@@ -189,7 +196,7 @@ MiniClaw OS isn't another wrapper around an LLM. It's the **operating system** f
 curl -fsSL https://raw.githubusercontent.com/augmentedmike/miniclaw-os/main/bootstrap.sh | bash
 ```
 
-That's it. Installs Homebrew, Node.js, the web dashboard, all plugins, and a LaunchAgent to keep it running. Your browser opens when ready.
+That's it. The **setup wizard** walks you through API key configuration, plugin selection, and identity setup — then installs Homebrew, Node.js, the web dashboard, all plugins, and a LaunchAgent to keep it running. Your browser opens when ready.
 
 ### Requirements
 
