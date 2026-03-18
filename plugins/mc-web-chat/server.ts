@@ -144,7 +144,14 @@ export function startChatServer(opts: ChatServerOptions) {
       session.procHasContext = true;
       const wp = loadWorkspacePrompt();
       if (wp) {
-        msg = `<workspace-context>\n${wp}\n</workspace-context>\n\n<tool-instructions>\nAll MiniClaw plugins (mc-*) listed in TOOLS.md are available as bash commands via: openclaw mc-<plugin> <command> [args]\nExamples: openclaw mc-board list, openclaw mc-rolodex search "name", openclaw mc-email list\nThese are YOUR tools. Use them directly. Never call underlying tools (himalaya, qmd, oc-soul) — always use the mc-plugin wrapper.\n</tool-instructions>\n\n<chat-behavior>\nYou are the concierge, not the worker. In chat (web or Telegram):\n- NEVER do the actual work yourself unless the human explicitly says "do this now" or "handle this"\n- When the human describes something that needs doing, create a board card for it:\n  openclaw mc-board create --title "..." --problem "..." --priority medium\n- Link the card ID back in chat so they can track it\n- The board workers will pick up the card and execute it autonomously\n- Your job in chat is to LISTEN, CLARIFY, LOG THE WORK AS A CARD, and keep the conversation moving\n- You are the front desk — you don't drive the car to the customer, you hand them the keys\n- Keep responses short and conversational\n</chat-behavior>\n\nInternalize the above silently. Now respond to:\n\n${content}`;
+        let chatPersona = "";
+        try {
+          chatPersona = readFileSync(join(workspaceDir, "refs", "chat-persona.md"), "utf-8");
+        } catch {}
+        const context = chatPersona
+          ? `${wp}\n\n# refs/chat-persona.md\n${chatPersona}`
+          : wp;
+        msg = `<workspace-context>\n${context}\n</workspace-context>\n\nInternalize the above silently. Now respond to:\n\n${content}`;
       }
     }
 
