@@ -533,26 +533,19 @@ export function renderOffice(
     }
   }
 
-  // Layer 3+4: Interleave furniture and characters by bottom-Y for correct depth
-  type Renderable = { sortY: number; kind: "furniture" | "character"; data: any };
-  const renderables: Renderable[] = [];
-
+  // Layer 3: All non-BACK furniture (rendered behind characters)
   for (const item of layout.furniture) {
     if (item.type.includes("BACK")) continue;
-    const info = getFurnitureInfo(item.type);
-    renderables.push({ sortY: (item.row + info.footprintH) * TILE_SIZE, kind: "furniture", data: item });
-  }
-  for (const ch of characters) {
-    renderables.push({ sortY: ch.y + TILE_SIZE, kind: "character", data: ch });
-  }
-  renderables.sort((a, b) => a.sortY - b.sortY || (a.kind === "character" ? 1 : 0) - (b.kind === "character" ? 1 : 0));
-
-  for (const r of renderables) {
-    if (r.kind === "furniture") drawFurnitureItem(r.data);
-    else renderCharacter(ctx, r.data, state);
+    drawFurnitureItem(item);
   }
 
-  // Layer 5: _BACK furniture only (drawn on top of everything)
+  // Layer 4: Characters (rendered on top of non-BACK furniture)
+  const sortedChars = [...characters].sort((a, b) => a.y - b.y);
+  for (const ch of sortedChars) {
+    renderCharacter(ctx, ch, state);
+  }
+
+  // Layer 5: BACK furniture only (occludes characters)
   for (const item of layout.furniture) {
     if (!item.type.includes("BACK")) continue;
     drawFurnitureItem(item);
