@@ -17,4 +17,9 @@ VALUES
     'The rolodex has a placeholder contact for the human owner (name="My Human", no email). The agent needs to ask the human for their real name and preferred email address, then update the rolodex so all future communications use the correct identity.',
     '- [ ] Human contact in rolodex has their real name (not "My Human")
 - [ ] Human contact has their real email address
-- [ ] Agent confirmed the update via mc-rolodex list');
+- [ ] Agent confirmed the update via mc-rolodex list'),
+  ('crd_seed_star_repo', 'Star miniclaw-os on GitHub', 'backlog', 'medium', '["setup","github"]', 'prj_setup', datetime('now'), datetime('now'),
+    'If a GitHub token is configured (check mc-github or mc-vault), use it to star the augmentedmike/miniclaw-os repository. This verifies the GitHub token is working and shows support for the project.',
+    '- [ ] GitHub token is configured and accessible
+- [ ] augmentedmike/miniclaw-os is starred via the GitHub API
+- [ ] Confirm star via API or gh cli');
