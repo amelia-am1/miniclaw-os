@@ -35,7 +35,7 @@ VAULT_BIN        = os.path.join(_STATE_DIR, "miniclaw", "system", "bin", "mc-vau
 SEND_ALERT       = os.path.join(_STATE_DIR, "miniclaw", "system", "bin", "send-alert")
 MC_BIN           = "/opt/homebrew/bin/openclaw"
 SETUP_STATE_FILE = os.path.join(_STATE_DIR, "USER", "setup-state.json")
-PROMPT_FILE      = os.path.join(_STATE_DIR, "cron", "prompts", "email-triage.md")
+PROMPT_FILE      = os.path.join(_STATE_DIR, "miniclaw", "cron", "prompts", "email-triage.md")
 MODEL            = "haiku"  # openclaw model alias for haiku
 MAX_BODY_CHARS   = 2000
 # OpenClaw local gateway — exposes OpenAI-compatible endpoint
@@ -479,7 +479,7 @@ def run_test_set(system_prompt: str, dry_run: bool = True) -> bool:
 
 
 # ── Main triage loop ──────────────────────────────────────────────────────
-def triage_inbox(password: str, system_prompt: str, limit: int = 20, dry_run: bool = False) -> None:
+def triage_inbox(password: str, system_prompt: str, limit: int = 20, dry_run: bool = False, skip_uids: set = None) -> None:
     cfg = _resolve_email_config()
     print(f"\n=== Email triage {'(DRY RUN) ' if dry_run else ''}===")
     print(f"Account: {cfg['email']} | IMAP: {cfg['imap_host']}:{cfg['imap_port']} | SMTP: {cfg['smtp_host']}:{cfg['smtp_port']}")
@@ -493,10 +493,17 @@ def triage_inbox(password: str, system_prompt: str, limit: int = 20, dry_run: bo
             f"Cannot determine SMTP host for {cfg['email']}. "
             "Set emailSmtpHost in setup-state.json."
         )
+    if skip_uids is None:
+        skip_uids = set()
     conn = imap_connect(password, cfg["email"], cfg["imap_host"], cfg["imap_port"])
     try:
         messages = list(fetch_unread(conn, limit=limit))
-        print(f"Fetched {len(messages)} unread messages")
+        if skip_uids:
+            before = len(messages)
+            messages = [(uid, msg) for uid, msg in messages if uid not in skip_uids]
+            print(f"Fetched {before} unread messages, skipped {before - len(messages)} already-processed")
+        else:
+            print(f"Fetched {len(messages)} unread messages")
 
         for uid, msg in messages:
             sender = decode_header_value(msg.get("From", ""))
@@ -573,6 +580,7 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="Classify but don't send/archive")
     parser.add_argument("--limit", type=int, default=20, help="Max unread messages to process")
     parser.add_argument("--test-set", action="store_true", help="Run classification test suite only")
+    parser.add_argument("--skip-uids", type=str, default="", help="Comma-separated UIDs to skip (already processed)")
     args = parser.parse_args()
 
     # Load system prompt
@@ -584,7 +592,8 @@ def main():
         sys.exit(0 if passed else 1)
 
     password = get_app_password()
-    triage_inbox(password, system_prompt, limit=args.limit, dry_run=args.dry_run)
+    skip_uids = set(args.skip_uids.split(",")) if args.skip_uids else set()
+    triage_inbox(password, system_prompt, limit=args.limit, dry_run=args.dry_run, skip_uids=skip_uids)
 
 
 if __name__ == "__main__":
